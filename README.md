@@ -92,7 +92,8 @@ src/
   lib/            firebase.ts (client SDK init)
   types/          firestore.ts (Firestore document types)
 public/
-  icons/          PWA icons (placeholder — swap before shipping)
+  icons/          PWA icons (placeholder SVGs — swap for real PNG/SVG icons
+                  before shipping; iOS's apple-touch-icon works best as PNG)
 ```
 
 ## Deploying
