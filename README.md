@@ -43,9 +43,9 @@ anything until you create your own Firebase project and add your keys to
 
 4. **Create a Firestore database.** Go to **Build → Firestore Database →
    Create database**. Start in **test mode** for local development (open
-   read/write for 30 days) — you'll want to lock this down with real
-   [security rules](https://firebase.google.com/docs/firestore/security/get-started)
-   before going to production. Pick a region close to your users.
+   read/write for 30 days), then deploy the starter rules in
+   `firestore.rules` (see below) before going to production. Pick a region
+   close to your users.
 
 5. **Copy the config into `.env.local`.** From **Project settings** (gear
    icon) **→ General → Your apps**, copy each value from the `firebaseConfig`
@@ -83,17 +83,56 @@ Types for every collection live in `src/types/firestore.ts`:
 
 `COLLECTIONS` in that same file holds the collection name constants.
 
+### Security rules
+
+`firestore.rules` has starter rules matching the schema above: every user can
+only read/write their own `users`/`streaks` docs and their own `check_ins`,
+`lessons` is read-only (seed it via the console or Admin SDK), and
+`accountability_links` is readable/updatable by either party in the pairing.
+Deploy it once you have the [Firebase CLI](https://firebase.google.com/docs/cli)
+installed and linked to your project:
+
+```bash
+firebase deploy --only firestore:rules
+```
+
+## Auth & streak logic
+
+- `src/lib/auth-context.tsx` — `AuthProvider`/`useAuth()`: email+password and
+  Google sign-in, wired up in `src/app/layout.tsx`. On first sign-in it calls
+  `ensureUserDoc` (`src/lib/db/users.ts`) to create the `users/{uid}` doc.
+- `src/app/login/page.tsx` — sign-in/sign-up form; the home page
+  (`src/app/page.tsx`) shows a "Sign in" prompt when logged out.
+- `src/lib/streak.ts` — `computeStreakUpdate`, the pure function deciding
+  the next streak state for a check-in: increments on a same-day no-op or a
+  consecutive day, bridges a single missed day with a streak freeze if one's
+  available, otherwise resets to 1.
+- `src/lib/db/streaks.ts` — `checkIn(uid, timeZone)` runs a Firestore
+  transaction that applies `computeStreakUpdate`, writes a `check_ins` doc,
+  and awards XP (`src/lib/xp.ts`) on the `users` doc, so a double-tap or two
+  devices checking in at once can't double-count.
+- "Today" is computed per-user via `dateKeyInTimeZone` (`src/lib/date.ts`)
+  using the `timezone` stored on their `users` doc (captured from the
+  browser at sign-in).
+- `isFirebaseConfigured` (`src/lib/firebase.ts`) is `false` until all six env
+  vars are set. The SDK throws synchronously on a missing/placeholder API
+  key, so `auth`/`db` are only initialized once it's `true` — the home and
+  login pages check it and show a setup notice instead of crashing.
+
 ## Project structure
 
 ```
 src/
   app/            App Router pages, layout, manifest.ts (PWA manifest route)
+                  login/ (sign-in/sign-up page)
   components/     UI components (StreakCard, ...)
-  lib/            firebase.ts (client SDK init)
+  lib/            firebase.ts (client SDK init), auth-context.tsx,
+                  streak.ts, xp.ts, date.ts (pure logic), db/ (Firestore reads/writes)
   types/          firestore.ts (Firestore document types)
 public/
   icons/          PWA icons (placeholder SVGs — swap for real PNG/SVG icons
                   before shipping; iOS's apple-touch-icon works best as PNG)
+firestore.rules   Security rules matching the schema above
 ```
 
 ## Deploying
