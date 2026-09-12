@@ -35,11 +35,19 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  // If Firebase isn't configured there's no auth state to wait for.
-  const [loading, setLoading] = useState(() => auth != null);
+  // Always starts `true`, on both server and client: `auth` is intentionally
+  // always `undefined` during SSR (see firebase.ts), so deriving the initial
+  // value from it here would render different output server- vs.
+  // client-side and break hydration. It only ever changes after mount.
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!auth) return;
+    if (!auth) {
+      // Nothing to subscribe to — there's no async auth state to wait for.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLoading(false);
+      return;
+    }
     return onAuthStateChanged(auth, async (nextUser) => {
       setUser(nextUser);
       setLoading(false);
