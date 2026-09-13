@@ -1,0 +1,43 @@
+<svg width="380" height="430" viewBox="0 0 380 430" xmlns="http://www.w3.org/2000/svg">
+<rect x="0" y="0" width="380" height="430" fill="#FFF9F2"/>
+<path d="M 190 320 Q 175 335 165 345" fill="none" stroke="#5C6B3E" stroke-width="3" stroke-linecap="round"/>
+<path d="M 190 320 Q 205 335 215 345" fill="none" stroke="#5C6B3E" stroke-width="3" stroke-linecap="round"/>
+<path d="M 190 320 Q 186 288 182 255 Q 182 225 183 195 Q 184 172 185 150 Q 186 131 187 112 Q 187.5 101 188 90" fill="none" stroke="#5C6B3E" stroke-width="6" stroke-linecap="round"/>
+<g transform="translate(182 255) rotate(-35)">
+<line x1="0" y1="0" x2="0" y2="-10" stroke="#5C6B3E" stroke-width="4"/>
+<path d="M0,-10 C28,-35 28,-85 0,-110 C-28,-85 -28,-35 0,-10 Z" fill="#8A9A5B"/>
+<line x1="0" y1="-15" x2="0" y2="-100" stroke="#5C6B3E" stroke-width="2"/>
+<line x1="0" y1="-25" x2="-15.4" y2="-55" stroke="#5C6B3E" stroke-width="1.5"/>
+<line x1="0" y1="-25" x2="15.4" y2="-55" stroke="#5C6B3E" stroke-width="1.5"/>
+</g>
+<g transform="translate(183 195) rotate(30)">
+<line x1="0" y1="0" x2="0" y2="-10" stroke="#5C6B3E" stroke-width="4"/>
+<path d="M0,-10 C30,-36.25 30,-88.75 0,-115 C-30,-88.75 -30,-36.25 0,-10 Z" fill="#8A9A5B"/>
+<line x1="0" y1="-15.25" x2="0" y2="-104.5" stroke="#5C6B3E" stroke-width="2"/>
+<line x1="0" y1="-25.75" x2="-16.5" y2="-57.25" stroke="#5C6B3E" stroke-width="1.5"/>
+<line x1="0" y1="-25.75" x2="16.5" y2="-57.25" stroke="#5C6B3E" stroke-width="1.5"/>
+</g>
+<g transform="translate(185 150) rotate(-20)">
+<line x1="0" y1="0" x2="0" y2="-8" stroke="#5C6B3E" stroke-width="3.2"/>
+<path d="M0,-8 C19,-25 19,-59 0,-76 C-19,-59 -19,-25 0,-8 Z" fill="#8A9A5B"/>
+<line x1="0" y1="-11.4" x2="0" y2="-69.2" stroke="#5C6B3E" stroke-width="1.6"/>
+<line x1="0" y1="-18.2" x2="-10.45" y2="-39" stroke="#5C6B3E" stroke-width="1.2"/>
+<line x1="0" y1="-18.2" x2="10.45" y2="-39" stroke="#5C6B3E" stroke-width="1.2"/>
+</g>
+<g transform="translate(187 112) rotate(18)">
+<line x1="0" y1="0" x2="0" y2="-8" stroke="#5C6B3E" stroke-width="3.2"/>
+<path d="M0,-8 C20,-25.5 20,-60.5 0,-78 C-20,-60.5 -20,-25.5 0,-8 Z" fill="#8A9A5B"/>
+<line x1="0" y1="-11.5" x2="0" y2="-71" stroke="#5C6B3E" stroke-width="1.6"/>
+<line x1="0" y1="-18.5" x2="-11" y2="-39.5" stroke="#5C6B3E" stroke-width="1.2"/>
+<line x1="0" y1="-18.5" x2="11" y2="-39.5" stroke="#5C6B3E" stroke-width="1.2"/>
+</g>
+<g transform="translate(188 90)">
+<line x1="0" y1="0" x2="0" y2="-6" stroke="#5C6B3E" stroke-width="2.8"/>
+<path d="M0,-6 C13,-17.25 13,-39.75 0,-51 C-13,-39.75 -13,-17.25 0,-6 Z" fill="#8A9A5B"/>
+<line x1="0" y1="-8.25" x2="0" y2="-45.9" stroke="#5C6B3E" stroke-width="1.2"/>
+<line x1="0" y1="-12.75" x2="-7.15" y2="-26.25" stroke="#5C6B3E" stroke-width="1"/>
+<line x1="0" y1="-12.75" x2="7.15" y2="-26.25" stroke="#5C6B3E" stroke-width="1"/>
+</g>
+<text x="190" y="378" text-anchor="middle" font-family="serif" font-size="34" font-weight="500" fill="#3A3532">Davar</text>
+<text x="190" y="404" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#8A9A5B">a daily walk in the word</text>
+</svg>

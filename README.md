@@ -22,6 +22,19 @@ it's active in `npm run build && npm run start`.
 > `@ducanh2912/next-pwa` generates the service worker via a Workbox webpack
 > plugin, which Turbopack doesn't run.
 
+### Logo & app icons
+
+`public/logo.svg` is the full lockup (plant mark + "Davar" wordmark +
+tagline) used in the landing page hero. The PWA/favicon icons in
+`public/icons/` are cropped to just the mark — a full lockup's text is
+illegible at 192px, let alone favicon sizes — with a bit more padding on
+the maskable variant so Android's icon mask doesn't cut into it. Both the
+mark and the full lockup carry their own opaque background, so they render
+correctly regardless of what's behind them (a dark surface included). If
+the logo changes, regenerate the PNGs by re-cropping `logo.svg` to the mark
+only and rendering it at 192×192, 512×512 (plus a more-padded 512×512 for
+`purpose: "maskable"`), and 180×180 for `apple-touch-icon.png`.
+
 ## Firebase setup
 
 The app ships with **placeholder** Firebase config — it won't connect to
@@ -171,8 +184,10 @@ src/
                   streak.ts, xp.ts, date.ts (pure logic), db/ (Firestore reads/writes)
   types/          firestore.ts (Firestore document types)
 public/
-  icons/          PWA icons (placeholder SVGs — swap for real PNG/SVG icons
-                  before shipping; iOS's apple-touch-icon works best as PNG)
+  logo.svg        Full logo lockup (mark + wordmark + tagline), used in the
+                  landing page hero
+  icons/          PNG app icons (192/512/maskable-512/apple-touch), cropped
+                  to just the mark from logo.svg — see below
 firestore.rules   Security rules matching the schema above
 scripts/          seed-lessons.mjs + lessons-data.mjs (Admin SDK lesson seeding),
                   rules-test.mjs (firestore.rules tests, npm run test:rules)

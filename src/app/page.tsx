@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { AuthForm } from "@/components/AuthForm";
 import { BenefitCard } from "@/components/BenefitCard";
@@ -131,9 +132,14 @@ function LandingPage() {
   return (
     <main className="flex-1 bg-ivory">
       <section className="flex flex-col items-center text-center gap-5 px-6 pt-24 pb-20 sm:pt-32 sm:pb-28">
-        <span className="text-sm font-medium tracking-[0.2em] uppercase text-clay-600">
-          Davar
-        </span>
+        <Image
+          src="/logo.svg"
+          alt="Davar"
+          width={380}
+          height={430}
+          priority
+          className="w-40 sm:w-48 h-auto"
+        />
         <h1 className="text-3xl sm:text-4xl font-semibold text-ink max-w-md">
           A daily rhythm of Scripture, prayer, and grace.
         </h1>
