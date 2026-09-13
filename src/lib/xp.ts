@@ -1,5 +1,5 @@
 export const CHECK_IN_XP = 10;
-const XP_PER_LEVEL = 100;
+export const XP_PER_LEVEL = 100;
 
 export function levelFromXp(xp: number): number {
   return Math.floor(xp / XP_PER_LEVEL) + 1;

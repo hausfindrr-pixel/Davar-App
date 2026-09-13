@@ -8,8 +8,8 @@ export default function manifest(): MetadataRoute.Manifest {
       "A daily discipleship app: gamified scripture engagement with streaks, XP, and lightweight accountability.",
     start_url: "/",
     display: "standalone",
-    background_color: "#0f0f23",
-    theme_color: "#4f46e5",
+    background_color: "#faf7f2",
+    theme_color: "#b9794a",
     orientation: "portrait",
     icons: [
       {

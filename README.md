@@ -142,7 +142,8 @@ rather than duplicating).
 src/
   app/            App Router pages, layout, manifest.ts (PWA manifest route)
                   login/ (sign-in/sign-up page)
-  components/     UI components (StreakCard, ...)
+  components/     UI components (StreakVisual, PlantIcon, LessonPreviewCard,
+                  BenefitCard, AuthForm)
   lib/            firebase.ts (client SDK init), auth-context.tsx,
                   streak.ts, xp.ts, date.ts (pure logic), db/ (Firestore reads/writes)
   types/          firestore.ts (Firestore document types)
