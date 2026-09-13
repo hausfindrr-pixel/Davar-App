@@ -2,9 +2,12 @@
 
 import { useState } from "react";
 
-const MONTHLY_PRICE = 12.99;
-const YEARLY_PRICE = 129.99;
-const YEARLY_SAVINGS_LABEL = "Save 17%";
+const MONTHLY_PRICE = 6.99;
+const YEARLY_PRICE = 59.99;
+const YEARLY_SAVINGS_AMOUNT = MONTHLY_PRICE * 12 - YEARLY_PRICE;
+const YEARLY_SAVINGS_PERCENT = Math.round(
+  (YEARLY_SAVINGS_AMOUNT / (MONTHLY_PRICE * 12)) * 100,
+);
 
 const FEATURES = [
   "Full gamified lesson library",
@@ -46,7 +49,7 @@ export function PricingSection() {
         >
           Yearly
           <span className="absolute -top-2.5 -right-2.5 rounded-full bg-sage-600 px-2 py-0.5 text-[10px] font-semibold text-paper">
-            {YEARLY_SAVINGS_LABEL}
+            Save {YEARLY_SAVINGS_PERCENT}%
           </span>
         </button>
       </div>
@@ -63,7 +66,7 @@ export function PricingSection() {
           </div>
           {isYearly && (
             <span className="text-xs font-medium text-sage-700">
-              2 months free compared to paying monthly
+              Save ${YEARLY_SAVINGS_AMOUNT.toFixed(2)} a year compared to paying monthly
             </span>
           )}
         </div>
