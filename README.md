@@ -75,10 +75,11 @@ The client SDK is initialized in `src/lib/firebase.ts`, exporting `auth` and
 
 Types for every collection live in `src/types/firestore.ts`:
 
-- **`users/{uid}`** — profile, XP, level
+- **`users/{uid}`** — profile, XP, level, `tier` (`"free"` | `"premium"`)
 - **`streaks/{uid}`** — current/longest streak count, last check-in date, streak freezes
 - **`lessons/{lessonId}`** — scripture/prayer/devotional content items
 - **`check_ins/{checkInId}`** — a completed lesson, prayer, reading, etc. for a given day
+- **`daily_lesson_progress/{uid}_{date}`** — which lessons a user completed on a given day; the server-side source of truth for the free-tier daily lesson cap
 - **`accountability_links/{linkId}`** — a pending/active/ended pairing between two users
 
 `COLLECTIONS` in that same file holds the collection name constants.
@@ -95,6 +96,28 @@ installed and linked to your project:
 ```bash
 firebase deploy --only firestore:rules
 ```
+
+### Free tier & the daily lesson cap
+
+Free-tier users are capped at `FREE_DAILY_LESSON_LIMIT` (3, in
+`src/types/firestore.ts`) lesson completions per day. This is enforced in
+`firestore.rules`, not just in the UI: `completeLesson()`
+(`src/lib/db/lessons.ts`) checks the limit client-side for a clean result,
+but the actual gate is the `daily_lesson_progress` update rule — growing
+`completedLessonIds` past the limit for a non-`"premium"` user rejects the
+whole transaction (the XP award and check-in write included), so it can't
+be bypassed by refreshing the page or calling Firestore directly. `tier`
+itself is locked: the `users` rule only lets it be created as `"free"` and
+never lets a client change it afterward — there's no billing integration
+yet, so nothing can currently grant `"premium"` except a direct Admin SDK
+write.
+
+Run `npm run test:rules` to check `firestore.rules` against a local
+Firestore emulator (`scripts/rules-test.mjs`, using
+`@firebase/rules-unit-testing`) — no network access to the real project or
+a service account needed. It covers the tier lock, the lesson cap itself
+(3rd allowed, 4th denied for free, allowed for premium), and cross-user
+isolation. Re-run it after touching `firestore.rules`.
 
 ### Seeding lessons
 
@@ -142,8 +165,8 @@ rather than duplicating).
 src/
   app/            App Router pages, layout, manifest.ts (PWA manifest route)
                   login/ (sign-in/sign-up page)
-  components/     UI components (StreakVisual, PlantIcon, LessonPreviewCard,
-                  BenefitCard, AuthForm)
+  components/     UI components (StreakVisual, PlantIcon, LessonsSection,
+                  BenefitCard, PricingSection, AuthForm)
   lib/            firebase.ts (client SDK init), auth-context.tsx,
                   streak.ts, xp.ts, date.ts (pure logic), db/ (Firestore reads/writes)
   types/          firestore.ts (Firestore document types)
@@ -151,7 +174,8 @@ public/
   icons/          PWA icons (placeholder SVGs — swap for real PNG/SVG icons
                   before shipping; iOS's apple-touch-icon works best as PNG)
 firestore.rules   Security rules matching the schema above
-scripts/          seed-lessons.mjs + lessons-data.mjs (Admin SDK lesson seeding)
+scripts/          seed-lessons.mjs + lessons-data.mjs (Admin SDK lesson seeding),
+                  rules-test.mjs (firestore.rules tests, npm run test:rules)
 ```
 
 ## Deploying

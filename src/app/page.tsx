@@ -3,15 +3,20 @@
 import { useEffect, useState } from "react";
 import { AuthForm } from "@/components/AuthForm";
 import { BenefitCard } from "@/components/BenefitCard";
-import { LessonPreviewCard } from "@/components/LessonPreviewCard";
+import { LessonsSection } from "@/components/LessonsSection";
 import { PricingSection } from "@/components/PricingSection";
 import { StreakVisual } from "@/components/StreakVisual";
 import { useAuth } from "@/lib/auth-context";
-import { fetchLessons } from "@/lib/db/lessons";
+import { completeLesson, fetchLessons, subscribeToLessonProgress } from "@/lib/db/lessons";
 import { checkIn, subscribeToStreak } from "@/lib/db/streaks";
 import { subscribeToUser } from "@/lib/db/users";
 import { dateKeyInTimeZone } from "@/lib/date";
-import type { LessonDoc, StreakDoc, UserDoc } from "@/types/firestore";
+import type {
+  DailyLessonProgressDoc,
+  LessonDoc,
+  StreakDoc,
+  UserDoc,
+} from "@/types/firestore";
 
 const PAIN_POINTS = [
   {
@@ -183,8 +188,12 @@ function Dashboard({ uid }: { uid: string }) {
   const [streak, setStreak] = useState<StreakDoc | null>(null);
   const [profile, setProfile] = useState<UserDoc | null>(null);
   const [lessons, setLessons] = useState<LessonDoc[]>([]);
+  const [lessonProgress, setLessonProgress] = useState<DailyLessonProgressDoc | null>(null);
   const [checkingIn, setCheckingIn] = useState(false);
   const { signOut } = useAuth();
+
+  const timeZone = profile?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const today = dateKeyInTimeZone(new Date(), timeZone);
 
   useEffect(() => {
     const unsubStreak = subscribeToStreak(uid, setStreak);
@@ -198,13 +207,11 @@ function Dashboard({ uid }: { uid: string }) {
     };
   }, [uid]);
 
-  const timeZone = profile?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const today = dateKeyInTimeZone(new Date(), timeZone);
+  useEffect(() => {
+    return subscribeToLessonProgress(uid, today, setLessonProgress);
+  }, [uid, today]);
+
   const checkedInToday = streak?.lastCheckInDate === today;
-  const todaysLesson =
-    lessons.length > 0
-      ? lessons[(streak?.currentCount ?? 0) % lessons.length]
-      : null;
 
   async function handleCheckIn() {
     setCheckingIn(true);
@@ -213,6 +220,10 @@ function Dashboard({ uid }: { uid: string }) {
     } finally {
       setCheckingIn(false);
     }
+  }
+
+  async function handleCompleteLesson(lesson: LessonDoc) {
+    await completeLesson(uid, timeZone, lesson);
   }
 
   return (
@@ -230,7 +241,12 @@ function Dashboard({ uid }: { uid: string }) {
         checkingIn={checkingIn}
         onCheckIn={handleCheckIn}
       />
-      <LessonPreviewCard lesson={todaysLesson} />
+      <LessonsSection
+        lessons={lessons}
+        completedLessonIds={lessonProgress?.completedLessonIds ?? []}
+        isPremium={profile?.tier === "premium"}
+        onComplete={handleCompleteLesson}
+      />
       <button
         type="button"
         onClick={() => void signOut()}

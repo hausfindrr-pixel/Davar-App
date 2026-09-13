@@ -11,8 +11,16 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
-      allow read, update: if isOwner(uid);
-      allow create: if isOwner(uid) && request.resource.data.uid == uid;
+      allow read: if isOwner(uid);
+      // `tier` can only ever be set to "free" by the client, and can never
+      // change once created — there's no billing integration, so nothing
+      // client-side should ever be able to grant itself "premium". Only an
+      // Admin SDK write (which bypasses these rules) can change it.
+      allow create: if isOwner(uid) &&
+        request.resource.data.uid == uid &&
+        request.resource.data.tier == "free";
+      allow update: if isOwner(uid) &&
+        request.resource.data.tier == resource.data.tier;
       allow delete: if false;
     }
 
@@ -29,6 +37,43 @@ service cloud.firestore {
     match /lessons/{lessonId} {
       allow read: if isSignedIn();
       allow write: if false; // managed via the console or the Admin SDK
+    }
+
+    // Free-tier daily lesson cap. docId is "{uid}_{date}" — one doc per
+    // user per day, so a new day naturally starts a fresh count. The real
+    // enforcement is here, not in the client: completeLesson() (see
+    // src/lib/db/lessons.ts) checks the limit client-side too for a clean
+    // UX, but if that check were bypassed, growing completedLessonIds past
+    // FREE_DAILY_LESSON_LIMIT (3) below rejects the whole transaction for
+    // a non-premium user — including the XP award and check-in write that
+    // ride along with it in the same transaction.
+    //
+    // Known limitation: `date` is client-supplied, same as lastCheckInDate
+    // on streaks/{uid} — a client forging an arbitrary date could start a
+    // fresh counter early. This stops casual bypass (refreshing the page,
+    // clearing local state) but not a client deliberately forging writes;
+    // closing that fully needs server-trusted time (e.g. a Cloud Function).
+    match /daily_lesson_progress/{docId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+
+      allow create: if isSignedIn() &&
+        request.resource.data.userId == request.auth.uid &&
+        docId == request.auth.uid + '_' + request.resource.data.date &&
+        request.resource.data.completedLessonIds.size() == 1;
+
+      allow update: if isSignedIn() &&
+        resource.data.userId == request.auth.uid &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.date == resource.data.date &&
+        request.resource.data.completedLessonIds.size() ==
+          resource.data.completedLessonIds.size() + 1 &&
+        request.resource.data.completedLessonIds.hasAll(resource.data.completedLessonIds) &&
+        (
+          resource.data.completedLessonIds.size() < 3 ||
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.tier == "premium"
+        );
+
+      allow delete: if false;
     }
 
     match /accountability_links/{linkId} {
