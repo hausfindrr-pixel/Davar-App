@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { PlanId } from "@/lib/plisio/plans";
 import { FREE_DAILY_LESSON_LIMIT, type LessonDoc } from "@/types/firestore";
 
 type LessonsSectionProps = {
@@ -8,6 +9,7 @@ type LessonsSectionProps = {
   completedLessonIds: string[];
   isPremium: boolean;
   onComplete: (lesson: LessonDoc) => Promise<void>;
+  onUpgrade: (plan: PlanId) => Promise<void>;
 };
 
 const TRACK_LABEL: Record<LessonDoc["track"], string> = {
@@ -21,8 +23,11 @@ export function LessonsSection({
   completedLessonIds,
   isPremium,
   onComplete,
+  onUpgrade,
 }: LessonsSectionProps) {
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [upgradingPlan, setUpgradingPlan] = useState<PlanId | null>(null);
+  const [upgradeError, setUpgradeError] = useState<string | null>(null);
   const completedCount = completedLessonIds.length;
   const atLimit = !isPremium && completedCount >= FREE_DAILY_LESSON_LIMIT;
 
@@ -32,6 +37,17 @@ export function LessonsSection({
       await onComplete(lesson);
     } finally {
       setPendingId(null);
+    }
+  }
+
+  async function handleUpgrade(plan: PlanId) {
+    setUpgradeError(null);
+    setUpgradingPlan(plan);
+    try {
+      await onUpgrade(plan);
+    } catch (err) {
+      setUpgradeError(err instanceof Error ? err.message : "Something went wrong.");
+      setUpgradingPlan(null);
     }
   }
 
@@ -107,13 +123,34 @@ export function LessonsSection({
       </div>
 
       {atLimit && (
-        <div className="rounded-2xl bg-clay-50 border border-clay-200 p-4 text-center">
-          <p className="text-sm text-ink">
-            You&apos;ve used all {FREE_DAILY_LESSON_LIMIT} free lessons today.
-          </p>
-          <p className="text-xs text-stone mt-1">
-            Come back tomorrow, or upgrade to Premium for unlimited daily lessons.
-          </p>
+        <div className="rounded-2xl bg-clay-50 border border-clay-200 p-4 flex flex-col items-center gap-3 text-center">
+          <div>
+            <p className="text-sm text-ink">
+              You&apos;ve used all {FREE_DAILY_LESSON_LIMIT} free lessons today.
+            </p>
+            <p className="text-xs text-stone mt-1">
+              Come back tomorrow, or upgrade to Premium for unlimited daily lessons.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={upgradingPlan !== null}
+              onClick={() => void handleUpgrade("monthly")}
+              className="rounded-full bg-clay-600 text-paper px-4 py-1.5 text-xs font-medium hover:bg-clay-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+            >
+              {upgradingPlan === "monthly" ? "Redirecting…" : "Monthly $6.99"}
+            </button>
+            <button
+              type="button"
+              disabled={upgradingPlan !== null}
+              onClick={() => void handleUpgrade("yearly")}
+              className="rounded-full border border-clay-400 text-clay-700 px-4 py-1.5 text-xs font-medium hover:bg-clay-100/50 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+            >
+              {upgradingPlan === "yearly" ? "Redirecting…" : "Yearly $59.99"}
+            </button>
+          </div>
+          {upgradeError && <p className="text-xs text-clay-700">{upgradeError}</p>}
         </div>
       )}
     </section>

@@ -27,12 +27,19 @@ export interface UserDoc {
   timezone: string | null;
   /**
    * Set to "free" on creation and never changed by the client — see the
-   * `users` update rule in firestore.rules. There's no billing integration
-   * yet, so nothing currently grants "premium"; the field exists so the
-   * free-tier lesson cap (daily_lesson_progress) has something real to key
-   * off once one does.
+   * `users` update rule in firestore.rules. Only the Plisio webhook (via
+   * the Admin SDK, which bypasses these rules) sets this to "premium".
    */
   tier: UserTier;
+  /**
+   * When a "premium" grant expires — set by the Plisio webhook alongside
+   * `tier`, locked from client writes the same way. Crypto payments via
+   * Plisio are one-time, not an auto-renewing subscription like Stripe, so
+   * this is the record of how long a given payment's access lasts. Nothing
+   * currently reads this to auto-downgrade back to "free" once it passes —
+   * that's not built yet.
+   */
+  premiumUntil: Timestamp | null;
 }
 
 /** streaks/{uid} — one streak-state document per user. */

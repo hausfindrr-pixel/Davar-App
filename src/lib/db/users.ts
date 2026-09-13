@@ -22,6 +22,7 @@ export async function ensureUserDoc(user: User): Promise<void> {
     level: 1,
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     tier: "free",
+    premiumUntil: null,
     createdAt: serverTimestamp(),
   });
 }

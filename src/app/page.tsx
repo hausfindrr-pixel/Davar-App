@@ -12,6 +12,8 @@ import { completeLesson, fetchLessons, subscribeToLessonProgress } from "@/lib/d
 import { checkIn, subscribeToStreak } from "@/lib/db/streaks";
 import { subscribeToUser } from "@/lib/db/users";
 import { dateKeyInTimeZone } from "@/lib/date";
+import { startCheckout } from "@/lib/plisio/checkout";
+import type { PlanId } from "@/lib/plisio/plans";
 import type {
   DailyLessonProgressDoc,
   LessonDoc,
@@ -196,7 +198,7 @@ function Dashboard({ uid }: { uid: string }) {
   const [lessons, setLessons] = useState<LessonDoc[]>([]);
   const [lessonProgress, setLessonProgress] = useState<DailyLessonProgressDoc | null>(null);
   const [checkingIn, setCheckingIn] = useState(false);
-  const { signOut } = useAuth();
+  const { user, signOut } = useAuth();
 
   const timeZone = profile?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
   const today = dateKeyInTimeZone(new Date(), timeZone);
@@ -232,6 +234,12 @@ function Dashboard({ uid }: { uid: string }) {
     await completeLesson(uid, timeZone, lesson);
   }
 
+  async function handleUpgrade(plan: PlanId) {
+    if (!user) return;
+    const idToken = await user.getIdToken();
+    await startCheckout(plan, idToken);
+  }
+
   return (
     <main className="flex-1 flex flex-col items-center gap-6 p-8 bg-ivory">
       <div className="flex flex-col items-center gap-1 text-center pt-4">
@@ -252,6 +260,7 @@ function Dashboard({ uid }: { uid: string }) {
         completedLessonIds={lessonProgress?.completedLessonIds ?? []}
         isPremium={profile?.tier === "premium"}
         onComplete={handleCompleteLesson}
+        onUpgrade={handleUpgrade}
       />
       <button
         type="button"

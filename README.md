@@ -149,6 +149,77 @@ file and re-run the script to add more — each lesson's `id` is also its
 Firestore document ID, so re-running is idempotent (it overwrites by ID
 rather than duplicating).
 
+## Payments (Plisio)
+
+Premium ($6.99/mo or $59.99/yr) is sold via [Plisio](https://plisio.net), a
+crypto payment gateway — no card processor involved.
+
+### Routes
+
+- `POST /api/plisio/create-invoice` (`src/app/api/plisio/create-invoice/route.ts`)
+  — called by the signed-in client (`src/lib/plisio/checkout.ts`) with a
+  Firebase ID token and `{ plan: "monthly" | "yearly" }`. Verifies the token
+  server-side, asks Plisio for a hosted invoice, and returns its URL for the
+  browser to redirect to.
+- `POST /api/plisio/webhook` (`src/app/api/plisio/webhook/route.ts`) — Plisio's
+  server calls this once a payment completes. It verifies Plisio's HMAC
+  signature (`src/lib/plisio/verify.ts`) and, if valid and `status ===
+  "completed"`, writes `tier: "premium"` and a `premiumUntil` expiry on the
+  user's Firestore doc via the Admin SDK (bypassing `firestore.rules`, which
+  is exactly why only this server-side path can grant premium — see the
+  `users` rule above).
+- `/premium/success` and `/premium/failed` — plain pages Plisio redirects the
+  browser to after checkout, independent of the webhook (the webhook is what
+  actually grants premium; these pages are just user-facing confirmation).
+
+### Environment variables
+
+| Variable | Used by | Notes |
+| --- | --- | --- |
+| `PLISIO_SECRET_KEY` | create-invoice, webhook | Plisio dashboard → API keys. Server-only — never prefixed `NEXT_PUBLIC_`, never sent to the browser. |
+| `FIREBASE_PROJECT_ID` | webhook (Admin SDK) | From a Firebase service account — see below. |
+| `FIREBASE_CLIENT_EMAIL` | webhook (Admin SDK) | Same service account. |
+| `FIREBASE_PRIVATE_KEY` | webhook (Admin SDK) | Same service account; keep the `\n`s in the value as-is, `src/lib/firebase-admin.ts` un-escapes them. |
+
+Generate the Admin SDK credential at Firebase console → **Project settings →
+Service accounts → Generate new private key**, and copy `project_id`,
+`client_email`, and `private_key` from the downloaded JSON into the three
+`FIREBASE_*` variables above — this is separate from `serviceAccountKey.json`
+(used only locally by `npm run seed:lessons`); the webhook reads these three
+env vars at runtime instead of a file. Add all four variables (this repo's
+`PLISIO_SECRET_KEY` plus the three `FIREBASE_*` ones) to Vercel under
+**Project Settings → Environment Variables** before payments will work in
+production.
+
+### Paste these into Plisio's dashboard
+
+Once deployed, give Plisio your production domain with these paths
+(`https://<your-domain>` + the path), matching what `create-invoice`
+already sends as `callback_url`/`success_invoice_url`/`fail_invoice_url`:
+
+- Webhook / callback URL: `/api/plisio/webhook`
+- Success URL: `/premium/success`
+- Failed URL: `/premium/failed`
+
+### Known limitations
+
+- **Webhook signature verification is untested against a live Plisio
+  callback.** `src/lib/plisio/verify.ts` reimplements Plisio's PHP-serialize
+  + HMAC-SHA1 scheme from Plisio's own PHP SDK and several independent
+  third-party implementations, with a dedicated regression test
+  (`npm run test:plisio`, `scripts/plisio-verify.test.mjs`) against
+  hand-computed HMAC vectors — but Plisio only sends real callbacks from an
+  IP-allowlisted production server, so this has not been exercised against
+  an actual Plisio payment yet. Watch the webhook's logs closely on your
+  first real transaction.
+- **No expiry enforcement.** `premiumUntil` is stored on the user doc when a
+  payment completes, but nothing currently checks it or downgrades a user
+  back to `"free"` once it passes — the data model is ready for that, but
+  the enforcement (e.g. a scheduled Cloud Function) doesn't exist yet.
+- **No subscription/recurring billing.** Each payment is a one-time crypto
+  invoice; there's no automatic renewal — a user re-runs checkout manually
+  when their `premiumUntil` is approaching.
+
 ## Auth & streak logic
 
 - `src/lib/auth-context.tsx` — `AuthProvider`/`useAuth()`: email+password and
@@ -178,10 +249,14 @@ rather than duplicating).
 src/
   app/            App Router pages, layout, manifest.ts (PWA manifest route)
                   login/ (sign-in/sign-up page)
+                  premium/success, premium/failed (post-checkout pages)
+                  api/plisio/create-invoice, api/plisio/webhook (route handlers)
   components/     UI components (StreakVisual, PlantIcon, LessonsSection,
                   BenefitCard, PricingSection, AuthForm)
-  lib/            firebase.ts (client SDK init), auth-context.tsx,
-                  streak.ts, xp.ts, date.ts (pure logic), db/ (Firestore reads/writes)
+  lib/            firebase.ts (client SDK init), firebase-admin.ts (server-only
+                  Admin SDK init), auth-context.tsx, streak.ts, xp.ts, date.ts
+                  (pure logic), db/ (Firestore reads/writes),
+                  plisio/ (plans.ts, checkout.ts, verify.ts — see "Payments" below)
   types/          firestore.ts (Firestore document types)
 public/
   logo.svg        Full logo lockup (mark + wordmark + tagline), used in the
@@ -190,7 +265,8 @@ public/
                   to just the mark from logo.svg — see below
 firestore.rules   Security rules matching the schema above
 scripts/          seed-lessons.mjs + lessons-data.mjs (Admin SDK lesson seeding),
-                  rules-test.mjs (firestore.rules tests, npm run test:rules)
+                  rules-test.mjs (firestore.rules tests, npm run test:rules),
+                  plisio-verify.test.mjs (webhook signature tests, npm run test:plisio)
 ```
 
 ## Deploying

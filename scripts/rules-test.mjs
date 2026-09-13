@@ -53,6 +53,7 @@ async function seedUser(uid, tier) {
       level: 1,
       timezone: "UTC",
       tier,
+      premiumUntil: null,
     });
   });
 }
@@ -65,7 +66,7 @@ const bobDb = testEnv.authenticatedContext(BOB).firestore();
 const anonDb = testEnv.unauthenticatedContext().firestore();
 const eveDb = testEnv.authenticatedContext("eve-uid").firestore();
 
-// --- users/{uid} tier lock ---
+// --- users/{uid} tier + premiumUntil lock ---
 await check("a brand-new user cannot self-create with tier=premium", async () => {
   await assertFails(
     setDoc(doc(eveDb, "users", "eve-uid"), {
@@ -77,11 +78,28 @@ await check("a brand-new user cannot self-create with tier=premium", async () =>
       level: 1,
       timezone: null,
       tier: "premium",
+      premiumUntil: null,
     }),
   );
 });
 
-await check("a brand-new user CAN self-create with tier=free", async () => {
+await check("a brand-new user cannot self-create with a non-null premiumUntil", async () => {
+  await assertFails(
+    setDoc(doc(eveDb, "users", "eve-uid"), {
+      uid: "eve-uid",
+      email: null,
+      displayName: null,
+      photoURL: null,
+      xp: 0,
+      level: 1,
+      timezone: null,
+      tier: "free",
+      premiumUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+    }),
+  );
+});
+
+await check("a brand-new user CAN self-create with tier=free, premiumUntil=null", async () => {
   await assertSucceeds(
     setDoc(doc(eveDb, "users", "eve-uid"), {
       uid: "eve-uid",
@@ -92,12 +110,21 @@ await check("a brand-new user CAN self-create with tier=free", async () => {
       level: 1,
       timezone: null,
       tier: "free",
+      premiumUntil: null,
     }),
   );
 });
 
 await check("alice cannot upgrade her own tier to premium via update", async () => {
   await assertFails(updateDoc(doc(aliceDb, "users", ALICE), { tier: "premium" }));
+});
+
+await check("alice cannot grant herself a premiumUntil date via update", async () => {
+  await assertFails(
+    updateDoc(doc(aliceDb, "users", ALICE), {
+      premiumUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+    }),
+  );
 });
 
 await check("alice CAN update other fields on her own user doc (e.g. displayName)", async () => {
