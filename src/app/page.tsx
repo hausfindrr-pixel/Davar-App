@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { AuthForm } from "@/components/AuthForm";
 import { BenefitCard } from "@/components/BenefitCard";
 import { LessonPreviewCard } from "@/components/LessonPreviewCard";
+import { PricingSection } from "@/components/PricingSection";
 import { StreakVisual } from "@/components/StreakVisual";
 import { useAuth } from "@/lib/auth-context";
 import { fetchLessons } from "@/lib/db/lessons";
@@ -11,6 +12,24 @@ import { checkIn, subscribeToStreak } from "@/lib/db/streaks";
 import { subscribeToUser } from "@/lib/db/users";
 import { dateKeyInTimeZone } from "@/lib/date";
 import type { LessonDoc, StreakDoc, UserDoc } from "@/types/firestore";
+
+const PAIN_POINTS = [
+  {
+    struggle: "Stuck in a cycle you can't seem to break",
+    response:
+      "Davar meets you with grace, not shame — daily accountability built to move you forward, not keep score of your failures.",
+  },
+  {
+    struggle: "Wanting to grow spiritually, but not knowing where to start",
+    response:
+      "A simple daily rhythm of Scripture and prayer gives you one clear next step, every single day.",
+  },
+  {
+    struggle: "Accountability that feels like judgment, not support",
+    response:
+      "A partner and a community built for honesty and encouragement — never judgment.",
+  },
+];
 
 const BENEFITS = [
   {
@@ -78,6 +97,29 @@ const BENEFITS = [
       </svg>
     ),
   },
+  {
+    title: "The Armory",
+    description:
+      "“The sword of the Spirit, which is the word of God” (Ephesians 6:17) — Davar means “Word.” The Armory groups verses by the specific struggle they target: lust, envy, anger, fear, and more.",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
+        <path
+          d="M12 3v11M12 14l-3 3M12 14l3 3"
+          stroke="currentColor"
+          strokeWidth="1.7"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M8.5 19.5h7"
+          stroke="currentColor"
+          strokeWidth="1.7"
+          strokeLinecap="round"
+        />
+        <circle cx="12" cy="3" r="1.1" fill="currentColor" />
+      </svg>
+    ),
+  },
 ];
 
 function LandingPage() {
@@ -98,13 +140,26 @@ function LandingPage() {
         </a>
       </section>
 
+      <section className="px-6 pb-20">
+        <div className="mx-auto max-w-3xl flex flex-col gap-10">
+          {PAIN_POINTS.map((point) => (
+            <div key={point.struggle} className="flex flex-col gap-2 text-center">
+              <p className="text-base text-stone italic">{point.struggle}</p>
+              <p className="text-base text-ink font-medium">{point.response}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
       <section className="px-6 pb-24">
-        <div className="mx-auto max-w-5xl grid gap-5 sm:grid-cols-2">
+        <div className="mx-auto max-w-5xl grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {BENEFITS.map((benefit) => (
             <BenefitCard key={benefit.title} {...benefit} />
           ))}
         </div>
       </section>
+
+      <PricingSection />
 
       <section
         id="join"
