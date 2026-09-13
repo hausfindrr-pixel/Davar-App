@@ -37,6 +37,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# Firebase Admin service account key (see scripts/seed-lessons.mjs) — never commit
+serviceAccountKey.json
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

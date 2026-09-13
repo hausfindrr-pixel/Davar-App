@@ -96,6 +96,23 @@ installed and linked to your project:
 firebase deploy --only firestore:rules
 ```
 
+### Seeding lessons
+
+`lessons` is intentionally locked to read-only for clients (see the rule
+above), so seeding it needs an admin credential, not the app's normal
+client config:
+
+1. Firebase console → **Project settings → Service accounts → Generate new
+   private key**. Save the downloaded file as `serviceAccountKey.json` at
+   the repo root (gitignored — never commit it).
+2. `npm run seed:lessons`
+
+This writes the week of lessons in `scripts/lessons-data.mjs` (scripture,
+prayer, and devotional tracks) via `scripts/seed-lessons.mjs`. Edit that data
+file and re-run the script to add more — each lesson's `id` is also its
+Firestore document ID, so re-running is idempotent (it overwrites by ID
+rather than duplicating).
+
 ## Auth & streak logic
 
 - `src/lib/auth-context.tsx` — `AuthProvider`/`useAuth()`: email+password and
@@ -133,6 +150,7 @@ public/
   icons/          PWA icons (placeholder SVGs — swap for real PNG/SVG icons
                   before shipping; iOS's apple-touch-icon works best as PNG)
 firestore.rules   Security rules matching the schema above
+scripts/          seed-lessons.mjs + lessons-data.mjs (Admin SDK lesson seeding)
 ```
 
 ## Deploying
