@@ -8,6 +8,8 @@ type LessonsSectionProps = {
   lessons: LessonDoc[];
   completedLessonIds: string[];
   isPremium: boolean;
+  /** Hide the "upgrade to unlock more" nag — e.g. right after checkout, while the upgrade is still confirming. */
+  suppressUpgradeNag?: boolean;
   onComplete: (lesson: LessonDoc) => Promise<void>;
   onUpgrade: (plan: PlanId) => Promise<void>;
 };
@@ -22,6 +24,7 @@ export function LessonsSection({
   lessons,
   completedLessonIds,
   isPremium,
+  suppressUpgradeNag = false,
   onComplete,
   onUpgrade,
 }: LessonsSectionProps) {
@@ -64,7 +67,9 @@ export function LessonsSection({
   return (
     <section className="w-full max-w-sm flex flex-col gap-3">
       <div className="flex items-center justify-between px-1">
-        <h2 className="text-sm font-medium text-ink">Today&apos;s lessons</h2>
+        <h2 className="text-sm font-medium text-ink">
+          {isPremium ? "Lesson library" : "Today's lessons"}
+        </h2>
         {!isPremium && (
           <span className="text-xs text-stone">
             {Math.min(completedCount, FREE_DAILY_LESSON_LIMIT)} of{" "}
@@ -122,7 +127,7 @@ export function LessonsSection({
         })}
       </div>
 
-      {atLimit && (
+      {atLimit && !suppressUpgradeNag && (
         <div className="rounded-2xl bg-clay-50 border border-clay-200 p-4 flex flex-col items-center gap-3 text-center">
           <div>
             <p className="text-sm text-ink">

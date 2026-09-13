@@ -121,9 +121,20 @@ but the actual gate is the `daily_lesson_progress` update rule — growing
 whole transaction (the XP award and check-in write included), so it can't
 be bypassed by refreshing the page or calling Firestore directly. `tier`
 itself is locked: the `users` rule only lets it be created as `"free"` and
-never lets a client change it afterward — there's no billing integration
-yet, so nothing can currently grant `"premium"` except a direct Admin SDK
-write.
+never lets a client change it afterward — the only way to grant `"premium"`
+is the Admin SDK write in the Plisio webhook (see "Payments" below).
+
+Completing a lesson also counts as that day's streak check-in (same
+`computeStreakUpdate` the manual "Check in today" button uses) — lessons
+are the app's actual daily practice, so the streak/plant visual tracks them
+directly instead of requiring a separate, unrelated tap.
+
+Free-tier accounts also only ever *see* `FREE_DAILY_LESSON_LIMIT` lessons
+per day of their journey (`visibleLessonsForFreeTier` in `src/lib/lessons.ts`,
+keyed off the user's account-creation date) — rather than the whole
+library with most of it shown as permanently "Locked". Premium accounts see
+the full library immediately, matching the "Full gamified lesson library"
+pricing copy.
 
 Run `npm run test:rules` to check `firestore.rules` against a local
 Firestore emulator (`scripts/rules-test.mjs`, using
@@ -225,8 +236,9 @@ already sends as `callback_url`/`success_invoice_url`/`fail_invoice_url`:
 - `src/lib/auth-context.tsx` — `AuthProvider`/`useAuth()`: email+password and
   Google sign-in, wired up in `src/app/layout.tsx`. On first sign-in it calls
   `ensureUserDoc` (`src/lib/db/users.ts`) to create the `users/{uid}` doc.
-- `src/app/login/page.tsx` — sign-in/sign-up form; the home page
-  (`src/app/page.tsx`) shows a "Sign in" prompt when logged out.
+- `src/components/AuthForm.tsx` — sign-in/sign-up form, embedded directly in
+  the landing page's "join" section (`src/app/page.tsx`) rather than a
+  separate route, so signing up is one continuous scroll, not a redirect.
 - `src/lib/streak.ts` — `computeStreakUpdate`, the pure function deciding
   the next streak state for a check-in: increments on a same-day no-op or a
   consecutive day, bridges a single missed day with a streak freeze if one's
@@ -240,15 +252,14 @@ already sends as `callback_url`/`success_invoice_url`/`fail_invoice_url`:
   browser at sign-in).
 - `isFirebaseConfigured` (`src/lib/firebase.ts`) is `false` until all six env
   vars are set. The SDK throws synchronously on a missing/placeholder API
-  key, so `auth`/`db` are only initialized once it's `true` — the home and
-  login pages check it and show a setup notice instead of crashing.
+  key, so `auth`/`db` are only initialized once it's `true` — `AuthForm`
+  checks it and shows a setup notice instead of crashing.
 
 ## Project structure
 
 ```
 src/
   app/            App Router pages, layout, manifest.ts (PWA manifest route)
-                  login/ (sign-in/sign-up page)
                   premium/success, premium/failed (post-checkout pages)
                   api/plisio/create-invoice, api/plisio/webhook (route handlers)
   components/     UI components (StreakVisual, PlantIcon, LessonsSection,

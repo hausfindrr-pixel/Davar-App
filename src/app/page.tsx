@@ -1,7 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import { AuthForm } from "@/components/AuthForm";
 import { BenefitCard } from "@/components/BenefitCard";
 import { LessonsSection } from "@/components/LessonsSection";
@@ -11,7 +12,8 @@ import { useAuth } from "@/lib/auth-context";
 import { completeLesson, fetchLessons, subscribeToLessonProgress } from "@/lib/db/lessons";
 import { checkIn, subscribeToStreak } from "@/lib/db/streaks";
 import { subscribeToUser } from "@/lib/db/users";
-import { dateKeyInTimeZone } from "@/lib/date";
+import { dateKeyInTimeZone, daysBetweenKeys } from "@/lib/date";
+import { visibleLessonsForFreeTier } from "@/lib/lessons";
 import { startCheckout } from "@/lib/plisio/checkout";
 import type { PlanId } from "@/lib/plisio/plans";
 import type {
@@ -199,9 +201,16 @@ function Dashboard({ uid }: { uid: string }) {
   const [lessonProgress, setLessonProgress] = useState<DailyLessonProgressDoc | null>(null);
   const [checkingIn, setCheckingIn] = useState(false);
   const { user, signOut } = useAuth();
+  const searchParams = useSearchParams();
+  const justUpgraded = searchParams.get("upgraded") === "1";
 
   const timeZone = profile?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
   const today = dateKeyInTimeZone(new Date(), timeZone);
+  const isPremium = profile?.tier === "premium";
+  const dayIndex = profile?.createdAt
+    ? daysBetweenKeys(dateKeyInTimeZone(profile.createdAt.toDate(), timeZone), today)
+    : 0;
+  const visibleLessons = isPremium ? lessons : visibleLessonsForFreeTier(lessons, dayIndex);
 
   useEffect(() => {
     const unsubStreak = subscribeToStreak(uid, setStreak);
@@ -243,9 +252,31 @@ function Dashboard({ uid }: { uid: string }) {
   return (
     <main className="flex-1 flex flex-col items-center gap-6 p-8 bg-ivory">
       <div className="flex flex-col items-center gap-1 text-center pt-4">
-        <h1 className="text-2xl font-semibold text-ink">Davar</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-semibold text-ink">Davar</h1>
+          {isPremium && (
+            <span className="rounded-full bg-clay-600 text-paper px-2.5 py-0.5 text-[11px] font-medium tracking-wide">
+              Premium
+            </span>
+          )}
+        </div>
         <p className="text-sm text-stone">Your daily walk, one day at a time.</p>
       </div>
+
+      {justUpgraded && (
+        <div
+          className={`w-full max-w-sm rounded-2xl border p-4 text-center text-sm ${
+            isPremium
+              ? "bg-sage-50 border-sage-200 text-sage-700"
+              : "bg-paper border-mist text-stone"
+          }`}
+        >
+          {isPremium
+            ? "You're Premium — unlimited daily lessons and the full library are unlocked."
+            : "Payment received — your upgrade is confirming on the network. This can take a few minutes; this page will update on its own, no need to refresh."}
+        </div>
+      )}
+
       <StreakVisual
         currentCount={streak?.currentCount ?? 0}
         longestCount={streak?.longestCount ?? 0}
@@ -256,9 +287,10 @@ function Dashboard({ uid }: { uid: string }) {
         onCheckIn={handleCheckIn}
       />
       <LessonsSection
-        lessons={lessons}
+        lessons={visibleLessons}
         completedLessonIds={lessonProgress?.completedLessonIds ?? []}
-        isPremium={profile?.tier === "premium"}
+        isPremium={isPremium}
+        suppressUpgradeNag={justUpgraded && !isPremium}
         onComplete={handleCompleteLesson}
         onUpgrade={handleUpgrade}
       />
@@ -288,5 +320,15 @@ export default function Home() {
     return <LandingPage />;
   }
 
-  return <Dashboard uid={user.uid} />;
+  return (
+    <Suspense
+      fallback={
+        <main className="flex-1 flex items-center justify-center bg-ivory">
+          <p className="text-sm text-stone">Loading…</p>
+        </main>
+      }
+    >
+      <Dashboard uid={user.uid} />
+    </Suspense>
+  );
 }

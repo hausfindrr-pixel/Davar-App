@@ -10,12 +10,14 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { dateKeyInTimeZone } from "@/lib/date";
-import { levelFromXp } from "@/lib/xp";
+import { computeStreakUpdate } from "@/lib/streak";
+import { CHECK_IN_XP, levelFromXp } from "@/lib/xp";
 import {
   COLLECTIONS,
   FREE_DAILY_LESSON_LIMIT,
   type DailyLessonProgressDoc,
   type LessonDoc,
+  type StreakDoc,
   type UserDoc,
 } from "@/types/firestore";
 
@@ -56,6 +58,11 @@ export interface CompleteLessonResult {
  * if a client bypassed this check and tried anyway, that rule rejects the
  * whole transaction (including the XP award and check-in), so the limit
  * holds even against a client that isn't using this function honestly.
+ *
+ * A lesson is the app's daily practice, so completing one also counts as
+ * today's streak check-in (via the same computeStreakUpdate the manual
+ * "Check in today" button uses) — otherwise the streak/plant visual never
+ * moves for a user who only ever does lessons.
  */
 export async function completeLesson(
   uid: string,
@@ -65,11 +72,13 @@ export async function completeLesson(
   const today = dateKeyInTimeZone(new Date(), timeZone);
   const progressRef = doc(db!, COLLECTIONS.dailyLessonProgress, progressDocId(uid, today));
   const userRef = doc(db!, COLLECTIONS.users, uid);
+  const streakRef = doc(db!, COLLECTIONS.streaks, uid);
   const checkInRef = doc(collection(db!, COLLECTIONS.checkIns));
 
   return runTransaction(db!, async (tx) => {
     const progressSnap = await tx.get(progressRef);
     const userSnap = await tx.get(userRef);
+    const streakSnap = await tx.get(streakRef);
 
     const prevProgress = progressSnap.exists()
       ? (progressSnap.data() as DailyLessonProgressDoc)
@@ -103,6 +112,20 @@ export async function completeLesson(
       tx.set(progressRef, progressFields);
     }
 
+    const prevStreak = streakSnap.exists() ? (streakSnap.data() as StreakDoc) : null;
+    const streakUpdate = computeStreakUpdate(prevStreak, today);
+    if (!streakUpdate.alreadyCheckedInToday) {
+      tx.set(streakRef, {
+        userId: uid,
+        currentCount: streakUpdate.currentCount,
+        longestCount: streakUpdate.longestCount,
+        lastCheckInDate: streakUpdate.lastCheckInDate,
+        freezesAvailable: streakUpdate.freezesAvailable,
+        freezesUsedDates: streakUpdate.freezesUsedDates,
+        updatedAt: serverTimestamp(),
+      });
+    }
+
     tx.set(checkInRef, {
       id: checkInRef.id,
       userId: uid,
@@ -114,14 +137,15 @@ export async function completeLesson(
       notes: null,
     });
 
-    const newXp = prevXp + lesson.xpReward;
+    const streakXp = streakUpdate.alreadyCheckedInToday ? 0 : CHECK_IN_XP;
+    const newXp = prevXp + lesson.xpReward + streakXp;
     const newLevel = levelFromXp(newXp);
     tx.update(userRef, { xp: newXp, level: newLevel });
 
     return {
       limitReached: false,
       completedLessonIds: nextCompletedLessonIds,
-      xpEarned: lesson.xpReward,
+      xpEarned: lesson.xpReward + streakXp,
       newXp,
       newLevel,
     };
