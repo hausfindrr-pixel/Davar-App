@@ -2,9 +2,9 @@
 
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { AuthForm } from "@/components/AuthForm";
-import { BenefitCard } from "@/components/BenefitCard";
+import { BenefitCarousel } from "@/components/BenefitCarousel";
 import { LessonsSection } from "@/components/LessonsSection";
 import { PricingSection } from "@/components/PricingSection";
 import { StreakVisual } from "@/components/StreakVisual";
@@ -23,29 +23,20 @@ import type {
   UserDoc,
 } from "@/types/firestore";
 
-const PAIN_POINTS = [
-  {
-    struggle: "Stuck in a cycle you can't seem to break",
-    response:
-      "Davar meets you with grace, not shame — daily accountability built to move you forward, not keep score of your failures.",
-  },
-  {
-    struggle: "Wanting to grow spiritually, but not knowing where to start",
-    response:
-      "A simple daily rhythm of Scripture and prayer gives you one clear next step, every single day.",
-  },
-  {
-    struggle: "Accountability that feels like judgment, not support",
-    response:
-      "A partner and a community built for honesty and encouragement — never judgment.",
-  },
-];
+/** The single strongest pain point, condensed to one short line each — this
+ * app's core value prop (grace-centered accountability). The other two
+ * pain points from earlier drafts (spiritual direction, judgment-free
+ * community) are already carried by the "Scripture, made daily" and "A
+ * community that gets it" benefit cards below. */
+const PAIN_POINT = {
+  struggle: "Stuck in a cycle you can't seem to break?",
+  response: "Grace, not shame — accountability that moves you forward.",
+};
 
 const BENEFITS = [
   {
     title: "Freedom through grace",
-    description:
-      "Break free from lust and pornography through daily, grace-centered accountability — never shame, always forward.",
+    description: "Daily, grace-centered accountability — never shame, always forward.",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
         <path
@@ -60,8 +51,7 @@ const BENEFITS = [
   },
   {
     title: "Scripture, made daily",
-    description:
-      "Engage with God's Word every day, gamified like Duolingo — streaks, XP, and levels that make consistency feel good.",
+    description: "Streaks, XP, and levels make consistency feel good.",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
         <path
@@ -76,8 +66,7 @@ const BENEFITS = [
   },
   {
     title: "Gentle reminders",
-    description:
-      "Daily nudges and encouragement keep you coming back — without guilt trips or noise.",
+    description: "Encouragement that keeps you coming back — no guilt trips.",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
         <path
@@ -92,8 +81,7 @@ const BENEFITS = [
   },
   {
     title: "A community that gets it",
-    description:
-      "Connect with an accountability partner in a judgment-free space built for honesty, not performance.",
+    description: "A judgment-free accountability partner, always in your corner.",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
         <circle cx="9" cy="9" r="3" stroke="currentColor" strokeWidth="1.7" />
@@ -107,89 +95,156 @@ const BENEFITS = [
       </svg>
     ),
   },
-  {
-    title: "The Armory",
-    description:
-      "“The sword of the Spirit, which is the word of God” (Ephesians 6:17) — Davar means “Word.” The Armory groups verses by the specific struggle they target: lust, envy, anger, fear, and more.",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
-        <path
-          d="M12 3v11M12 14l-3 3M12 14l3 3"
-          stroke="currentColor"
-          strokeWidth="1.7"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M8.5 19.5h7"
-          stroke="currentColor"
-          strokeWidth="1.7"
-          strokeLinecap="round"
-        />
-        <circle cx="12" cy="3" r="1.1" fill="currentColor" />
-      </svg>
-    ),
-  },
 ];
 
-function LandingPage() {
+const SCREEN_COUNT = 4;
+
+function ChevronIcon({ direction }: { direction: "left" | "right" }) {
   return (
-    <main className="flex-1 bg-ivory">
-      <section className="flex flex-col items-center text-center gap-5 px-6 pt-24 pb-20 sm:pt-32 sm:pb-28">
-        <Image
-          src="/logo.svg"
-          alt="Davar"
-          width={380}
-          height={430}
-          priority
-          className="w-40 sm:w-48 h-auto"
-        />
-        <h1 className="text-3xl sm:text-4xl font-semibold text-ink max-w-md">
-          A daily rhythm of Scripture, prayer, and grace.
-        </h1>
-        <a
-          href="#join"
-          className="mt-2 rounded-full bg-clay-600 text-paper px-8 py-3 text-sm font-medium hover:bg-clay-700 transition-colors"
-        >
-          Get Started
-        </a>
-      </section>
+    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
+      <path
+        d={direction === "left" ? "M15 5l-7 7 7 7" : "M9 5l7 7-7 7"}
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
-      <section className="px-6 pb-20">
-        <div className="mx-auto max-w-3xl flex flex-col gap-10">
-          {PAIN_POINTS.map((point) => (
-            <div key={point.struggle} className="flex flex-col gap-2 text-center">
-              <p className="text-base text-stone italic">{point.struggle}</p>
-              <p className="text-base text-ink font-medium">{point.response}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+function LandingPage() {
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const joinRef = useRef<HTMLDivElement>(null);
+  const [activeScreen, setActiveScreen] = useState(0);
 
-      <section className="px-6 pb-24">
-        <div className="mx-auto max-w-5xl grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {BENEFITS.map((benefit) => (
-            <BenefitCard key={benefit.title} {...benefit} />
-          ))}
-        </div>
-      </section>
+  function goToScreen(index: number) {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    scroller.scrollTo({ left: index * scroller.clientWidth, behavior: "smooth" });
+  }
 
-      <PricingSection />
+  function handleScroll() {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    setActiveScreen(Math.round(scroller.scrollLeft / scroller.clientWidth));
+  }
 
-      <section
-        id="join"
-        className="flex flex-col items-center gap-6 px-6 pb-24 pt-4 border-t border-mist"
+  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key === "ArrowRight") goToScreen(Math.min(SCREEN_COUNT - 1, activeScreen + 1));
+    if (event.key === "ArrowLeft") goToScreen(Math.max(0, activeScreen - 1));
+  }
+
+  function goToSignUp() {
+    goToScreen(SCREEN_COUNT - 1);
+    // Runs on the pricing screen's own vertical scroller, independent of
+    // the horizontal one above — both can animate at once.
+    joinRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  return (
+    <main className="h-dvh flex flex-col bg-ivory overflow-hidden">
+      <div
+        ref={scrollerRef}
+        onScroll={handleScroll}
+        onKeyDown={handleKeyDown}
+        tabIndex={0}
+        role="region"
+        aria-label="Introduction"
+        className="flex-1 min-h-0 flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory snap-always scroll-smooth [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden focus:outline-none"
       >
-        <div className="flex flex-col items-center gap-2 text-center pt-16">
-          <h2 className="text-2xl font-semibold text-ink">
-            Your first day starts now
-          </h2>
-          <p className="text-sm text-stone max-w-sm">
-            No pressure, no performance — just a quiet place to begin.
+        {/* Screen 1 — hero */}
+        <section className="w-full h-full shrink-0 snap-start overflow-y-auto flex flex-col items-center justify-center text-center gap-5 px-6 py-12">
+          <Image
+            src="/logo.svg"
+            alt="Davar"
+            width={380}
+            height={430}
+            priority
+            className="w-40 sm:w-48 h-auto"
+          />
+          <h1 className="text-3xl sm:text-4xl font-semibold text-ink max-w-md">
+            A daily rhythm of Scripture, prayer, and grace.
+          </h1>
+          <button
+            type="button"
+            onClick={goToSignUp}
+            className="mt-2 rounded-full bg-clay-600 text-paper px-8 py-3 text-sm font-medium hover:bg-clay-700 transition-colors"
+          >
+            Get Started
+          </button>
+        </section>
+
+        {/* Screen 2 — the one pain point that matters most */}
+        <section className="w-full h-full shrink-0 snap-start overflow-y-auto flex flex-col items-center justify-center text-center gap-4 px-6 py-12">
+          <p className="text-xl sm:text-2xl text-stone italic max-w-sm">
+            {PAIN_POINT.struggle}
           </p>
+          <p className="text-xl sm:text-2xl text-ink font-semibold max-w-sm">
+            {PAIN_POINT.response}
+          </p>
+        </section>
+
+        {/* Screen 3 — benefits, swipeable */}
+        <section className="w-full h-full shrink-0 snap-start overflow-y-auto flex flex-col items-center justify-center gap-6 py-12">
+          <h2 className="text-xl font-semibold text-ink px-6 text-center">
+            Built for the walk, not just the win
+          </h2>
+          <BenefitCarousel benefits={BENEFITS} />
+        </section>
+
+        {/* Screen 4 — pricing + sign up */}
+        <section className="w-full h-full shrink-0 snap-start overflow-y-auto flex flex-col">
+          <PricingSection onGetStarted={goToSignUp} />
+          <div
+            id="join"
+            ref={joinRef}
+            className="flex flex-col items-center gap-6 px-6 pb-16 pt-4 border-t border-mist"
+          >
+            <div className="flex flex-col items-center gap-2 text-center pt-10">
+              <h2 className="text-2xl font-semibold text-ink">Your first day starts now</h2>
+              <p className="text-sm text-stone max-w-sm">
+                No pressure, no performance — just a quiet place to begin.
+              </p>
+            </div>
+            <AuthForm />
+          </div>
+        </section>
+      </div>
+
+      <div className="flex items-center justify-center gap-4 py-4 shrink-0">
+        <button
+          type="button"
+          aria-label="Previous screen"
+          disabled={activeScreen === 0}
+          onClick={() => goToScreen(activeScreen - 1)}
+          className="text-stone disabled:opacity-0 transition-opacity"
+        >
+          <ChevronIcon direction="left" />
+        </button>
+        <div className="flex items-center gap-2">
+          {Array.from({ length: SCREEN_COUNT }).map((_, i) => (
+            <button
+              key={i}
+              type="button"
+              aria-label={`Go to screen ${i + 1}`}
+              onClick={() => goToScreen(i)}
+              className={`h-2 rounded-full transition-all ${
+                i === activeScreen ? "w-6 bg-clay-600" : "w-2 bg-mist"
+              }`}
+            />
+          ))}
         </div>
-        <AuthForm />
-      </section>
+        <button
+          type="button"
+          aria-label="Next screen"
+          disabled={activeScreen === SCREEN_COUNT - 1}
+          onClick={() => goToScreen(activeScreen + 1)}
+          className="text-stone disabled:opacity-0 transition-opacity"
+        >
+          <ChevronIcon direction="right" />
+        </button>
+      </div>
     </main>
   );
 }

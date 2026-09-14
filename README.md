@@ -25,11 +25,14 @@ it's active in `npm run build && npm run start`.
 ### Logo & app icons
 
 `public/logo.svg` is the full lockup (plant mark + "Davar" wordmark +
-tagline) used in the landing page hero. The PWA/favicon icons in
-`public/icons/` are cropped to just the mark — a full lockup's text is
-illegible at 192px, let alone favicon sizes — with a bit more padding on
-the maskable variant so Android's icon mask doesn't cut into it. Both the
-mark and the full lockup carry their own opaque background, so they render
+tagline) used in the landing page hero. It has no background rect — it's
+transparent and blends into whatever's behind it (ivory, or any other
+surface) rather than sitting on top like a sticker. The PWA/favicon icons
+in `public/icons/` are separately-generated PNGs cropped to just the mark
+— a full lockup's text is illegible at 192px, let alone favicon sizes —
+with a bit more padding on the maskable variant so Android's icon mask
+doesn't cut into it; those PNGs carry their own opaque background on
+purpose (icons need one, unlike the in-page hero logo), so they render
 correctly regardless of what's behind them (a dark surface included). If
 the logo changes, regenerate the PNGs by re-cropping `logo.svg` to the mark
 only and rendering it at 192×192, 512×512 (plus a more-padded 512×512 for
@@ -236,9 +239,17 @@ already sends as `callback_url`/`success_invoice_url`/`fail_invoice_url`:
 - `src/lib/auth-context.tsx` — `AuthProvider`/`useAuth()`: email+password and
   Google sign-in, wired up in `src/app/layout.tsx`. On first sign-in it calls
   `ensureUserDoc` (`src/lib/db/users.ts`) to create the `users/{uid}` doc.
-- `src/components/AuthForm.tsx` — sign-in/sign-up form, embedded directly in
-  the landing page's "join" section (`src/app/page.tsx`) rather than a
-  separate route, so signing up is one continuous scroll, not a redirect.
+- `src/components/AuthForm.tsx` — sign-in/sign-up form. The signed-out home
+  page (`src/app/page.tsx`) is a short, swipeable 4-screen onboarding
+  carousel (hero → pain point → benefits → pricing) rather than a long
+  scroll — every "Get Started" CTA jumps straight to the sign-up form on the
+  last screen, reachable in at most 3 swipes from the hero. Screen 3's
+  benefit cards are their own nested swipe carousel
+  (`src/components/BenefitCarousel.tsx`), showing 1 card at a time on
+  narrow screens and ~2 on `sm+`. Both carousels are plain CSS scroll-snap
+  (`overflow-x-auto` + `snap-x`) with dot indicators and prev/next buttons
+  driving `scrollTo`, not a swipe-gesture library — native touch/trackpad
+  swipe and the on-screen controls both work.
 - `src/lib/streak.ts` — `computeStreakUpdate`, the pure function deciding
   the next streak state for a check-in: increments on a same-day no-op or a
   consecutive day, bridges a single missed day with a streak freeze if one's
@@ -263,7 +274,7 @@ src/
                   premium/success, premium/failed (post-checkout pages)
                   api/plisio/create-invoice, api/plisio/webhook (route handlers)
   components/     UI components (StreakVisual, PlantIcon, LessonsSection,
-                  BenefitCard, PricingSection, AuthForm)
+                  BenefitCard, BenefitCarousel, PricingSection, AuthForm)
   lib/            firebase.ts (client SDK init), firebase-admin.ts (server-only
                   Admin SDK init), auth-context.tsx, streak.ts, xp.ts, date.ts
                   (pure logic), db/ (Firestore reads/writes),

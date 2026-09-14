@@ -38,7 +38,11 @@ function CheckIcon() {
   );
 }
 
-export function PricingSection() {
+type PricingSectionProps = {
+  onGetStarted: () => void;
+};
+
+export function PricingSection({ onGetStarted }: PricingSectionProps) {
   const [billing, setBilling] = useState<"monthly" | "yearly">("yearly");
   const isYearly = billing === "yearly";
 
@@ -77,12 +81,13 @@ export function PricingSection() {
             those stay in Premium.
           </p>
 
-          <a
-            href="#join"
+          <button
+            type="button"
+            onClick={onGetStarted}
             className="w-full rounded-full border border-mist py-2.5 text-center text-sm font-medium text-ink hover:bg-mist/40 transition-colors"
           >
             Get Started
-          </a>
+          </button>
         </div>
 
         <div className="rounded-3xl bg-paper border-2 border-clay-400 p-8 flex flex-col items-center gap-6">
@@ -138,12 +143,13 @@ export function PricingSection() {
           </ul>
 
           <div className="w-full flex flex-col items-center gap-1.5">
-            <a
-              href="#join"
+            <button
+              type="button"
+              onClick={onGetStarted}
               className="w-full rounded-full bg-clay-600 text-paper py-2.5 text-center text-sm font-medium hover:bg-clay-700 transition-colors"
             >
               Start free for 7 days
-            </a>
+            </button>
             <span className="text-xs text-stone">
               No charge until your trial ends — cancel anytime.
             </span>
