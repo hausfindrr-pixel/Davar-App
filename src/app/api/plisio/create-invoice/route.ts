@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { adminAuth } from "@/lib/firebase-admin";
+import { adminAuth, logTokenVerificationError } from "@/lib/firebase-admin";
 import { PLANS, isPlanId } from "@/lib/plisio/plans";
 
 // Needs Node's crypto/Admin SDK — not compatible with the edge runtime.
@@ -21,7 +21,8 @@ export async function POST(req: Request) {
   let uid: string;
   try {
     uid = (await adminAuth().verifyIdToken(idToken)).uid;
-  } catch {
+  } catch (err) {
+    logTokenVerificationError("plisio create-invoice", err);
     return NextResponse.json({ error: "Your session has expired — sign in again." }, { status: 401 });
   }
 

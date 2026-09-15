@@ -9,7 +9,7 @@ import {
   systemPromptFor,
   WATCH_CHAT_DAILY_LIMIT,
 } from "@/lib/chat-apostle";
-import { adminAuth, adminDb } from "@/lib/firebase-admin";
+import { adminAuth, adminDb, logTokenVerificationError } from "@/lib/firebase-admin";
 import { COLLECTIONS, type ChatRole } from "@/types/firestore";
 import type { ApostleId } from "@/lib/apostles";
 
@@ -48,7 +48,8 @@ export async function POST(req: Request) {
   let uid: string;
   try {
     uid = (await adminAuth().verifyIdToken(idToken)).uid;
-  } catch {
+  } catch (err) {
+    logTokenVerificationError("watch-chat", err);
     return NextResponse.json({ error: "Your session has expired — sign in again." }, { status: 401 });
   }
 

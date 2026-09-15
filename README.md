@@ -522,6 +522,59 @@ entirely:
   route's own specific error messages instead of the generic fallback —
   which would then point at an actual Plisio-side problem, not this one.
 
+### Diagnosing "Your session has expired" on a fresh sign-in
+
+The ESM/CJS crash above happened at *import* time — before any request
+ever reached `verifyIdToken()`. Once it was fixed, `verifyIdToken()` ran
+for the first time in production and could, in principle, fail for a
+completely different, previously-invisible reason. Two changes make that
+diagnosable instead of a generic, unexplained 401:
+
+- **`src/lib/firebase-admin.ts` now checks `FIREBASE_PROJECT_ID` (Admin
+  SDK) against `NEXT_PUBLIC_FIREBASE_PROJECT_ID` (client) on first use**,
+  and logs a specific, loud warning if they don't match. This is the #1
+  real-world cause of "every ID token fails, even a fresh one": Admin SDK
+  `verifyIdToken()` rejects a token outright if its `aud` (audience) claim
+  doesn't equal the project the Admin SDK was initialized with — and that
+  check has nothing to do with whether the token is actually expired, so
+  it fails identically for a token that's 2 seconds old or 2 hours old.
+- **Every route that calls `adminAuth().verifyIdToken()`**
+  (`create-invoice`, `watch-chat`) **now logs the specific Admin SDK error**
+  via `logTokenVerificationError()` (same file) before returning the
+  generic client-facing message — previously the `catch` block discarded
+  the real error entirely, so a project-ID mismatch, a genuinely expired
+  token, and a malformed token all looked identical in the logs (nothing
+  at all). Check Vercel's function logs for a line like
+  `plisio create-invoice: ID token verification failed (code=..., ...)` —
+  the `code` (e.g. `auth/argument-error`) and message name the exact cause.
+
+**Verified from this sandbox** by reproducing the failure directly against
+firebase-admin's real verification code — no live credentials or network
+access to Google's cert endpoint needed, since the project-ID check runs
+before any signature/network step: a throwaway RSA keypair plus a
+hand-built token were used to initialize the Admin SDK against one project
+ID while presenting a token audienced to another, and to confirm the
+reverse (matching project IDs) produces a different, expected error
+instead. The full local production server was hit both ways:
+- **Mismatched `FIREBASE_PROJECT_ID`**: logged both the startup warning
+  and `ID token verification failed (code=auth/argument-error): Firebase
+  ID token has incorrect "aud" (audience) claim. Expected
+  "davar-app-WRONG-PROJECT" but got "davar-app". Make sure the ID token
+  comes from the same Firebase project as the service account used to
+  authenticate this SDK.` — exactly the class of error this feature is
+  built to surface.
+- **Matching `FIREBASE_PROJECT_ID`**: no mismatch warning (confirmed no
+  false positive), and verification failed for the expected different
+  reason instead (an unrecognized `kid`, since the test token wasn't a
+  real Google-signed one) — confirming the code path runs past the
+  project-ID check normally once the IDs agree.
+
+If this happens again: the very next request's logs will name the exact
+Admin SDK error code and message, which points straight at the fix —
+matching `FIREBASE_PROJECT_ID` to the real client project if it's an
+`auth/argument-error` "aud" mismatch, or regenerating the service account
+key in Vercel if it's a credential/signing error.
+
 ### Known limitations
 
 - **Webhook signature verification is untested against a live Plisio
