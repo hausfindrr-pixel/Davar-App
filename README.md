@@ -442,19 +442,43 @@ crypto payment gateway — no card processor involved.
 | Variable | Used by | Notes |
 | --- | --- | --- |
 | `PLISIO_SECRET_KEY` | create-invoice, webhook | Plisio dashboard → API keys. Server-only — never prefixed `NEXT_PUBLIC_`, never sent to the browser. |
-| `FIREBASE_PROJECT_ID` | webhook (Admin SDK) | From a Firebase service account — see below. |
-| `FIREBASE_CLIENT_EMAIL` | webhook (Admin SDK) | Same service account. |
-| `FIREBASE_PRIVATE_KEY` | webhook (Admin SDK) | Same service account; keep the `\n`s in the value as-is, `src/lib/firebase-admin.ts` un-escapes them. |
+| `FIREBASE_PROJECT_ID` | create-invoice, webhook, watch-chat (Admin SDK) | From a Firebase service account — see below. **Must exactly match** `NEXT_PUBLIC_FIREBASE_PROJECT_ID` — a mismatch makes every ID token fail verification, not just some. |
+| `FIREBASE_CLIENT_EMAIL` | create-invoice, webhook, watch-chat (Admin SDK) | Same service account. |
+| `FIREBASE_PRIVATE_KEY` | create-invoice, webhook, watch-chat (Admin SDK) | Same service account — see the exact paste format below; a mis-pasted value is the most common way this whole setup breaks. |
 
 Generate the Admin SDK credential at Firebase console → **Project settings →
-Service accounts → Generate new private key**, and copy `project_id`,
-`client_email`, and `private_key` from the downloaded JSON into the three
-`FIREBASE_*` variables above — this is separate from `serviceAccountKey.json`
-(used only locally by `npm run seed:lessons`); the webhook reads these three
-env vars at runtime instead of a file. Add all four variables (this repo's
-`PLISIO_SECRET_KEY` plus the three `FIREBASE_*` ones) to Vercel under
-**Project Settings → Environment Variables** before payments will work in
-production.
+Service accounts → Generate new private key**. This downloads a JSON file —
+copy `project_id`, `client_email`, and `private_key` from it into the three
+`FIREBASE_*` variables above (separate from `serviceAccountKey.json`, which
+is only used locally by `npm run seed:lessons`). Add all four variables
+(this repo's `PLISIO_SECRET_KEY` plus the three `FIREBASE_*` ones) to Vercel
+under **Project Settings → Environment Variables** before payments — or
+Peter's Watch, or Profile's "Your Plan" — will work in production.
+
+**`FIREBASE_PRIVATE_KEY`'s exact expected format:** open the downloaded JSON
+in a plain text editor and copy everything between (not including) the
+quotes on the `"private_key": "..."` line — that text already looks like
+`-----BEGIN PRIVATE KEY-----\nMIIEvQ...\n-----END PRIVATE KEY-----\n`, with
+literal two-character `\n` sequences rather than real line breaks, because
+that's how JSON represents a multiline string. **Paste exactly that into
+Vercel's value field — nothing more:**
+- Do **not** add quotes around it — Vercel's field is not JSON, and a
+  leftover pair of quotes from copying too much of the JSON line is the
+  single most common way this breaks (`src/lib/firebase-admin.ts` now
+  strips a single matching pair defensively, but don't rely on that).
+  Pasting the real, multiline PEM text directly (actual line breaks, no
+  `\n` at all) into Vercel's field also works — `normalizePrivateKey()` in
+  that same file accepts either shape.
+- Don't hand-edit the `\n` sequences into real newlines yourself; the app
+  does that at runtime (`normalizePrivateKey()` in
+  `src/lib/firebase-admin.ts`, which also tolerates a Windows-style
+  `\r\n`-escaped key and trims stray whitespace from the copy).
+- If the value is wrong in a way that isn't just escaping — truncated,
+  missing the `BEGIN`/`END` lines — the app now fails immediately with a
+  clear `FIREBASE_PRIVATE_KEY doesn't look like a valid PEM private key...`
+  error instead of a cryptic downstream crypto failure; see "Diagnosing
+  'Your session has expired'" below for where that shows up in Vercel's
+  logs.
 
 ### Paste these into Plisio's dashboard
 
@@ -574,6 +598,21 @@ Admin SDK error code and message, which points straight at the fix —
 matching `FIREBASE_PROJECT_ID` to the real client project if it's an
 `auth/argument-error` "aud" mismatch, or regenerating the service account
 key in Vercel if it's a credential/signing error.
+
+**What this logging actually caught in production:** the real error was
+`code=app/invalid-credential): Failed to parse...` — a malformed
+`FIREBASE_PRIVATE_KEY`, not a project-ID mismatch. `src/lib/firebase-admin.ts`
+already had `.replace(/\\n/g, "\n")` to un-escape a JSON-pasted key, but two
+realistic paste mistakes still broke it (confirmed by parsing each variant
+with Node's own `crypto.createPrivateKey()`, not just pattern-matching the
+string): a leftover pair of surrounding quote characters, and a
+Windows-edited key whose newlines were escaped as `\r\n` instead of `\n`.
+`normalizePrivateKey()` (same file) now handles both, plus a real multiline
+paste with no escaping at all, plus stray whitespace from the copy — and if
+the value is broken in some *other* way, `adminApp()` now fails immediately
+with a specific "doesn't look like a valid PEM" error instead of the
+Admin SDK's cryptic downstream parse failure. See the exact expected paste
+format under "Environment variables" above.
 
 ### Known limitations
 
