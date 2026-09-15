@@ -124,6 +124,12 @@ export interface UserHighlightDoc {
   book: string;
   chapter: number;
   verse: number;
+  /** The verse text at the time it was highlighted, stored alongside it
+   * (not re-fetched from the Bible API later) so the Profile page's
+   * "Highlighted Verses" list works without a network round-trip per verse. */
+  text: string;
   color: HighlightColor;
+  /** A personal note the user attached to this verse, editable from Profile. */
+  notes: string | null;
   createdAt: Timestamp;
 }

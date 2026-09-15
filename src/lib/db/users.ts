@@ -1,4 +1,4 @@
-import { doc, getDoc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
+import { doc, getDoc, onSnapshot, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
 import type { User } from "firebase/auth";
 import { db } from "@/lib/firebase";
 import { COLLECTIONS, type UserDoc } from "@/types/firestore";
@@ -35,4 +35,15 @@ export function subscribeToUser(
   return onSnapshot(ref, (snap) => {
     callback(snap.exists() ? (snap.data() as UserDoc) : null);
   });
+}
+
+/** Updates a user's own display name and/or photo URL. Every other field
+ * on users/{uid} is either set at creation or (tier/premiumUntil) locked
+ * to Admin SDK writes only — see the `users` rule in firestore.rules —
+ * these two are the only ones a client can freely change. */
+export async function updateUserProfile(
+  uid: string,
+  fields: { displayName?: string; photoURL?: string },
+): Promise<void> {
+  await updateDoc(doc(db!, COLLECTIONS.users, uid), fields);
 }

@@ -1,6 +1,7 @@
 import { getApps, initializeApp, type FirebaseApp, type FirebaseOptions } from "firebase/app";
 import { getAuth, type Auth } from "firebase/auth";
 import { getFirestore, type Firestore } from "firebase/firestore";
+import { getStorage, type FirebaseStorage } from "firebase/storage";
 
 // Values come from your Firebase project's web app config (Project settings ->
 // General -> Your apps -> SDK setup and configuration). See README.md for the
@@ -21,6 +22,7 @@ export const isFirebaseConfigured = Object.values(firebaseConfig).every(
 let app: FirebaseApp | undefined;
 let auth: Auth | undefined;
 let db: Firestore | undefined;
+let storage: FirebaseStorage | undefined;
 
 // Only initialize in the browser, and only once real config is present: the
 // SDK throws synchronously on a missing/placeholder API key, which would
@@ -30,7 +32,8 @@ if (typeof window !== "undefined" && isFirebaseConfigured) {
   app = getApps().length ? getApps()[0]! : initializeApp(firebaseConfig);
   auth = getAuth(app);
   db = getFirestore(app);
+  storage = getStorage(app);
 }
 
-export { auth, db };
+export { auth, db, storage };
 export default app;

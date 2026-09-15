@@ -194,3 +194,48 @@ export function HighlighterIcon({ className }: IconProps) {
     </svg>
   );
 }
+
+/** A person silhouette — the profile avatar fallback. */
+export function UserIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className}>
+      <circle cx="12" cy="8.5" r="3.5" stroke="currentColor" strokeWidth="1.7" />
+      <path
+        d="M4.5 20c1-3.8 4-6 7.5-6s6.5 2.2 7.5 6"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+/** A camera — the "change photo" affordance on the profile avatar. */
+export function CameraIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className}>
+      <path
+        d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2l1-1.7A1 1 0 0 1 9.36 4.8h5.28a1 1 0 0 1 .86.5L16.5 7h2A1.5 1.5 0 0 1 20 8.5v9A1.5 1.5 0 0 1 18.5 19h-13A1.5 1.5 0 0 1 4 17.5v-9Z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+      <circle cx="12" cy="12.5" r="3.2" stroke="currentColor" strokeWidth="1.6" />
+    </svg>
+  );
+}
+
+/** A left arrow — back navigation, e.g. out of the Profile page. */
+export function ArrowLeftIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className}>
+      <path
+        d="M19 12H5M11 6l-6 6 6 6"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}

@@ -8,6 +8,8 @@ import { AuthForm } from "@/components/AuthForm";
 import { BottomTabBar, type TabId } from "@/components/BottomTabBar";
 import { CompassIcon, FlameIcon, UsersIcon } from "@/components/icons";
 import { PricingSection } from "@/components/PricingSection";
+import { ProfileButton } from "@/components/ProfileButton";
+import { ProfilePage } from "@/components/ProfilePage";
 import { ArmoryTab } from "@/components/tabs/ArmoryTab";
 import { PathTab } from "@/components/tabs/PathTab";
 import { TodayTab } from "@/components/tabs/TodayTab";
@@ -333,6 +335,7 @@ function Dashboard({ uid }: { uid: string }) {
   const [lessonProgress, setLessonProgress] = useState<DailyLessonProgressDoc | null>(null);
   const [checkingIn, setCheckingIn] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("today");
+  const [showProfile, setShowProfile] = useState(false);
   const { user, signOut } = useAuth();
   const searchParams = useSearchParams();
   const justUpgraded = searchParams.get("upgraded") === "1";
@@ -409,13 +412,7 @@ function Dashboard({ uid }: { uid: string }) {
               </span>
             )}
           </div>
-          <button
-            type="button"
-            onClick={() => void signOut()}
-            className="text-xs text-stone underline"
-          >
-            Sign out
-          </button>
+          <ProfileButton photoURL={profile?.photoURL ?? null} onClick={() => setShowProfile(true)} />
         </div>
       </header>
 
@@ -434,36 +431,47 @@ function Dashboard({ uid }: { uid: string }) {
       )}
 
       <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
-        {activeTab === "today" && (
-          <TodayTab
-            currentCount={streak?.currentCount ?? 0}
-            longestCount={streak?.longestCount ?? 0}
-            level={profile?.level ?? 1}
-            xp={profile?.xp ?? 0}
-            checkedInToday={checkedInToday}
-            checkingIn={checkingIn}
-            onCheckIn={handleCheckIn}
-            apostleMoment={apostleMoment}
+        {showProfile ? (
+          <ProfilePage
+            uid={uid}
+            profile={profile}
+            onBack={() => setShowProfile(false)}
+            onSignOut={() => void signOut()}
           />
+        ) : (
+          <>
+            {activeTab === "today" && (
+              <TodayTab
+                currentCount={streak?.currentCount ?? 0}
+                longestCount={streak?.longestCount ?? 0}
+                level={profile?.level ?? 1}
+                xp={profile?.xp ?? 0}
+                checkedInToday={checkedInToday}
+                checkingIn={checkingIn}
+                onCheckIn={handleCheckIn}
+                apostleMoment={apostleMoment}
+              />
+            )}
+            {activeTab === "path" && (
+              <PathTab
+                lessons={visibleLessons}
+                completedLessonIds={lessonProgress?.completedLessonIds ?? []}
+                isPremium={isPremium}
+                suppressUpgradeNag={justUpgraded && !isPremium}
+                onComplete={handleCompleteLesson}
+                onUpgrade={handleUpgrade}
+              />
+            )}
+            {activeTab === "armory" && <ArmoryTab isPremium={isPremium} getIdToken={getIdToken} />}
+            {activeTab === "watch" && (
+              <WatchTab uid={uid} isPremium={isPremium} getIdToken={getIdToken} />
+            )}
+            {activeTab === "word" && <WordTab uid={uid} />}
+          </>
         )}
-        {activeTab === "path" && (
-          <PathTab
-            lessons={visibleLessons}
-            completedLessonIds={lessonProgress?.completedLessonIds ?? []}
-            isPremium={isPremium}
-            suppressUpgradeNag={justUpgraded && !isPremium}
-            onComplete={handleCompleteLesson}
-            onUpgrade={handleUpgrade}
-          />
-        )}
-        {activeTab === "armory" && <ArmoryTab isPremium={isPremium} getIdToken={getIdToken} />}
-        {activeTab === "watch" && (
-          <WatchTab uid={uid} isPremium={isPremium} getIdToken={getIdToken} />
-        )}
-        {activeTab === "word" && <WordTab uid={uid} />}
       </div>
 
-      <BottomTabBar active={activeTab} onSelect={setActiveTab} />
+      {!showProfile && <BottomTabBar active={activeTab} onSelect={setActiveTab} />}
     </main>
   );
 }

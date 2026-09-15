@@ -63,6 +63,10 @@ anything until you create your own Firebase project and add your keys to
    `firestore.rules` (see below) before going to production. Pick a region
    close to your users.
 
+4b. **Enable Storage** (needed for profile photos — see "Profile" below).
+   **Build → Storage → Get started**, same region as Firestore. Deploy
+   `storage.rules` the same way as the Firestore rules — see below.
+
 5. **Copy the config into `.env.local`.** From **Project settings** (gear
    icon) **→ General → Your apps**, copy each value from the `firebaseConfig`
    object into the matching variable:
@@ -97,7 +101,10 @@ Types for every collection live in `src/types/firestore.ts`:
 - **`check_ins/{checkInId}`** — a completed lesson, prayer, reading, etc. for a given day
 - **`daily_lesson_progress/{uid}_{date}`** — which lessons a user completed on a given day; the server-side source of truth for the free-tier daily lesson cap
 - **`accountability_links/{linkId}`** — a pending/active/ended pairing between two users
-- **`user_highlights/{uid}_{book}_{chapter}_{verse}`** — a verse a user highlighted in The Word, with its color
+- **`user_highlights/{uid}_{book}_{chapter}_{verse}`** — a verse a user
+  highlighted in The Word: its color, the verse `text` itself (stored
+  alongside it so Profile's highlight list doesn't need to re-fetch it),
+  and an optional personal `notes` string, editable from Profile
 
 `COLLECTIONS` in that same file holds the collection name constants.
 
@@ -108,13 +115,24 @@ only read/write their own `users`/`streaks` docs and their own `check_ins`,
 `lessons` is read-only (seed it via the console or Admin SDK),
 `accountability_links` is readable/updatable by either party in the pairing,
 and `user_highlights` docs (docId derived from `{uid}_{book}_{chapter}_{verse}`)
-are only readable/writable by the user they belong to. **Whenever you change
-this file, you have to deploy it yourself** — editing it here only changes
-what's in the repo, not what's enforced on your live project — once you have
-the [Firebase CLI](https://firebase.google.com/docs/cli) installed and linked:
+are only readable/writable by the user they belong to — editing just the
+`notes` field on an existing highlight is an "update" under this same rule,
+no separate carve-out needed. `storage.rules` covers profile photos the
+same way (see "Profile" below).
+
+**Whenever you change either rules file, you have to deploy it yourself** —
+editing it here only changes what's in the repo, not what's enforced on
+your live project. This has bitten this app before: `user_highlights` had
+rules written and tested (`npm run test:rules`) but never actually deployed,
+so every highlight attempt was silently rejected — confirmed directly
+against production by writing to it with a real ID token and getting
+`PERMISSION_DENIED`, while the same token could write to `streaks` (rules
+deployed long ago) with no issue. Deploy both rules files together once you
+have the [Firebase CLI](https://firebase.google.com/docs/cli) installed and
+linked:
 
 ```bash
-firebase deploy --only firestore:rules
+firebase deploy --only firestore:rules,storage
 ```
 
 ### Free tier & the daily lesson cap
@@ -243,13 +261,49 @@ route's own "Could not reach the Bible text source" error rather than
 crashing — so verify it end-to-end once deployed somewhere without that
 restriction.
 
-Tapping a verse opens a 3-color highlight picker (clay/sage/stone);
-`highlightVerse`/`removeHighlight` (`src/lib/db/highlights.ts`) write to
-`user_highlights`, keyed by `{uid}_{book}_{chapter}_{verse}` so a user has
-at most one highlight per verse — picking a new color overwrites it rather
-than stacking duplicates. `subscribeToHighlights` loads a user's highlights
-across every book/chapter they've ever read in one listener, filtered
-client-side to whatever chapter is currently open.
+The reading layout: a chapter header card (serif "Book Chapter" title above
+labeled book/chapter selects) followed by the verse list, each verse a
+small circular number badge next to serif text with generous line-height
+and spacing between verses — reading as a designed page rather than a wall
+of plain text. Tapping a verse opens a labeled 3-color highlight picker
+(Clay/Sage/Stone); `highlightVerse`/`removeHighlight`
+(`src/lib/db/highlights.ts`) write to `user_highlights`, keyed by
+`{uid}_{book}_{chapter}_{verse}` so a user has at most one highlight per
+verse — picking a new color overwrites it rather than stacking duplicates.
+`subscribeToHighlights` loads a user's highlights across every book/chapter
+they've ever read in one listener, filtered client-side to whatever
+chapter is currently open. Every highlight/remove write shows a "Saving…"
+state and a clear error on failure instead of assuming success — a write
+that's silently rejected (the undeployed-rules issue above) used to look
+identical to one that worked, which is what actually made highlighting
+feel unreliable; now a failure is visible instead of silent.
+
+## Profile
+
+A profile avatar button sits at the top-right of the header
+(`ProfileButton`, `src/components/ProfileButton.tsx`) on every tab — not
+one of the 5 in the bottom bar — and opens a dedicated Profile page
+(`ProfilePage.tsx`) in its place, with its own back button; "Sign out"
+lives here now instead of the main header.
+
+- **Photo.** Tapping the small camera badge on the avatar opens a file
+  picker; `uploadProfilePhoto` (`src/lib/storage.ts`) uploads to Firebase
+  Storage at `avatars/{uid}` (one file per user — re-uploading overwrites
+  it, no orphaned old files) and the resulting download URL is saved to
+  `users/{uid}.photoURL` (`updateUserProfile`, `src/lib/db/users.ts`) — the
+  same field Google sign-in already populates, so both paths feed the one
+  field the rest of the app reads. `storage.rules` caps uploads at 5MB and
+  requires an image content type; `uploadProfilePhoto` checks the same
+  limits client-side first for a fast, clear error.
+- **Display name.** An editable field over the same `users/{uid}.displayName`
+  already in the schema, saved explicitly (a "Save name" button, disabled
+  until the value actually changes) rather than auto-saving on every
+  keystroke.
+- **Highlighted Verses.** Every highlight from `user_highlights`
+  (`subscribeToHighlights`), newest first, each its own card — reference,
+  the verse text stored on the highlight itself (no re-fetch), and a notes
+  textarea (`updateHighlightNote`) with its own "Save note" button, dirty
+  only enabling once the text actually changes from what's saved.
 
 ## Payments (Plisio)
 
@@ -413,14 +467,15 @@ src/
   components/     UI components (StreakVisual, PlantIcon, LessonsSection,
                   PricingSection, AuthForm, ApostleAvatar, ApostleMessageCard,
                   BottomTabBar, PremiumGate (UnlockCard + blurredPreviewClass),
-                  icons.tsx — shared line icons)
+                  ProfileButton, ProfilePage, icons.tsx — shared line icons)
                   tabs/ — TodayTab, PathTab, ArmoryTab, WatchTab, WordTab
                   (see "Navigation" above)
-  lib/            firebase.ts (client SDK init), firebase-admin.ts (server-only
-                  Admin SDK init), auth-context.tsx, streak.ts, xp.ts, date.ts
-                  (pure logic), apostles.ts, apostle-moment.ts (see "Apostle
-                  Companion" above), armory.ts (Armory content), bible.ts
-                  (book list + /api/bible client), db/ (Firestore reads/writes,
+  lib/            firebase.ts (client SDK init, incl. Storage), firebase-admin.ts
+                  (server-only Admin SDK init), auth-context.tsx, streak.ts,
+                  xp.ts, date.ts (pure logic), apostles.ts, apostle-moment.ts
+                  (see "Apostle Companion" above), armory.ts (Armory content),
+                  bible.ts (book list + /api/bible client), storage.ts
+                  (profile photo upload), db/ (Firestore reads/writes,
                   including highlights.ts and accountability.ts),
                   plisio/ (plans.ts, checkout.ts, verify.ts — see "Payments" below)
   types/          firestore.ts (Firestore document types)
@@ -433,6 +488,7 @@ public/
                   portraits for the landing page (see "Apostle Companion"
                   above); falls back to an icon avatar if one's ever missing
 firestore.rules   Security rules matching the schema above
+storage.rules     Security rules for profile photo uploads (see "Profile" above)
 scripts/          seed-lessons.mjs + lessons-data.mjs (Admin SDK lesson seeding),
                   rules-test.mjs (firestore.rules tests, npm run test:rules),
                   plisio-verify.test.mjs (webhook signature tests, npm run test:plisio)

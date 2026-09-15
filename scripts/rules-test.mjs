@@ -280,7 +280,24 @@ await check("alice can re-color her own highlight (update, same docId)", async (
       book: "John",
       chapter: 3,
       verse: 16,
+      text: "For God so loved the world...",
       color: "sage",
+    }),
+  );
+});
+
+await check("alice can attach a personal note to her own highlight (update, notes only)", async () => {
+  await assertSucceeds(
+    updateDoc(doc(aliceDb, "user_highlights", aliceHighlightId), {
+      notes: "This is the one my grandmother always quoted.",
+    }),
+  );
+});
+
+await check("bob cannot attach a note to alice's highlight", async () => {
+  await assertFails(
+    updateDoc(doc(bobDb, "user_highlights", aliceHighlightId), {
+      notes: "not mine to edit",
     }),
   );
 });
