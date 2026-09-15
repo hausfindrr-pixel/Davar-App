@@ -10,10 +10,15 @@ import {
   assertFails,
 } from "@firebase/rules-unit-testing";
 import {
+  collection,
+  deleteDoc,
   doc,
   getDoc,
+  getDocs,
+  query,
   setDoc,
   updateDoc,
+  where,
 } from "firebase/firestore";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -219,6 +224,112 @@ await check("bob cannot write to alice's daily_lesson_progress doc", async () =>
 
 await check("an unauthenticated client cannot read alice's progress doc", async () => {
   await assertFails(getDoc(doc(anonDb, "daily_lesson_progress", aliceProgressId)));
+});
+
+// --- user_highlights: docId derived from uid + reference ---
+const aliceHighlightId = `${ALICE}_John_3_16`;
+
+await check("alice can highlight a verse (docId matches uid+book+chapter+verse)", async () => {
+  await assertSucceeds(
+    setDoc(doc(aliceDb, "user_highlights", aliceHighlightId), {
+      id: aliceHighlightId,
+      userId: ALICE,
+      reference: "John 3:16",
+      book: "John",
+      chapter: 3,
+      verse: 16,
+      color: "clay",
+    }),
+  );
+});
+
+await check("alice cannot create a highlight under a docId that doesn't match the verse", async () => {
+  await assertFails(
+    setDoc(doc(aliceDb, "user_highlights", `${ALICE}_wrong_id`), {
+      id: `${ALICE}_wrong_id`,
+      userId: ALICE,
+      reference: "John 3:16",
+      book: "John",
+      chapter: 3,
+      verse: 16,
+      color: "clay",
+    }),
+  );
+});
+
+await check("alice cannot create a highlight claiming to be bob", async () => {
+  await assertFails(
+    setDoc(doc(aliceDb, "user_highlights", `${BOB}_John_3_16`), {
+      id: `${BOB}_John_3_16`,
+      userId: BOB,
+      reference: "John 3:16",
+      book: "John",
+      chapter: 3,
+      verse: 16,
+      color: "clay",
+    }),
+  );
+});
+
+await check("alice can re-color her own highlight (update, same docId)", async () => {
+  await assertSucceeds(
+    setDoc(doc(aliceDb, "user_highlights", aliceHighlightId), {
+      id: aliceHighlightId,
+      userId: ALICE,
+      reference: "John 3:16",
+      book: "John",
+      chapter: 3,
+      verse: 16,
+      color: "sage",
+    }),
+  );
+});
+
+await check("bob cannot read alice's highlight", async () => {
+  await assertFails(getDoc(doc(bobDb, "user_highlights", aliceHighlightId)));
+});
+
+await check("bob cannot delete alice's highlight", async () => {
+  await assertFails(deleteDoc(doc(bobDb, "user_highlights", aliceHighlightId)));
+});
+
+await check("alice can delete her own highlight", async () => {
+  await assertSucceeds(deleteDoc(doc(aliceDb, "user_highlights", aliceHighlightId)));
+});
+
+// --- list-query patterns used by Peter's Watch (check_ins, accountability_links) ---
+await testEnv.withSecurityRulesDisabled(async (ctx) => {
+  await setDoc(doc(ctx.firestore(), "check_ins", "checkin-1"), {
+    id: "checkin-1",
+    userId: ALICE,
+    lessonId: null,
+    type: "custom",
+    date: TODAY,
+    xpEarned: 10,
+    notes: null,
+  });
+  await setDoc(doc(ctx.firestore(), "accountability_links", "link-1"), {
+    id: "link-1",
+    userId: BOB,
+    partnerId: ALICE,
+    initiatedBy: BOB,
+    status: "active",
+    respondedAt: null,
+    shareStreak: true,
+    shareLastCheckIn: true,
+  });
+});
+
+await check("alice can list her own check_ins via a where(userId==self) query", async () => {
+  const snap = await getDocs(query(collection(aliceDb, "check_ins"), where("userId", "==", ALICE)));
+  if (snap.size !== 1) throw new Error(`expected 1 doc, got ${snap.size}`);
+});
+
+await check("alice can list accountability_links where she's the partner (not the initiator)", async () => {
+  const snap = await getDocs(
+    query(collection(aliceDb, "accountability_links"), where("partnerId", "==", ALICE)),
+  );
+  if (snap.size !== 1) throw new Error(`expected 1 doc, got ${snap.size}`);
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

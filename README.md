@@ -97,6 +97,7 @@ Types for every collection live in `src/types/firestore.ts`:
 - **`check_ins/{checkInId}`** — a completed lesson, prayer, reading, etc. for a given day
 - **`daily_lesson_progress/{uid}_{date}`** — which lessons a user completed on a given day; the server-side source of truth for the free-tier daily lesson cap
 - **`accountability_links/{linkId}`** — a pending/active/ended pairing between two users
+- **`user_highlights/{uid}_{book}_{chapter}_{verse}`** — a verse a user highlighted in The Word, with its color
 
 `COLLECTIONS` in that same file holds the collection name constants.
 
@@ -104,10 +105,13 @@ Types for every collection live in `src/types/firestore.ts`:
 
 `firestore.rules` has starter rules matching the schema above: every user can
 only read/write their own `users`/`streaks` docs and their own `check_ins`,
-`lessons` is read-only (seed it via the console or Admin SDK), and
-`accountability_links` is readable/updatable by either party in the pairing.
-Deploy it once you have the [Firebase CLI](https://firebase.google.com/docs/cli)
-installed and linked to your project:
+`lessons` is read-only (seed it via the console or Admin SDK),
+`accountability_links` is readable/updatable by either party in the pairing,
+and `user_highlights` docs (docId derived from `{uid}_{book}_{chapter}_{verse}`)
+are only readable/writable by the user they belong to. **Whenever you change
+this file, you have to deploy it yourself** — editing it here only changes
+what's in the repo, not what's enforced on your live project — once you have
+the [Firebase CLI](https://firebase.google.com/docs/cli) installed and linked:
 
 ```bash
 firebase deploy --only firestore:rules
@@ -148,20 +152,104 @@ isolation. Re-run it after touching `firestore.rules`.
 
 ### Seeding lessons
 
-`lessons` is intentionally locked to read-only for clients (see the rule
-above), so seeding it needs an admin credential, not the app's normal
-client config:
+**If The Path is showing "No lessons yet" with nothing appearing, this is
+almost certainly why:** `lessons` is intentionally locked to read-only for
+clients (see the rule above), so nobody — including this app's own
+deploy — can seed it automatically. It has to be run once, by hand, with an
+admin credential:
 
 1. Firebase console → **Project settings → Service accounts → Generate new
    private key**. Save the downloaded file as `serviceAccountKey.json` at
    the repo root (gitignored — never commit it).
 2. `npm run seed:lessons`
 
+Until that's been run against your actual project, `lessons` has zero
+documents in it — confirmed directly against production more than once in
+this app's history — so `fetchLessons()` (`src/lib/db/lessons.ts`) and the
+free-tier reveal logic (`visibleLessonsForFreeTier`,
+`src/lib/lessons.ts`) both work correctly, there's simply nothing for them
+to return yet.
+
 This writes the week of lessons in `scripts/lessons-data.mjs` (scripture,
 prayer, and devotional tracks) via `scripts/seed-lessons.mjs`. Edit that data
 file and re-run the script to add more — each lesson's `id` is also its
 Firestore document ID, so re-running is idempotent (it overwrites by ID
 rather than duplicating).
+
+## Navigation (bottom tab bar)
+
+The signed-in app (`src/app/page.tsx`, `Dashboard`) is five tabs
+(`BottomTabBar`, `src/components/BottomTabBar.tsx`) rather than one long
+scroll. Each tab is its own component under `src/components/tabs/`:
+
+| Tab | Component | Access |
+| --- | --- | --- |
+| Today | `TodayTab.tsx` | Everyone — streak, XP, level, the apostle companion message, check-in |
+| The Path | `PathTab.tsx` | Free: capped at `FREE_DAILY_LESSON_LIMIT`/day. Premium: unlimited |
+| The Armory | `ArmoryTab.tsx` | Free: teaser (see below). Premium: full access |
+| Peter's Watch | `WatchTab.tsx` | Free: teaser. Premium: full access |
+| The Word | `WordTab.tsx` | Everyone, never gated |
+
+### The Armory
+
+Scripture grouped by struggle — "the sword of the Spirit, which is the word
+of God" (Ephesians 6:17) — content lives in `src/lib/armory.ts` as static
+data (`ARMORY_CATEGORIES`: Lust, Anger, Envy, Fear, each with a handful of
+verses), not a Firestore collection, since it's reference content rather
+than anything user- or dashboard-driven. The verse wording is given in
+common, widely-recognized phrasing close to public-domain translations —
+worth checking against your preferred translation before treating it as an
+exact quote.
+
+### Peter's Watch
+
+Free tier sees the same teaser pattern as The Armory. Premium sees two real
+things built from existing data — **check-in history** (from `check_ins`,
+`subscribeToCheckInHistory` in `src/lib/db/accountability.ts`) and
+**accountability-link status** (from `accountability_links`,
+`subscribeToAccountabilityLink`) — but **partner matching itself (finding
+and pairing you with someone) isn't built**. That needs real infrastructure
+(discovery, an invite/accept flow, ideally a server-side lookup rather than
+a client querying other users by email) that's out of scope here. The
+premium view says so honestly ("Matching is still being built") rather than
+faking a matching flow; `accountability_links` is ready to read from and
+write to once that exists.
+
+### The Armory & Peter's Watch: the shared locked-preview pattern
+
+Both premium-gated tabs use `src/components/PremiumGate.tsx`:
+`UnlockCard` (the lock icon + copy + "Unlock — Monthly $6.99" / "Yearly
+$59.99" buttons, wired to the same Plisio checkout as everywhere else) and
+`blurredPreviewClass` (a `blur`/`opacity`/`pointer-events-none` utility
+string) applied by each tab around whatever content should read as "real,
+but locked" — category names and section headers stay crisp; the actual
+verses or check-in rows underneath are blurred, not hidden outright, so a
+free user can see enough to want it rather than hitting an immediate
+popup.
+
+### The Word
+
+A general Bible reader, free for everyone, never gated. Verse text comes
+from **bible-api.com** (free, public-domain World English Bible
+translation, no API key) via a server-side proxy,
+`src/app/api/bible/route.ts` — proxied rather than called directly from the
+browser so CORS/error-handling live in one place and the third-party
+dependency isn't hardcoded into client code. `src/lib/bible.ts` holds the
+client-side `fetchChapter()` helper and the full 66-book/chapter-count list
+that drives the book/chapter picker. **Not exercised against the live API
+from this environment** — bible-api.com is blocked by this sandbox's
+egress proxy, confirmed via a direct request that correctly produced the
+route's own "Could not reach the Bible text source" error rather than
+crashing — so verify it end-to-end once deployed somewhere without that
+restriction.
+
+Tapping a verse opens a 3-color highlight picker (clay/sage/stone);
+`highlightVerse`/`removeHighlight` (`src/lib/db/highlights.ts`) write to
+`user_highlights`, keyed by `{uid}_{book}_{chapter}_{verse}` so a user has
+at most one highlight per verse — picking a new color overwrites it rather
+than stacking duplicates. `subscribeToHighlights` loads a user's highlights
+across every book/chapter they've ever read in one listener, filtered
+client-side to whatever chapter is currently open.
 
 ## Payments (Plisio)
 
@@ -320,14 +408,20 @@ from their own story:
 src/
   app/            App Router pages, layout, manifest.ts (PWA manifest route)
                   premium/success, premium/failed (post-checkout pages)
-                  api/plisio/create-invoice, api/plisio/webhook (route handlers)
+                  api/plisio/create-invoice, api/plisio/webhook,
+                  api/bible (route handlers — the last proxies bible-api.com)
   components/     UI components (StreakVisual, PlantIcon, LessonsSection,
                   PricingSection, AuthForm, ApostleAvatar, ApostleMessageCard,
+                  BottomTabBar, PremiumGate (UnlockCard + blurredPreviewClass),
                   icons.tsx — shared line icons)
+                  tabs/ — TodayTab, PathTab, ArmoryTab, WatchTab, WordTab
+                  (see "Navigation" above)
   lib/            firebase.ts (client SDK init), firebase-admin.ts (server-only
                   Admin SDK init), auth-context.tsx, streak.ts, xp.ts, date.ts
                   (pure logic), apostles.ts, apostle-moment.ts (see "Apostle
-                  Companion" above), db/ (Firestore reads/writes),
+                  Companion" above), armory.ts (Armory content), bible.ts
+                  (book list + /api/bible client), db/ (Firestore reads/writes,
+                  including highlights.ts and accountability.ts),
                   plisio/ (plans.ts, checkout.ts, verify.ts — see "Payments" below)
   types/          firestore.ts (Firestore document types)
 public/

@@ -88,3 +88,109 @@ export function CheckIcon({ className }: IconProps) {
     </svg>
   );
 }
+
+/** A sprout — Today: where the day's growth starts. */
+export function SproutIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M12 21v-9" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      <path
+        d="M12 12c0-4 3-6 7-6 0 4-3 6-7 6Z"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M12 14c0-3.5-2.5-5.5-6-5.5 0 3.5 2.5 5.5 6 5.5Z"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/** A scroll — The Path: the daily lessons feed. */
+export function ScrollIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className}>
+      <path
+        d="M6 4.5a2 2 0 0 0-2 2V7a1.5 1.5 0 0 0 1.5 1.5H7V5a.5.5 0 0 0-.5-.5H6Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M18 19.5a2 2 0 0 0 2-2V17a1.5 1.5 0 0 0-1.5-1.5H17V19a.5.5 0 0 0 .5.5H18Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      <path d="M7 4.5h10a2 2 0 0 1 2 2v9.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      <path d="M17 19.5H7a2 2 0 0 1-2-2V6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      <path d="M9 9h6M9 12.5h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** A shield — The Armory: protection, the sword of the Spirit's cover. */
+export function ShieldIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className}>
+      <path
+        d="M12 3.5 5 6v5.5c0 4.6 3 8 7 9.5 4-1.5 7-4.9 7-9.5V6l-7-2.5Z"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+      />
+      <path d="M12 8v6.5M9 11h6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** A key — Peter's Watch: keys of the kingdom, accountability. */
+export function KeyIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className}>
+      <circle cx="8" cy="8" r="3.3" stroke="currentColor" strokeWidth="1.7" />
+      <path
+        d="M10.3 10.3 19 19M15.3 14.7l2.2-2.2M17.8 17.2l2-2"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/** A padlock — the locked-preview teaser on gated content. */
+export function LockIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className}>
+      <rect x="5.5" y="10.5" width="13" height="9" rx="2" stroke="currentColor" strokeWidth="1.7" />
+      <path
+        d="M8 10.5V8a4 4 0 0 1 8 0v2.5"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+      <circle cx="12" cy="14.8" r="1.3" fill="currentColor" />
+    </svg>
+  );
+}
+
+/** A pencil/highlighter mark — used for the highlight action in The Word. */
+export function HighlighterIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className}>
+      <path
+        d="M14.5 4.5 19 9l-8.5 8.5H6V13L14.5 4.5Z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+      <path d="M4 20h6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}

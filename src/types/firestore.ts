@@ -11,6 +11,7 @@ export const COLLECTIONS = {
   checkIns: "check_ins",
   accountabilityLinks: "accountability_links",
   dailyLessonProgress: "daily_lesson_progress",
+  userHighlights: "user_highlights",
 } as const;
 
 export type UserTier = "free" | "premium";
@@ -111,4 +112,18 @@ export interface AccountabilityLinkDoc {
   respondedAt: Timestamp | null;
   shareStreak: boolean;
   shareLastCheckIn: boolean;
+}
+
+export type HighlightColor = "clay" | "sage" | "stone";
+
+/** user_highlights/{highlightId} — a verse a user highlighted in The Word. */
+export interface UserHighlightDoc {
+  id: string;
+  userId: string;
+  reference: string; // e.g. "John 3:16" — the exact string used to look the verse back up
+  book: string;
+  chapter: number;
+  verse: number;
+  color: HighlightColor;
+  createdAt: Timestamp;
 }

@@ -4,12 +4,15 @@ import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { ApostleAvatar } from "@/components/ApostleAvatar";
-import { ApostleMessageCard } from "@/components/ApostleMessageCard";
 import { AuthForm } from "@/components/AuthForm";
+import { BottomTabBar, type TabId } from "@/components/BottomTabBar";
 import { CompassIcon, FlameIcon, UsersIcon } from "@/components/icons";
-import { LessonsSection } from "@/components/LessonsSection";
 import { PricingSection } from "@/components/PricingSection";
-import { StreakVisual } from "@/components/StreakVisual";
+import { ArmoryTab } from "@/components/tabs/ArmoryTab";
+import { PathTab } from "@/components/tabs/PathTab";
+import { TodayTab } from "@/components/tabs/TodayTab";
+import { WatchTab } from "@/components/tabs/WatchTab";
+import { WordTab } from "@/components/tabs/WordTab";
 import { pickApostleMoment } from "@/lib/apostle-moment";
 import { APOSTLES, type ApostleId } from "@/lib/apostles";
 import { useAuth } from "@/lib/auth-context";
@@ -329,6 +332,7 @@ function Dashboard({ uid }: { uid: string }) {
   const [lessons, setLessons] = useState<LessonDoc[]>([]);
   const [lessonProgress, setLessonProgress] = useState<DailyLessonProgressDoc | null>(null);
   const [checkingIn, setCheckingIn] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabId>("today");
   const { user, signOut } = useAuth();
   const searchParams = useSearchParams();
   const justUpgraded = searchParams.get("upgraded") === "1";
@@ -383,29 +387,41 @@ function Dashboard({ uid }: { uid: string }) {
     await completeLesson(uid, timeZone, lesson);
   }
 
+  async function getIdToken(): Promise<string> {
+    if (!user) throw new Error("Sign in required.");
+    return user.getIdToken();
+  }
+
   async function handleUpgrade(plan: PlanId) {
     if (!user) return;
-    const idToken = await user.getIdToken();
-    await startCheckout(plan, idToken);
+    await startCheckout(plan, await getIdToken());
   }
 
   return (
-    <main className="flex-1 flex flex-col items-center gap-6 p-8 bg-ivory">
-      <div className="flex flex-col items-center gap-1 text-center pt-4">
-        <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-semibold text-ink">Davar</h1>
-          {isPremium && (
-            <span className="rounded-full bg-clay-600 text-paper px-2.5 py-0.5 text-[11px] font-medium tracking-wide">
-              Premium
-            </span>
-          )}
+    <main className="h-dvh flex flex-col bg-ivory overflow-hidden">
+      <header className="shrink-0 flex flex-col items-center gap-1 text-center pt-4 px-6">
+        <div className="w-full flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-semibold text-ink">Davar</h1>
+            {isPremium && (
+              <span className="rounded-full bg-clay-600 text-paper px-2.5 py-0.5 text-[11px] font-medium tracking-wide">
+                Premium
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => void signOut()}
+            className="text-xs text-stone underline"
+          >
+            Sign out
+          </button>
         </div>
-        <p className="text-sm text-stone">Your daily walk, one day at a time.</p>
-      </div>
+      </header>
 
       {justUpgraded && (
         <div
-          className={`w-full max-w-sm rounded-2xl border p-4 text-center text-sm ${
+          className={`shrink-0 mx-6 mt-3 rounded-2xl border p-4 text-center text-sm ${
             isPremium
               ? "bg-sage-50 border-sage-200 text-sage-700"
               : "bg-paper border-mist text-stone"
@@ -417,34 +433,37 @@ function Dashboard({ uid }: { uid: string }) {
         </div>
       )}
 
-      {apostleMoment && (
-        <ApostleMessageCard apostle={apostleMoment.apostle} message={apostleMoment.message} />
-      )}
+      <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
+        {activeTab === "today" && (
+          <TodayTab
+            currentCount={streak?.currentCount ?? 0}
+            longestCount={streak?.longestCount ?? 0}
+            level={profile?.level ?? 1}
+            xp={profile?.xp ?? 0}
+            checkedInToday={checkedInToday}
+            checkingIn={checkingIn}
+            onCheckIn={handleCheckIn}
+            apostleMoment={apostleMoment}
+          />
+        )}
+        {activeTab === "path" && (
+          <PathTab
+            lessons={visibleLessons}
+            completedLessonIds={lessonProgress?.completedLessonIds ?? []}
+            isPremium={isPremium}
+            suppressUpgradeNag={justUpgraded && !isPremium}
+            onComplete={handleCompleteLesson}
+            onUpgrade={handleUpgrade}
+          />
+        )}
+        {activeTab === "armory" && <ArmoryTab isPremium={isPremium} getIdToken={getIdToken} />}
+        {activeTab === "watch" && (
+          <WatchTab uid={uid} isPremium={isPremium} getIdToken={getIdToken} />
+        )}
+        {activeTab === "word" && <WordTab uid={uid} />}
+      </div>
 
-      <StreakVisual
-        currentCount={streak?.currentCount ?? 0}
-        longestCount={streak?.longestCount ?? 0}
-        level={profile?.level ?? 1}
-        xp={profile?.xp ?? 0}
-        checkedInToday={checkedInToday}
-        checkingIn={checkingIn}
-        onCheckIn={handleCheckIn}
-      />
-      <LessonsSection
-        lessons={visibleLessons}
-        completedLessonIds={lessonProgress?.completedLessonIds ?? []}
-        isPremium={isPremium}
-        suppressUpgradeNag={justUpgraded && !isPremium}
-        onComplete={handleCompleteLesson}
-        onUpgrade={handleUpgrade}
-      />
-      <button
-        type="button"
-        onClick={() => void signOut()}
-        className="text-xs text-stone underline"
-      >
-        Sign out
-      </button>
+      <BottomTabBar active={activeTab} onSelect={setActiveTab} />
     </main>
   );
 }

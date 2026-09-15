@@ -86,5 +86,18 @@ service cloud.firestore {
       allow create: if isSignedIn() && request.resource.data.initiatedBy == request.auth.uid;
       allow delete: if false;
     }
+
+    // The Word's verse highlights. docId is derived from uid + reference
+    // ("{uid}_{book}_{chapter}_{verse}") so a user can only ever have one
+    // highlight per verse — re-highlighting with a new color overwrites it
+    // (an "update" in rules terms) rather than creating a duplicate.
+    match /user_highlights/{highlightId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create, update: if isSignedIn() &&
+        request.resource.data.userId == request.auth.uid &&
+        highlightId == request.auth.uid + '_' + request.resource.data.book + '_' +
+          string(request.resource.data.chapter) + '_' + string(request.resource.data.verse);
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
   }
 }
