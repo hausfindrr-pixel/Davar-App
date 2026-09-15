@@ -105,6 +105,10 @@ Types for every collection live in `src/types/firestore.ts`:
   highlighted in The Word: its color, the verse `text` itself (stored
   alongside it so Profile's highlight list doesn't need to re-fetch it),
   and an optional personal `notes` string, editable from Profile
+- **`conversations/{uid}/messages/{messageId}`** — Peter's Watch AI chat
+  history: `role` (`"user"` | `"assistant"`), `apostleId` (`null` for the
+  user's own messages), `text`, `createdAt`. Read-only from the client —
+  see "Peter's Watch: AI chat" below.
 
 `COLLECTIONS` in that same file holds the collection name constants.
 
@@ -117,8 +121,12 @@ only read/write their own `users`/`streaks` docs and their own `check_ins`,
 and `user_highlights` docs (docId derived from `{uid}_{book}_{chapter}_{verse}`)
 are only readable/writable by the user they belong to — editing just the
 `notes` field on an existing highlight is an "update" under this same rule,
-no separate carve-out needed. `storage.rules` covers profile photos the
-same way (see "Profile" below).
+no separate carve-out needed. `conversations/{uid}/messages/{messageId}` is
+readable only by `{uid}` and **not writable by any client at all** — only
+the Admin SDK (via `/api/watch-chat`) writes to it, so the crisis-detection
+and apostle-routing logic in that route can't be bypassed by writing
+straight to Firestore. `storage.rules` covers profile photos the same way
+(see "Profile" below).
 
 **Whenever you change either rules file, you have to deploy it yourself** —
 editing it here only changes what's in the repo, not what's enforced on
@@ -219,19 +227,79 @@ common, widely-recognized phrasing close to public-domain translations —
 worth checking against your preferred translation before treating it as an
 exact quote.
 
-### Peter's Watch
+### Peter's Watch: AI chat
 
-Free tier sees the same teaser pattern as The Armory. Premium sees two real
-things built from existing data — **check-in history** (from `check_ins`,
-`subscribeToCheckInHistory` in `src/lib/db/accountability.ts`) and
-**accountability-link status** (from `accountability_links`,
-`subscribeToAccountabilityLink`) — but **partner matching itself (finding
-and pairing you with someone) isn't built**. That needs real infrastructure
-(discovery, an invite/accept flow, ideally a server-side lookup rather than
-a client querying other users by email) that's out of scope here. The
-premium view says so honestly ("Matching is still being built") rather than
-faking a matching flow; `accountability_links` is ready to read from and
-write to once that exists.
+Free tier sees a blurred, illustrative preview of the chat concept (no
+Firestore, no network — just static markup) under the same
+`UnlockCard`/`blurredPreviewClass` pattern as The Armory. Premium unlocks a
+real chat with Claude, styled as ordinary message bubbles: Peter opens
+("Tell me what's on your mind today."), the user types, and one of three
+apostles replies.
+
+- **Where the logic lives.** `src/lib/chat-apostle.ts` is a small,
+  dependency-free module (no Firestore, no Anthropic SDK) holding:
+  - `isCrisisMessage(text)` — a deterministic, regex-based first-layer
+    safety net (self-harm/suicide language) checked **before** any call to
+    Claude. If it fires, the reply is always the same fixed
+    `CRISIS_RESPONSE` string — never model-generated — pointing to 988 (US)
+    or findahelpline.com and encouraging the user to reach a real person.
+  - `routeApostle(text)` — simple, ordered keyword matching deciding who
+    replies: doubt/discouragement language → **Thomas**, positive/
+    encouragement-worthy language → **John**, everything else (the default,
+    including ordinary accountability content) → **Peter**. Intentionally
+    simple per spec — "good enough," not sentiment analysis.
+  - `systemPromptFor(apostleId)` — builds each apostle's system prompt from
+    the `characteristic`/`tone` strings already in `src/lib/apostles.ts`
+    (shared with the notification system, so the voice is consistent app-
+    wide), plus shared guidelines: short replies, never shame or diagnose,
+    always point back to grace and a concrete next step, be honest if asked
+    whether it's a real person, and defer to the crisis instructions above
+    if the model itself picks up on subtler crisis language the first-layer
+    regex list misses.
+  - All three are covered by a scratch unit-test pass (not checked into the
+    repo as a script, run ad hoc) verifying the crisis short-circuit,
+    apostle routing including a doubt-vs-encouragement tie-break, and that
+    each system prompt carries the expected persona and safety language.
+- **The route.** `POST /api/watch-chat` (`src/app/api/watch-chat/route.ts`)
+  verifies the caller's ID token, re-checks `tier === "premium"` server-side
+  (defense in depth beyond the UI gate — the same discipline as the daily
+  lesson cap), writes the user's message to Firestore, runs the crisis
+  check, and — if it didn't fire — fetches the last 20 messages as
+  conversation history, routes to an apostle, and calls Claude via the
+  official `@anthropic-ai/sdk` (model `claude-opus-5`, `effort: "low"`,
+  `max_tokens: 400` — a short chat reply doesn't need more). It checks
+  `stop_reason === "refusal"` before reading the response and falls back to
+  a gentle, hard-coded line if the model declines to answer. Both the user's
+  message and the reply are written via the Admin SDK, which is why clients
+  can't write to `conversations` directly (see "Security rules" above).
+- **The client.** `src/lib/db/conversations.ts` subscribes to a user's
+  message history in order; `src/lib/watch-chat.ts` posts a new message to
+  the route. `WatchTab.tsx` shows the running conversation, an apostle
+  name + small icon (`ApostleAvatar`) next to every assistant bubble, a
+  "…" pending indicator while waiting on a reply, and a visible (not
+  silent) error with the draft text preserved if a send fails.
+- **What's verified vs. not from this sandbox.** The crisis-detection and
+  apostle-routing logic, the system prompts, the Firestore rules (via
+  `npm run test:rules`), and the chat UI's layout/styling (via a mocked,
+  non-committed dev-preview route and Playwright screenshots) are all
+  checked. **An actual end-to-end call to Claude is not** — this sandbox
+  has no `ANTHROPIC_API_KEY` and `api.anthropic.com` reachability from here
+  is unconfirmed. Verify a real round trip once `ANTHROPIC_API_KEY` is set
+  in your environment.
+- **Environment variable.** Add `ANTHROPIC_API_KEY` (from
+  [console.anthropic.com](https://console.anthropic.com/settings/keys)) to
+  `.env.local` locally and to Vercel under **Project Settings → Environment
+  Variables** before this feature will work in production — server-only,
+  never prefixed `NEXT_PUBLIC_`.
+
+Partner matching (an older idea for this tab — pairing two users up as
+accountability partners) was replaced by the AI chat above and isn't built.
+`check_ins` and `accountability_links` still exist in the schema and rules
+(and are still covered by `npm run test:rules`) in case that's revisited
+later, but nothing in the UI reads from them anymore —
+`src/lib/db/accountability.ts` (the old `subscribeToCheckInHistory`/
+`subscribeToAccountabilityLink` helpers) was deleted as dead code once
+`WatchTab.tsx` stopped using it.
 
 ### The Armory & Peter's Watch: the shared locked-preview pattern
 

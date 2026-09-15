@@ -1,4 +1,5 @@
 import type { Timestamp } from "firebase/firestore";
+import type { ApostleId } from "@/lib/apostles";
 
 /**
  * Firestore collection names, kept in one place so a rename doesn't require
@@ -12,6 +13,7 @@ export const COLLECTIONS = {
   accountabilityLinks: "accountability_links",
   dailyLessonProgress: "daily_lesson_progress",
   userHighlights: "user_highlights",
+  conversations: "conversations",
 } as const;
 
 export type UserTier = "free" | "premium";
@@ -131,5 +133,23 @@ export interface UserHighlightDoc {
   color: HighlightColor;
   /** A personal note the user attached to this verse, editable from Profile. */
   notes: string | null;
+  createdAt: Timestamp;
+}
+
+export type ChatRole = "user" | "assistant";
+
+/**
+ * conversations/{uid}/messages/{messageId} — Peter's Watch AI chat history.
+ * Read-only from the client (see firestore.rules) — only the Admin SDK,
+ * via /api/watch-chat, ever writes. That's deliberate: the crisis-detection
+ * and apostle-routing logic lives entirely in that server route, and a
+ * client that could write directly to this collection could bypass it.
+ */
+export interface ConversationMessageDoc {
+  id: string;
+  role: ChatRole;
+  /** Which apostle sent this — null for the user's own messages. */
+  apostleId: ApostleId | null;
+  text: string;
   createdAt: Timestamp;
 }

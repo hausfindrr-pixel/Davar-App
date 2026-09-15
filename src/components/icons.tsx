@@ -225,6 +225,21 @@ export function CameraIcon({ className }: IconProps) {
   );
 }
 
+/** A paper airplane — sending a chat message. */
+export function SendIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className}>
+      <path
+        d="M4 12 20 4l-6.5 16-2.5-7-7-1Z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 /** A left arrow — back navigation, e.g. out of the Profile page. */
 export function ArrowLeftIcon({ className }: IconProps) {
   return (

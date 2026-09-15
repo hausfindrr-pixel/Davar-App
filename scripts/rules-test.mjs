@@ -349,6 +349,38 @@ await check("alice can list accountability_links where she's the partner (not th
   if (snap.size !== 1) throw new Error(`expected 1 doc, got ${snap.size}`);
 });
 
+// --- conversations/{uid}/messages: Peter's Watch AI chat, read-only for clients ---
+await testEnv.withSecurityRulesDisabled(async (ctx) => {
+  await setDoc(
+    doc(ctx.firestore(), "conversations", ALICE, "messages", "msg-1"),
+    {
+      id: "msg-1",
+      role: "user",
+      apostleId: null,
+      text: "I fell into it again today.",
+    },
+  );
+});
+
+await check("alice can read her own conversation message", async () => {
+  await assertSucceeds(getDoc(doc(aliceDb, "conversations", ALICE, "messages", "msg-1")));
+});
+
+await check("bob cannot read alice's conversation message", async () => {
+  await assertFails(getDoc(doc(bobDb, "conversations", ALICE, "messages", "msg-1")));
+});
+
+await check("alice cannot write directly to her own conversation (server-only)", async () => {
+  await assertFails(
+    setDoc(doc(aliceDb, "conversations", ALICE, "messages", "msg-2"), {
+      id: "msg-2",
+      role: "assistant",
+      apostleId: "peter",
+      text: "forged reply",
+    }),
+  );
+});
+
 console.log(`\n${pass} passed, ${fail} failed`);
 await testEnv.cleanup();
 process.exit(fail > 0 ? 1 : 0);

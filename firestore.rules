@@ -99,5 +99,16 @@ service cloud.firestore {
           string(request.resource.data.chapter) + '_' + string(request.resource.data.verse);
       allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
+
+    // Peter's Watch AI chat. docId path is conversations/{uid}/messages/{id}
+    // — ownership comes from the uid path segment itself, not a data field.
+    // Read-only for clients: only the Admin SDK (via /api/watch-chat, which
+    // runs crisis-detection and apostle-routing server-side before writing
+    // anything) ever creates these docs, so that logic can't be bypassed by
+    // writing straight to Firestore.
+    match /conversations/{uid}/messages/{messageId} {
+      allow read: if isOwner(uid);
+      allow write: if false;
+    }
   }
 }
