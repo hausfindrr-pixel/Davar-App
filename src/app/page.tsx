@@ -3,11 +3,14 @@
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { ApostleAvatar } from "@/components/ApostleAvatar";
+import { ApostleMessageCard } from "@/components/ApostleMessageCard";
 import { AuthForm } from "@/components/AuthForm";
 import { BenefitCarousel } from "@/components/BenefitCarousel";
 import { LessonsSection } from "@/components/LessonsSection";
 import { PricingSection } from "@/components/PricingSection";
 import { StreakVisual } from "@/components/StreakVisual";
+import { pickApostleMoment } from "@/lib/apostle-moment";
 import { useAuth } from "@/lib/auth-context";
 import { completeLesson, fetchLessons, subscribeToLessonProgress } from "@/lib/db/lessons";
 import { checkIn, subscribeToStreak } from "@/lib/db/streaks";
@@ -27,10 +30,13 @@ import type {
  * app's core value prop (grace-centered accountability). The other two
  * pain points from earlier drafts (spiritual direction, judgment-free
  * community) are already carried by the "Scripture, made daily" and "A
- * community that gets it" benefit cards below. */
+ * community that gets it" benefit cards below. The response introduces the
+ * Apostle Companion concept via Peter specifically — his own story is
+ * failure followed by restoration, so he's the one who greets you here,
+ * not a generic "accountability partner." */
 const PAIN_POINT = {
-  struggle: "Stuck in a cycle you can't seem to break?",
-  response: "Grace, not shame — accountability that moves you forward.",
+  struggle: "Stuck fighting the same temptation alone?",
+  response: "Meet Peter — an accountability companion who knows what it's like to fail, and be restored.",
 };
 
 const BENEFITS = [
@@ -81,7 +87,7 @@ const BENEFITS = [
   },
   {
     title: "A community that gets it",
-    description: "A judgment-free accountability partner, always in your corner.",
+    description: "Your apostle companion — judgment-free, always in your corner.",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
         <circle cx="9" cy="9" r="3" stroke="currentColor" strokeWidth="1.7" />
@@ -175,14 +181,16 @@ function LandingPage() {
           </button>
         </section>
 
-        {/* Screen 2 — the one pain point that matters most */}
-        <section className="w-full h-full shrink-0 snap-start overflow-y-auto flex flex-col items-center justify-center text-center gap-4 px-6 py-12">
+        {/* Screen 2 — the one pain point that matters most, answered by
+            Peter specifically, not a generic "accountability partner" */}
+        <section className="w-full h-full shrink-0 snap-start overflow-y-auto flex flex-col items-center justify-center text-center gap-6 px-6 py-12">
           <p className="text-xl sm:text-2xl text-stone italic max-w-sm">
             {PAIN_POINT.struggle}
           </p>
-          <p className="text-xl sm:text-2xl text-ink font-semibold max-w-sm">
-            {PAIN_POINT.response}
-          </p>
+          <div className="flex items-center gap-3 max-w-sm text-left">
+            <ApostleAvatar apostleId="peter" size="md" />
+            <p className="text-lg sm:text-xl text-ink font-semibold">{PAIN_POINT.response}</p>
+          </div>
         </section>
 
         {/* Screen 3 — benefits, swipeable */}
@@ -284,6 +292,17 @@ function Dashboard({ uid }: { uid: string }) {
   }, [uid, today]);
 
   const checkedInToday = streak?.lastCheckInDate === today;
+  const apostleMoment = profile
+    ? pickApostleMoment({
+        uid,
+        today,
+        checkedInToday,
+        currentStreak: streak?.currentCount ?? 0,
+        longestStreak: streak?.longestCount ?? 0,
+        xp: profile.xp,
+        level: profile.level,
+      })
+    : null;
 
   async function handleCheckIn() {
     setCheckingIn(true);
@@ -330,6 +349,10 @@ function Dashboard({ uid }: { uid: string }) {
             ? "You're Premium — unlimited daily lessons and the full library are unlocked."
             : "Payment received — your upgrade is confirming on the network. This can take a few minutes; this page will update on its own, no need to refresh."}
         </div>
+      )}
+
+      {apostleMoment && (
+        <ApostleMessageCard apostle={apostleMoment.apostle} message={apostleMoment.message} />
       )}
 
       <StreakVisual

@@ -234,6 +234,44 @@ already sends as `callback_url`/`success_invoice_url`/`fail_invoice_url`:
   invoice; there's no automatic renewal — a user re-runs checkout manually
   when their `premiumUntil` is approaching.
 
+## Apostle Companion
+
+Every in-app nudge is attributed to one of four apostles rather than a
+generic "notification" — each stands for a different kind of moment, drawn
+from their own story:
+
+| Apostle | Notification type | Tone |
+| --- | --- | --- |
+| Peter | Accountability / check-in nudges | Bold, restorative — a stumble isn't the end |
+| Matthew | Progress & stats recaps | Precise, detail-oriented |
+| John | Daily gentle encouragement to open Scripture | Warm, relational |
+| Thomas | Reassurance during doubt / low motivation | Honest about doubt, still points to faith |
+
+- `src/lib/apostles.ts` — the data model: `APOSTLES` (name, one-line
+  scriptural characteristic, tone, and a message-template array per
+  apostle) and `APOSTLE_FOR_TYPE`, the **fixed** type → apostle mapping
+  (Peter always sends check-in nudges, never Matthew). Which message
+  within that apostle's own list is shown is picked by
+  `pickApostleMessage(apostle, seed)` — deterministically hashed from a
+  `${uid}-${date}-${type}` seed rather than `Math.random()`, so it's stable
+  across re-renders/navigation within a day (no flicker) but still varies
+  day to day and user to user. `formatApostleMessage` fills
+  `{streak}`/`{longest}`/`{xp}`/`{level}` placeholders (used by Matthew's
+  recap templates).
+- `src/lib/apostle-moment.ts` — `pickApostleMoment(ctx)` decides which
+  *type* applies right now from simple dashboard state, in priority order:
+  not checked in today → Peter; checked in but the streak just reset after
+  being longer → Thomas; checked in on a 7-day streak milestone → Matthew;
+  otherwise → John (the steady default).
+- `src/components/ApostleAvatar.tsx` / `ApostleMessageCard.tsx` — the UI
+  surface: each apostle gets a small distinct icon (a key for Peter, a
+  ledger for Matthew, a heart for John, an eye for Thomas) in the existing
+  clay/sage/neutral palette — no new colors — so apostles are told apart by
+  glyph, not by introducing new hues. The card shows the apostle's name and
+  avatar next to their message, on the dashboard (`src/app/page.tsx`,
+  `Dashboard`) and, for Peter specifically, on the landing page's pain-point
+  screen introducing him as the accountability companion.
+
 ## Auth & streak logic
 
 - `src/lib/auth-context.tsx` — `AuthProvider`/`useAuth()`: email+password and
@@ -274,10 +312,12 @@ src/
                   premium/success, premium/failed (post-checkout pages)
                   api/plisio/create-invoice, api/plisio/webhook (route handlers)
   components/     UI components (StreakVisual, PlantIcon, LessonsSection,
-                  BenefitCard, BenefitCarousel, PricingSection, AuthForm)
+                  BenefitCard, BenefitCarousel, PricingSection, AuthForm,
+                  ApostleAvatar, ApostleMessageCard)
   lib/            firebase.ts (client SDK init), firebase-admin.ts (server-only
                   Admin SDK init), auth-context.tsx, streak.ts, xp.ts, date.ts
-                  (pure logic), db/ (Firestore reads/writes),
+                  (pure logic), apostles.ts, apostle-moment.ts (see "Apostle
+                  Companion" above), db/ (Firestore reads/writes),
                   plisio/ (plans.ts, checkout.ts, verify.ts — see "Payments" below)
   types/          firestore.ts (Firestore document types)
 public/
