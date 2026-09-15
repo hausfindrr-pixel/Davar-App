@@ -271,12 +271,13 @@ from their own story:
   avatar next to their message on the dashboard (`src/app/page.tsx`,
   `Dashboard`).
 - **Companion portraits.** The landing page's "Meet your companions" screen
-  expects a photo per apostle at `public/apostles/{peter,matthew,john,thomas}.png`
-  — drop them in and they'll render automatically (`CompanionPortrait` in
-  `src/app/page.tsx`, via `next/image`). Until they exist (or if one fails
-  to load), it falls back to that apostle's `ApostleAvatar` icon instead of
-  a broken-image icon, so the screen never looks unfinished in the
-  meantime.
+  shows a character portrait per apostle from
+  `public/apostles/{peter,matthew,john,thomas}.png` (`CompanionPortrait` in
+  `src/app/page.tsx`, via `next/image`, cropped to a square on the top of
+  the image). If a file is ever missing or fails to load, it falls back to
+  that apostle's `ApostleAvatar` icon instead of a broken-image icon, so
+  the screen never looks unfinished — replace a file to update that
+  apostle's portrait.
 
 ## Auth & streak logic
 
@@ -336,7 +337,7 @@ public/
                   to just the mark from logo.svg — see below
   apostles/       peter.png, matthew.png, john.png, thomas.png — companion
                   portraits for the landing page (see "Apostle Companion"
-                  above); falls back to an icon avatar until these exist
+                  above); falls back to an icon avatar if one's ever missing
 firestore.rules   Security rules matching the schema above
 scripts/          seed-lessons.mjs + lessons-data.mjs (Admin SDK lesson seeding),
                   rules-test.mjs (firestore.rules tests, npm run test:rules),
