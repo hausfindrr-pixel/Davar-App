@@ -3,17 +3,19 @@ import type { ApostleId } from "@/lib/apostles";
 
 type ApostleAvatarProps = {
   apostleId: ApostleId;
-  size?: "sm" | "md";
+  size?: "sm" | "md" | "lg";
 };
 
 const SIZE_CLASSES: Record<NonNullable<ApostleAvatarProps["size"]>, string> = {
   sm: "h-8 w-8",
   md: "h-10 w-10",
+  lg: "h-16 w-16",
 };
 
 const ICON_SIZE_CLASSES: Record<NonNullable<ApostleAvatarProps["size"]>, string> = {
   sm: "h-4 w-4",
   md: "h-5 w-5",
+  lg: "h-7 w-7",
 };
 
 // Same restrained clay/sage/neutral palette as the rest of the app — no new

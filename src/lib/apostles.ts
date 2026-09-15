@@ -23,6 +23,8 @@ export interface Apostle {
   characteristic: string;
   /** How their messages should read. */
   tone: string;
+  /** Short landing-page tagline — "who they are to you," not who they were. */
+  role: string;
   notificationType: NotificationType;
   /** Message templates for this apostle's lane. May contain {streak},
    * {longest}, {xp}, or {level} placeholders — see formatApostleMessage. */
@@ -35,6 +37,7 @@ export const APOSTLES: Record<ApostleId, Apostle> = {
     name: "Peter",
     characteristic: "Denied Jesus three times — then was restored and told to feed His sheep.",
     tone: "Bold and restorative — a stumble isn't the end of the story, so get back up.",
+    role: "Accountability when you need it most",
     notificationType: "checkIn",
     messages: [
       "You stumbled — that's not the end of your story. Show up again today.",
@@ -49,6 +52,7 @@ export const APOSTLES: Record<ApostleId, Apostle> = {
     name: "Matthew",
     characteristic: "A tax collector who kept careful records — now numbers your days of faithfulness.",
     tone: "Precise and detail-oriented — your progress is worth counting.",
+    role: "A gentle record of your progress",
     notificationType: "progress",
     messages: [
       "{streak}-day streak, {xp} XP earned, Level {level}. Every number here is a day you showed up.",
@@ -63,6 +67,7 @@ export const APOSTLES: Record<ApostleId, Apostle> = {
     name: "John",
     characteristic: "The disciple who leaned close at the table — wrote most about love and abiding.",
     tone: "Warm and relational — like a close friend checking in, never a task reminder.",
+    role: "Daily encouragement to keep going",
     notificationType: "encouragement",
     messages: [
       "I'm glad you're here today. Even a few minutes in the Word matters.",
@@ -77,6 +82,7 @@ export const APOSTLES: Record<ApostleId, Apostle> = {
     name: "Thomas",
     characteristic: "Doubted until he saw — then was the first to call Him \"my Lord and my God.\"",
     tone: "Honest about doubt, never dismissive of it — still points back to faith.",
+    role: "A steady presence in your doubt",
     notificationType: "reassurance",
     messages: [
       "It's okay to not feel sure today. Doubt isn't the opposite of faith — it's part of the walk.",

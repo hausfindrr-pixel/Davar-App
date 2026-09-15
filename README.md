@@ -268,9 +268,15 @@ from their own story:
   ledger for Matthew, a heart for John, an eye for Thomas) in the existing
   clay/sage/neutral palette — no new colors — so apostles are told apart by
   glyph, not by introducing new hues. The card shows the apostle's name and
-  avatar next to their message, on the dashboard (`src/app/page.tsx`,
-  `Dashboard`) and, for Peter specifically, on the landing page's pain-point
-  screen introducing him as the accountability companion.
+  avatar next to their message on the dashboard (`src/app/page.tsx`,
+  `Dashboard`).
+- **Companion portraits.** The landing page's "Meet your companions" screen
+  expects a photo per apostle at `public/apostles/{peter,matthew,john,thomas}.png`
+  — drop them in and they'll render automatically (`CompanionPortrait` in
+  `src/app/page.tsx`, via `next/image`). Until they exist (or if one fails
+  to load), it falls back to that apostle's `ApostleAvatar` icon instead of
+  a broken-image icon, so the screen never looks unfinished in the
+  meantime.
 
 ## Auth & streak logic
 
@@ -278,16 +284,19 @@ from their own story:
   Google sign-in, wired up in `src/app/layout.tsx`. On first sign-in it calls
   `ensureUserDoc` (`src/lib/db/users.ts`) to create the `users/{uid}` doc.
 - `src/components/AuthForm.tsx` — sign-in/sign-up form. The signed-out home
-  page (`src/app/page.tsx`) is a short, swipeable 4-screen onboarding
-  carousel (hero → pain point → benefits → pricing) rather than a long
-  scroll — every "Get Started" CTA jumps straight to the sign-up form on the
-  last screen, reachable in at most 3 swipes from the hero. Screen 3's
-  benefit cards are their own nested swipe carousel
-  (`src/components/BenefitCarousel.tsx`), showing 1 card at a time on
-  narrow screens and ~2 on `sm+`. Both carousels are plain CSS scroll-snap
-  (`overflow-x-auto` + `snap-x`) with dot indicators and prev/next buttons
-  driving `scrollTo`, not a swipe-gesture library — native touch/trackpad
-  swipe and the on-screen controls both work.
+  page (`src/app/page.tsx`) is a short, swipeable 5-screen onboarding
+  carousel rather than a long scroll — hero → pain points → grace → meet
+  the companions → pricing + sign-up — with a "1 / 5"-style counter in the
+  header. Every "Get Started" CTA jumps straight to the sign-up form on the
+  last screen, reachable in at most 4 swipes from the hero (or 0, via the
+  jump). It's plain CSS scroll-snap (`overflow-x-auto` + `snap-x`) with a
+  dot indicator and prev/next buttons driving `scrollTo`, not a
+  swipe-gesture library — native touch/trackpad swipe and the on-screen
+  controls both work. Headlines use a serif font (`font-serif`, Georgia —
+  a `@theme` token in `globals.css`, no webfont to load) distinct from the
+  sans body/UI text, matching the onboarding design this was adapted from.
+  `src/components/icons.tsx` holds the small set of line icons shared
+  between the onboarding screens and `PricingSection`.
 - `src/lib/streak.ts` — `computeStreakUpdate`, the pure function deciding
   the next streak state for a check-in: increments on a same-day no-op or a
   consecutive day, bridges a single missed day with a streak freeze if one's
@@ -312,8 +321,8 @@ src/
                   premium/success, premium/failed (post-checkout pages)
                   api/plisio/create-invoice, api/plisio/webhook (route handlers)
   components/     UI components (StreakVisual, PlantIcon, LessonsSection,
-                  BenefitCard, BenefitCarousel, PricingSection, AuthForm,
-                  ApostleAvatar, ApostleMessageCard)
+                  PricingSection, AuthForm, ApostleAvatar, ApostleMessageCard,
+                  icons.tsx — shared line icons)
   lib/            firebase.ts (client SDK init), firebase-admin.ts (server-only
                   Admin SDK init), auth-context.tsx, streak.ts, xp.ts, date.ts
                   (pure logic), apostles.ts, apostle-moment.ts (see "Apostle
@@ -325,6 +334,9 @@ public/
                   landing page hero
   icons/          PNG app icons (192/512/maskable-512/apple-touch), cropped
                   to just the mark from logo.svg — see below
+  apostles/       peter.png, matthew.png, john.png, thomas.png — companion
+                  portraits for the landing page (see "Apostle Companion"
+                  above); falls back to an icon avatar until these exist
 firestore.rules   Security rules matching the schema above
 scripts/          seed-lessons.mjs + lessons-data.mjs (Admin SDK lesson seeding),
                   rules-test.mjs (firestore.rules tests, npm run test:rules),

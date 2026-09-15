@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { BarChartIcon, BookOpenIcon, CheckIcon, CompassIcon, UsersIcon } from "@/components/icons";
 import { FREE_DAILY_LESSON_LIMIT } from "@/types/firestore";
 
 const MONTHLY_PRICE = 6.99;
@@ -16,27 +17,28 @@ const FREE_FEATURES = [
   "Basic streak tracking",
 ];
 
-const PREMIUM_FEATURES = [
-  "Full gamified lesson library",
-  "Accountability partner check-ins",
-  "Advanced habit & streak analytics — grace-based, never shaming",
-  "The Armory — verse collections grouped by the struggle they target",
-  "Community & prayer wall",
+const PREMIUM_FEATURE_ROWS = [
+  {
+    icon: BookOpenIcon,
+    title: "The Armory",
+    copy: "Scripture for lust, anger, envy, or fear — the sword of the Spirit for the struggle in front of you. (Ephesians 6:17)",
+  },
+  {
+    icon: CompassIcon,
+    title: "Unlimited daily lessons",
+    copy: "Go beyond the free tier's 3-per-day cap and follow your curiosity.",
+  },
+  {
+    icon: UsersIcon,
+    title: "Accountability matching",
+    copy: "Find a steady partner who brings support, not judgment.",
+  },
+  {
+    icon: BarChartIcon,
+    title: "Progress analytics",
+    copy: "See your growth and keep a meaningful history of your streaks — grace-based, never shaming.",
+  },
 ];
-
-function CheckIcon() {
-  return (
-    <svg viewBox="0 0 20 20" fill="none" className="mt-0.5 h-4 w-4 shrink-0 text-sage-600">
-      <path
-        d="M4 10.5 8 14l8-8"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
 
 type PricingSectionProps = {
   onGetStarted: () => void;
@@ -49,12 +51,36 @@ export function PricingSection({ onGetStarted }: PricingSectionProps) {
   return (
     <section className="flex flex-col items-center gap-8 px-6 py-24 border-t border-mist">
       <div className="flex flex-col items-center gap-2 text-center">
-        <h2 className="text-2xl font-semibold text-ink">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-sage-600">
+          choose your rhythm
+        </p>
+        <h2 className="font-serif text-3xl sm:text-4xl text-ink">
           Start free, go deeper when you&apos;re ready
         </h2>
         <p className="text-sm text-stone max-w-sm">
           Join others building a daily habit rooted in grace.
         </p>
+      </div>
+
+      <div className="flex items-center gap-1 rounded-full bg-mist p-1 text-xs font-semibold">
+        <button
+          type="button"
+          onClick={() => setBilling("monthly")}
+          className={`rounded-full px-5 py-2.5 transition-colors ${
+            !isYearly ? "bg-paper text-ink shadow-sm" : "text-stone"
+          }`}
+        >
+          Monthly
+        </button>
+        <button
+          type="button"
+          onClick={() => setBilling("yearly")}
+          className={`rounded-full px-5 py-2.5 transition-colors ${
+            isYearly ? "bg-paper text-ink shadow-sm" : "text-stone"
+          }`}
+        >
+          Yearly <span className="text-sage-600">save {YEARLY_SAVINGS_PERCENT}%</span>
+        </button>
       </div>
 
       <div className="w-full max-w-3xl grid gap-5 sm:grid-cols-2 items-start">
@@ -70,7 +96,7 @@ export function PricingSection({ onGetStarted }: PricingSectionProps) {
           <ul className="w-full flex flex-col gap-3">
             {FREE_FEATURES.map((feature) => (
               <li key={feature} className="flex items-start gap-2.5 text-sm text-ink/80">
-                <CheckIcon />
+                <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-sage-600" />
                 <span>{feature}</span>
               </li>
             ))}
@@ -90,59 +116,39 @@ export function PricingSection({ onGetStarted }: PricingSectionProps) {
           </button>
         </div>
 
-        <div className="rounded-3xl bg-paper border-2 border-clay-400 p-8 flex flex-col items-center gap-6">
-          <div className="flex flex-col items-center gap-3 text-center">
-            <span className="text-sm font-medium text-clay-600">Premium</span>
+        <div className="rounded-3xl bg-sage-700 p-8 flex flex-col gap-6 shadow-[0_15px_35px_rgba(92,107,62,0.18)]">
+          <div className="flex items-start justify-between">
+            <span className="text-xs font-semibold uppercase tracking-[0.16em] text-paper/65">
+              Premium
+            </span>
+            <span className="rounded-full bg-clay-600 px-2.5 py-1 text-[10px] font-bold text-paper">
+              {isYearly ? `$${YEARLY_PRICE.toFixed(2)} / yr` : `$${MONTHLY_PRICE.toFixed(2)} / mo`}
+            </span>
+          </div>
 
-            <div className="flex items-center gap-1 rounded-full border border-mist p-1">
-              <button
-                type="button"
-                onClick={() => setBilling("monthly")}
-                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                  !isYearly ? "bg-clay-600 text-paper" : "text-stone"
-                }`}
-              >
-                Monthly
-              </button>
-              <button
-                type="button"
-                onClick={() => setBilling("yearly")}
-                className={`relative rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                  isYearly ? "bg-clay-600 text-paper" : "text-stone"
-                }`}
-              >
-                Yearly
-                <span className="absolute -top-2.5 -right-2.5 rounded-full bg-sage-600 px-2 py-0.5 text-[10px] font-semibold text-paper">
-                  Save {YEARLY_SAVINGS_PERCENT}%
-                </span>
-              </button>
-            </div>
-
-            <div className="flex items-end gap-1">
-              <span className="text-4xl font-semibold tabular-nums text-ink">
-                ${isYearly ? YEARLY_PRICE.toFixed(2) : MONTHLY_PRICE.toFixed(2)}
-              </span>
-              <span className="pb-1 text-sm text-stone">
-                /{isYearly ? "year" : "month"}
-              </span>
-            </div>
+          <div>
+            <h3 className="font-serif text-3xl text-paper">The full walk</h3>
             {isYearly && (
-              <span className="text-xs font-medium text-sage-700 -mt-2">
+              <p className="mt-1 text-xs font-medium text-paper/70">
                 Save ${YEARLY_SAVINGS_AMOUNT.toFixed(2)} a year compared to paying monthly
-              </span>
+              </p>
             )}
           </div>
 
-          <ul className="w-full flex flex-col gap-3">
-            {PREMIUM_FEATURES.map((feature) => (
-              <li key={feature} className="flex items-start gap-2.5 text-sm text-ink/80">
-                <CheckIcon />
-                <span>{feature}</span>
-              </li>
+          <div className="flex flex-col gap-3">
+            {PREMIUM_FEATURE_ROWS.map(({ icon: Icon, title, copy }) => (
+              <div key={title} className="flex gap-2.5">
+                <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-paper/15 text-clay-200">
+                  <Icon className="h-3.5 w-3.5" />
+                </span>
+                <p className="text-[13px] leading-5 text-paper/85">
+                  <strong className="font-semibold text-paper">{title}.</strong> {copy}
+                </p>
+              </div>
             ))}
-          </ul>
+          </div>
 
-          <div className="w-full flex flex-col items-center gap-1.5">
+          <div className="flex flex-col items-center gap-1.5">
             <button
               type="button"
               onClick={onGetStarted}
@@ -150,7 +156,7 @@ export function PricingSection({ onGetStarted }: PricingSectionProps) {
             >
               Start free for 7 days
             </button>
-            <span className="text-xs text-stone">
+            <span className="text-xs text-paper/60">
               No charge until your trial ends — cancel anytime.
             </span>
           </div>

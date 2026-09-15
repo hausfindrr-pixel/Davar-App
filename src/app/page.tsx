@@ -2,15 +2,16 @@
 
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { Suspense, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { ApostleAvatar } from "@/components/ApostleAvatar";
 import { ApostleMessageCard } from "@/components/ApostleMessageCard";
 import { AuthForm } from "@/components/AuthForm";
-import { BenefitCarousel } from "@/components/BenefitCarousel";
+import { CompassIcon, FlameIcon, UsersIcon } from "@/components/icons";
 import { LessonsSection } from "@/components/LessonsSection";
 import { PricingSection } from "@/components/PricingSection";
 import { StreakVisual } from "@/components/StreakVisual";
 import { pickApostleMoment } from "@/lib/apostle-moment";
+import { APOSTLES, type ApostleId } from "@/lib/apostles";
 import { useAuth } from "@/lib/auth-context";
 import { completeLesson, fetchLessons, subscribeToLessonProgress } from "@/lib/db/lessons";
 import { checkIn, subscribeToStreak } from "@/lib/db/streaks";
@@ -26,84 +27,43 @@ import type {
   UserDoc,
 } from "@/types/firestore";
 
-/** The single strongest pain point, condensed to one short line each — this
- * app's core value prop (grace-centered accountability). The other two
- * pain points from earlier drafts (spiritual direction, judgment-free
- * community) are already carried by the "Scripture, made daily" and "A
- * community that gets it" benefit cards below. The response introduces the
- * Apostle Companion concept via Peter specifically — his own story is
- * failure followed by restoration, so he's the one who greets you here,
- * not a generic "accountability partner." */
-const PAIN_POINT = {
-  struggle: "Stuck fighting the same temptation alone?",
-  response: "Meet Peter — an accountability companion who knows what it's like to fail, and be restored.",
-};
-
-const BENEFITS = [
+/** Three pain points, each paired with the specific next step Davar offers
+ * — not just naming the struggle, but answering it. The first leads with
+ * temptation (worded generally, no explicit language) since it's this
+ * app's core value prop; the other two carry what earlier drafts split
+ * out into separate "benefit" cards (growth, judgment-free support). */
+const PAIN_POINTS = [
   {
-    title: "Freedom through grace",
-    description: "Daily, grace-centered accountability — never shame, always forward.",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
-        <path
-          d="M12 21c-4-2.5-7-5.8-7-9.8A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7 3.2c0 4-3 7.3-7 9.8Z"
-          stroke="currentColor"
-          strokeWidth="1.7"
-          strokeLinejoin="round"
-        />
-        <path d="M9 11.5h6M12 8.5v6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-      </svg>
-    ),
+    icon: FlameIcon,
+    struggle: "Stuck in a cycle",
+    body: "Lust and temptation can make tomorrow feel like a promise you've already broken. You are not disqualified by the pattern.",
+    nextStep: "Davar gives you a next faithful step.",
   },
   {
-    title: "Scripture, made daily",
-    description: "Streaks, XP, and levels make consistency feel good.",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
-        <path
-          d="M4 5.5c2.5-1 5-1 8 .3 3-1.3 5.5-1.3 8-.3v13c-2.5-1-5-1-8 .3-3-1.3-5.5-1.3-8-.3v-13Z"
-          stroke="currentColor"
-          strokeWidth="1.7"
-          strokeLinejoin="round"
-        />
-        <path d="M12 5.8v13" stroke="currentColor" strokeWidth="1.7" />
-      </svg>
-    ),
+    icon: CompassIcon,
+    struggle: "Wanting to grow, unsure where to start",
+    body: "When spiritual growth feels like a shelf of unread books, even opening one can feel overwhelming.",
+    nextStep: "Davar makes the first lesson small and clear.",
   },
   {
-    title: "Gentle reminders",
-    description: "Encouragement that keeps you coming back — no guilt trips.",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
-        <path
-          d="M7 17v-5.5a5 5 0 0 1 10 0V17l1.5 2h-13L7 17Z"
-          stroke="currentColor"
-          strokeWidth="1.7"
-          strokeLinejoin="round"
-        />
-        <path d="M10 20a2 2 0 0 0 4 0" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-      </svg>
-    ),
-  },
-  {
-    title: "A community that gets it",
-    description: "Your apostle companion — judgment-free, always in your corner.",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
-        <circle cx="9" cy="9" r="3" stroke="currentColor" strokeWidth="1.7" />
-        <circle cx="16" cy="11" r="2.4" stroke="currentColor" strokeWidth="1.7" />
-        <path
-          d="M4 19c0-2.8 2.2-5 5-5s5 2.2 5 5M13.5 19c0-2-1-3.7-2.5-4.7a4 4 0 0 1 6.5 3.1"
-          stroke="currentColor"
-          strokeWidth="1.7"
-          strokeLinecap="round"
-        />
-      </svg>
-    ),
+    icon: UsersIcon,
+    struggle: "Accountability that feels like judgment",
+    body: "You need honesty without shame — someone who can sit with the truth and still help you keep walking.",
+    nextStep: "Davar pairs support with grace.",
   },
 ];
 
-const SCREEN_COUNT = 4;
+const COMPANION_ORDER: ApostleId[] = ["peter", "matthew", "john", "thomas"];
+
+const SCREEN_COUNT = 5;
+
+function Eyebrow({ children }: { children: ReactNode }) {
+  return (
+    <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-sage-600">
+      {children}
+    </p>
+  );
+}
 
 function ChevronIcon({ direction }: { direction: "left" | "right" }) {
   return (
@@ -116,6 +76,33 @@ function ChevronIcon({ direction }: { direction: "left" | "right" }) {
         strokeLinejoin="round"
       />
     </svg>
+  );
+}
+
+/** A companion's portrait image, once provided (public/apostles/{id}.png) —
+ * falls back to their existing icon avatar if the image isn't there yet or
+ * fails to load, so this screen never looks broken in the meantime. */
+function CompanionPortrait({ apostleId }: { apostleId: ApostleId }) {
+  const [imgError, setImgError] = useState(false);
+  const apostle = APOSTLES[apostleId];
+
+  return (
+    <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-mist">
+      {!imgError ? (
+        <Image
+          src={`/apostles/${apostleId}.png`}
+          alt={`${apostle.name}, a Davar companion`}
+          fill
+          sizes="(min-width: 640px) 200px, 45vw"
+          className="object-cover object-top"
+          onError={() => setImgError(true)}
+        />
+      ) : (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <ApostleAvatar apostleId={apostleId} size="lg" />
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -150,6 +137,13 @@ function LandingPage() {
 
   return (
     <main className="h-dvh flex flex-col bg-ivory overflow-hidden">
+      <header className="flex items-center justify-between px-6 pt-5 shrink-0">
+        <Image src="/icons/icon-192.png" alt="Davar" width={192} height={192} className="h-8 w-8 rounded-full" />
+        <span className="text-[10px] font-semibold uppercase tracking-[0.24em] text-sage-600">
+          {activeScreen + 1} / {SCREEN_COUNT}
+        </span>
+      </header>
+
       <div
         ref={scrollerRef}
         onScroll={handleScroll}
@@ -160,18 +154,23 @@ function LandingPage() {
         className="flex-1 min-h-0 flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory snap-always scroll-smooth [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden focus:outline-none"
       >
         {/* Screen 1 — hero */}
-        <section className="w-full h-full shrink-0 snap-start overflow-y-auto flex flex-col items-center justify-center text-center gap-5 px-6 py-12">
-          <Image
-            src="/logo.svg"
-            alt="Davar"
-            width={380}
-            height={430}
-            priority
-            className="w-40 sm:w-48 h-auto"
-          />
-          <h1 className="text-3xl sm:text-4xl font-semibold text-ink max-w-md">
+        <section className="animate-fade-in w-full h-full shrink-0 snap-start overflow-y-auto flex flex-col items-center justify-center text-center gap-5 px-6 py-12">
+          <div className="mb-2 flex h-36 w-36 sm:h-44 sm:w-44 items-center justify-center rounded-[2.25rem] border border-clay-200 bg-clay-50 shadow-[0_18px_45px_rgba(92,107,62,0.08)]">
+            <Image
+              src="/logo.svg"
+              alt="Davar"
+              width={380}
+              height={430}
+              priority
+              className="w-24 sm:w-28 h-auto"
+            />
+          </div>
+          <h1 className="font-serif text-4xl sm:text-5xl leading-tight tracking-tight text-ink max-w-md">
             A daily rhythm of Scripture, prayer, and grace.
           </h1>
+          <p className="max-w-sm text-sm text-ink/65">
+            Make space for the Word, one faithful moment at a time.
+          </p>
           <button
             type="button"
             onClick={goToSignUp}
@@ -181,28 +180,94 @@ function LandingPage() {
           </button>
         </section>
 
-        {/* Screen 2 — the one pain point that matters most, answered by
-            Peter specifically, not a generic "accountability partner" */}
-        <section className="w-full h-full shrink-0 snap-start overflow-y-auto flex flex-col items-center justify-center text-center gap-6 px-6 py-12">
-          <p className="text-xl sm:text-2xl text-stone italic max-w-sm">
-            {PAIN_POINT.struggle}
-          </p>
-          <div className="flex items-center gap-3 max-w-sm text-left">
-            <ApostleAvatar apostleId="peter" size="md" />
-            <p className="text-lg sm:text-xl text-ink font-semibold">{PAIN_POINT.response}</p>
+        {/* Screen 2 — the pain points, each answered by what Davar gives */}
+        <section className="animate-fade-in w-full h-full shrink-0 snap-start overflow-y-auto flex flex-col justify-center px-6 py-12">
+          <div className="mx-auto w-full max-w-xl">
+            <div className="mb-6 text-center">
+              <Eyebrow>you are not alone here</Eyebrow>
+              <h1 className="mt-3 font-serif text-3xl sm:text-4xl leading-tight tracking-tight text-ink">
+                A different way to meet the hard parts.
+              </h1>
+            </div>
+            <div className="space-y-3">
+              {PAIN_POINTS.map(({ icon: Icon, struggle, body, nextStep }) => (
+                <article
+                  key={struggle}
+                  className="rounded-2xl border-l-4 border-clay-400 bg-paper/70 px-4 py-3"
+                >
+                  <div className="flex gap-3">
+                    <Icon className="mt-1 h-4.5 w-4.5 shrink-0 text-clay-600" />
+                    <div>
+                      <h2 className="font-serif text-lg text-ink">{struggle}</h2>
+                      <p className="mt-1 text-xs leading-5 text-ink/65">{body}</p>
+                      <p className="mt-1 text-[11px] font-semibold text-sage-700">{nextStep}</p>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
           </div>
         </section>
 
-        {/* Screen 3 — benefits, swipeable */}
-        <section className="w-full h-full shrink-0 snap-start overflow-y-auto flex flex-col items-center justify-center gap-6 py-12">
-          <h2 className="text-xl font-semibold text-ink px-6 text-center">
-            Built for the walk, not just the win
-          </h2>
-          <BenefitCarousel benefits={BENEFITS} />
+        {/* Screen 3 — grace, before we get to companions or pricing */}
+        <section className="animate-fade-in w-full h-full shrink-0 snap-start overflow-y-auto flex flex-col items-center justify-center text-center gap-4 px-6 py-12">
+          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-sage-50 text-sage-700">
+            <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6">
+              <path
+                d="M4 5.5c2.5-1 5-1 8 .3 3-1.3 5.5-1.3 8-.3v13c-2.5-1-5-1-8 .3-3-1.3-5.5-1.3-8-.3v-13Z"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinejoin="round"
+              />
+              <path d="M12 5.8v13" stroke="currentColor" strokeWidth="1.5" />
+            </svg>
+          </span>
+          <Eyebrow>you are not alone here</Eyebrow>
+          <h1 className="max-w-2xl font-serif text-3xl sm:text-4xl leading-tight tracking-tight text-ink">
+            Still finding yourself in the same struggle?
+          </h1>
+          <p className="max-w-lg text-[15px] leading-7 text-ink/70">
+            Whether it&apos;s lust, isolation, or simply losing your rhythm, you
+            don&apos;t have to carry the weight of it in silence. Falling short
+            doesn&apos;t disqualify you from coming close.
+          </p>
+          <div className="mt-2 h-px w-14 bg-clay-400" />
+          <p className="max-w-md font-serif text-xl leading-8 text-sage-700">
+            Davar meets you with grace — and gives you a way to begin again,
+            today.
+          </p>
         </section>
 
-        {/* Screen 4 — pricing + sign up */}
-        <section className="w-full h-full shrink-0 snap-start overflow-y-auto flex flex-col">
+        {/* Screen 4 — meet the four apostle companions */}
+        <section className="animate-fade-in w-full h-full shrink-0 snap-start overflow-y-auto flex flex-col items-center justify-center gap-6 px-6 py-12">
+          <div className="text-center">
+            <Eyebrow>walk with us</Eyebrow>
+            <h1 className="mt-3 font-serif text-3xl sm:text-4xl leading-tight tracking-tight text-ink">
+              Meet your companions.
+            </h1>
+            <p className="mx-auto mt-3 max-w-md text-sm text-ink/65">
+              Four steady voices for the road ahead.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:mx-auto sm:max-w-xl sm:gap-5">
+            {COMPANION_ORDER.map((apostleId) => {
+              const apostle = APOSTLES[apostleId];
+              return (
+                <article
+                  key={apostleId}
+                  className="rounded-[1.375rem] bg-paper/70 p-3 shadow-[0_10px_28px_rgba(92,107,62,0.09)] sm:p-4"
+                >
+                  <CompanionPortrait apostleId={apostleId} />
+                  <h2 className="mt-3 font-serif text-xl text-ink">{apostle.name}</h2>
+                  <p className="mt-1 text-[11px] leading-4 text-ink/60">{apostle.role}</p>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* Screen 5 — pricing + sign up */}
+        <section className="animate-fade-in w-full h-full shrink-0 snap-start overflow-y-auto flex flex-col">
           <PricingSection onGetStarted={goToSignUp} />
           <div
             id="join"
@@ -210,9 +275,10 @@ function LandingPage() {
             className="flex flex-col items-center gap-6 px-6 pb-16 pt-4 border-t border-mist"
           >
             <div className="flex flex-col items-center gap-2 text-center pt-10">
-              <h2 className="text-2xl font-semibold text-ink">Your first day starts now</h2>
+              <h2 className="font-serif text-3xl text-ink">Come as you are.</h2>
               <p className="text-sm text-stone max-w-sm">
-                No pressure, no performance — just a quiet place to begin.
+                Pick up your daily rhythm of Scripture, prayer, and grace — no
+                pressure, no performance, just a quiet place to begin.
               </p>
             </div>
             <AuthForm />
