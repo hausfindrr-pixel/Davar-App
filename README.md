@@ -466,55 +466,61 @@ already sends as `callback_url`/`success_invoice_url`/`fail_invoice_url`:
 - Success URL: `/premium/success`
 - Failed URL: `/premium/failed`
 
-### Troubleshooting: "Could not start checkout"
+### Fixed: "Could not start checkout" was a `jose` ESM/CJS crash, not credentials
 
-If clicking an Unlock button (The Armory, Peter's Watch, or Profile's "Your
-Plan") shows this error instead of redirecting to Plisio:
+Clicking an Unlock button (The Armory, Peter's Watch, or Profile's "Your
+Plan") used to show this error instead of redirecting to Plisio. It was
+first suspected to be a stale `PLISIO_SECRET_KEY` after a key rotation —
+**that suspicion was wrong.** The real cause, found in Vercel's function
+logs (`Error: require() of ES Module ... not supported`), was a
+third-party ESM/CJS incompatibility, unrelated to Plisio credentials
+entirely:
 
-- **It's not a wiring bug.** Every "Unlock" button in the app — The
-  Armory, Peter's Watch, and Profile's "Your Plan" — renders the exact same
-  `UnlockCard` component (`src/components/PremiumGate.tsx`), which calls
-  the exact same `startCheckout()` (`src/lib/plisio/checkout.ts`) →
-  `POST /api/plisio/create-invoice`. There is no separate/older button left
-  over from the tab restructuring; confirmed by grepping the whole client
-  for every caller of `startCheckout`.
-- **What the message itself tells you.** `startCheckout()` only shows the
-  generic "Could not start checkout." when the response from
-  `/api/plisio/create-invoice` isn't valid JSON (e.g. a 500/timeout page, or
-  the request never reached the route at all) — every error path *inside*
-  the route returns a specific message instead ("Payments aren't configured
-  yet.", "Could not reach Plisio.", "Could not create an invoice.", "Your
-  session has expired — sign in again."). **Open the browser's Network tab,
-  click Unlock, and look at the actual response body/status of the
-  `create-invoice` request** — whichever specific message (or lack of one)
-  it shows narrows this down immediately; this sandbox has no way to open a
-  live browser session against your deployment to check that for you.
-- **Most likely cause, given the key was recently rotated:** Vercel's
-  `PLISIO_SECRET_KEY` either (a) still holds the old/revoked key, or (b)
-  was updated in the dashboard but the project was never redeployed
-  afterward — **Vercel env var changes don't reach an already-running
-  serverless function until the next deployment.** Re-copy the current key
-  from Plisio's dashboard into Vercel's **Project Settings → Environment
-  Variables**, then trigger a fresh deployment (redeploy the latest, or
-  push any commit) — don't just save the env var and assume it's live.
-- **Improved server-side logging** (this change): `create-invoice/route.ts`
-  now reads Plisio's response as text first and logs the raw body/HTTP
-  status on any non-success response — including the specific case of
-  Plisio returning HTML/plain-text instead of JSON, which a bare
-  `response.json()` used to swallow into a generic parse error. After a
-  redeploy, check **Vercel → your project → the latest deployment →
-  Functions/Logs**, filtered to `create-invoice`, for a line like
-  `plisio create-invoice: Plisio rejected the request (uid=..., plan=...,
-  http ...)` — Plisio's own error name/message (e.g. "Invalid api key")
-  will be right there.
-- **Not verifiable from this sandbox.** `api.plisio.net` is blocked by this
-  environment's egress policy (confirmed via a direct test call, same
-  restriction already hit with bible-api.com) — so a live test-invoice
-  creation, and a direct comparison of the key in Vercel against Plisio's
-  dashboard, both need to happen from your own machine/dashboards, not from
-  here. Once `PLISIO_SECRET_KEY` is confirmed current and redeployed,
-  clicking Unlock should redirect to a real Plisio invoice page — that's
-  the concrete "it's fixed" signal to look for.
+- **Root cause.** `firebase-admin/auth` (used by every route that verifies
+  a caller's ID token — `create-invoice`, `webhook`, `watch-chat`, all via
+  `src/lib/firebase-admin.ts`) eagerly `require()`s a chain that ends at
+  `jose`, the JWT/JWK library: `firebase-admin/auth` → `lib/auth/base-auth.js`
+  → `lib/utils/jwt.js` → `jwks-rsa` → `jose`. `firebase-admin@14.4.0` pins
+  `jwks-rsa@^4.0.1`, which depends on `jose@^6.1.3` — and **jose v6 is
+  pure ESM** (`"type": "module"`, no CommonJS build at all). The moment
+  anything imports `firebase-admin/auth`, Node tries to `require()` that
+  ESM-only package and throws, *before any of our own route logic ever
+  runs* — so every call to any of those three routes failed identically,
+  regardless of the Plisio key, the plan, or the ID token's validity.
+  (It didn't reproduce locally in this environment because this sandbox's
+  Node 22.22 supports `require()`-ing synchronous ESM graphs, a fairly
+  recent Node feature — Vercel's deployed runtime evidently doesn't have
+  it, which is exactly why this only surfaced in production.)
+- **The fix.** `package.json` pins `jose` to its last version with a real
+  CommonJS build via npm's `overrides` field:
+  ```json
+  "overrides": { "jose": "^4.15.9" }
+  ```
+  This forces `jwks-rsa`'s `require('jose')` to resolve to
+  `jose@4`'s `./dist/node/cjs/index.js` instead of `jose@6`'s ESM-only
+  entry — no code changes needed, since `jose@4` exposes the same
+  `importJWK`/`exportSPKI` APIs `jwks-rsa` calls with compatible
+  signatures. (`transpilePackages`/`serverExternalPackages` were
+  considered but wouldn't have helped: this is Node's own `require()`
+  refusing to load a real ESM module, not a webpack bundling artifact —
+  the version conflict had to be resolved, not routed around.)
+- **How this was verified**, all from this sandbox (`api.plisio.net`
+  itself is still unreachable here, but nothing above needed it):
+  `node -e "require('firebase-admin/auth')"` after the override resolves
+  cleanly; `jwks-rsa`'s exact `importJWK`/`exportSPKI` calls were run
+  directly against the pinned `jose@4` build and succeeded; and a full
+  local production build (`next build && next start`) hit all three
+  affected routes (`create-invoice`, `webhook`'s shared import, and
+  `watch-chat`) with a bogus bearer token — each returned a clean, expected
+  `{"error":"Your session has expired — sign in again."}` (401) instead of
+  crashing, confirming the whole `verifyIdToken` → `jwks-rsa` → `jose` path
+  now runs end-to-end without the module-loading error.
+- **After deploying this**, Vercel's function logs for `create-invoice`
+  should show no more `ERR_REQUIRE_ESM` errors, and clicking Unlock should
+  reach Plisio and either redirect to a real invoice page or, if something
+  else is still wrong (e.g. the key genuinely is stale), surface one of the
+  route's own specific error messages instead of the generic fallback —
+  which would then point at an actual Plisio-side problem, not this one.
 
 ### Known limitations
 
