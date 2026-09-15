@@ -14,6 +14,7 @@ export const COLLECTIONS = {
   dailyLessonProgress: "daily_lesson_progress",
   userHighlights: "user_highlights",
   conversations: "conversations",
+  watchChatUsage: "watch_chat_usage",
 } as const;
 
 export type UserTier = "free" | "premium";
@@ -151,5 +152,26 @@ export interface ConversationMessageDoc {
   /** Which apostle sent this — null for the user's own messages. */
   apostleId: ApostleId | null;
   text: string;
+  /** True only on the scripted, in-character "closing" message sent when
+   * the day's WATCH_CHAT_DAILY_LIMIT is hit (see src/lib/chat-apostle.ts).
+   * Lets the client disable the input on reload without a separate
+   * usage-counter read — it just checks whether today's last message
+   * carries this flag. */
+  limitReached: boolean;
   createdAt: Timestamp;
+}
+
+/**
+ * watch_chat_usage/{uid}_{date} — a per-user-per-day counter of how many
+ * messages Peter's Watch has answered, the same docId/reset pattern as
+ * daily_lesson_progress. Server-only: the client never reads or writes
+ * this directly (see firestore.rules) — the API route enforces the cap
+ * with it and the client instead reads `limitReached` off the persisted
+ * conversation message (see ConversationMessageDoc above).
+ */
+export interface WatchChatUsageDoc {
+  userId: string;
+  date: string; // "YYYY-MM-DD", in the user's timezone
+  messageCount: number;
+  updatedAt: Timestamp;
 }

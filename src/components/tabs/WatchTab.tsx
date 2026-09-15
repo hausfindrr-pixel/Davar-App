@@ -6,12 +6,15 @@ import { SendIcon } from "@/components/icons";
 import { blurredPreviewClass, UnlockCard } from "@/components/PremiumGate";
 import { APOSTLES } from "@/lib/apostles";
 import { subscribeToConversation } from "@/lib/db/conversations";
+import { dateKeyInTimeZone } from "@/lib/date";
 import { sendWatchChatMessage } from "@/lib/watch-chat";
 import type { ConversationMessageDoc } from "@/types/firestore";
 
 type WatchTabProps = {
   uid: string;
   isPremium: boolean;
+  today: string;
+  timeZone: string;
   getIdToken: () => Promise<string>;
 };
 
@@ -43,6 +46,9 @@ function ApostleBubble({ apostleId, name, text }: { apostleId: keyof typeof APOS
 
 function MessageBubble({ message }: { message: ConversationMessageDoc }) {
   if (message.role === "user") return <UserBubble text={message.text} />;
+  // Deliberately no special styling for a limitReached message — it's the
+  // same warm bubble as any other reply from this apostle, not an error
+  // banner, so the daily close reads as part of the conversation.
   const apostle = APOSTLES[message.apostleId ?? "peter"];
   return <ApostleBubble apostleId={apostle.id} name={apostle.name} text={message.text} />;
 }
@@ -51,7 +57,17 @@ function MessageBubble({ message }: { message: ConversationMessageDoc }) {
  * source of truth for messages (see src/lib/db/conversations.ts) — sending
  * only kicks off the API call; the reply arrives back through the live
  * subscription, not through the fetch response. */
-function ChatInterface({ uid, getIdToken }: { uid: string; getIdToken: () => Promise<string> }) {
+function ChatInterface({
+  uid,
+  today,
+  timeZone,
+  getIdToken,
+}: {
+  uid: string;
+  today: string;
+  timeZone: string;
+  getIdToken: () => Promise<string>;
+}) {
   const [messages, setMessages] = useState<ConversationMessageDoc[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [draft, setDraft] = useState("");
@@ -78,7 +94,7 @@ function ChatInterface({ uid, getIdToken }: { uid: string; getIdToken: () => Pro
     setDraft("");
     try {
       const idToken = await getIdToken();
-      await sendWatchChatMessage(text, idToken);
+      await sendWatchChatMessage(text, today, idToken);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not send that message.");
       setDraft(text);
@@ -86,6 +102,16 @@ function ChatInterface({ uid, getIdToken }: { uid: string; getIdToken: () => Pro
       setSending(false);
     }
   }
+
+  // The closing message (see pickClosingMessage in src/lib/chat-apostle.ts)
+  // is a normal, persisted assistant message — reading it back off the
+  // last message in history (rather than a separate usage-counter read)
+  // means the input stays disabled across a reload, and re-enables itself
+  // naturally once a new calendar day's first message arrives.
+  const lastMessage = messages[messages.length - 1];
+  const dailyLimitReached =
+    !!lastMessage?.limitReached && dateKeyInTimeZone(lastMessage.createdAt.toDate(), timeZone) === today;
+  const closingApostleName = APOSTLES[lastMessage?.apostleId ?? "peter"].name;
 
   return (
     <div className="w-full max-w-sm flex-1 min-h-0 flex flex-col">
@@ -110,31 +136,37 @@ function ChatInterface({ uid, getIdToken }: { uid: string; getIdToken: () => Pro
 
       {error && <p className="text-xs text-clay-700 px-1 pb-1">{error}</p>}
 
-      <div className="flex items-center gap-2 pt-2 border-t border-mist shrink-0">
-        <input
-          type="text"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              void handleSend();
-            }
-          }}
-          placeholder="Tell Peter what's on your mind…"
-          disabled={sending}
-          className="flex-1 rounded-full border border-mist bg-paper px-4 py-2.5 text-sm text-ink placeholder:text-stone/70 disabled:opacity-60"
-        />
-        <button
-          type="button"
-          onClick={() => void handleSend()}
-          disabled={sending || !draft.trim()}
-          aria-label="Send"
-          className="shrink-0 flex h-10 w-10 items-center justify-center rounded-full bg-clay-600 text-paper disabled:opacity-50 disabled:cursor-not-allowed hover:bg-clay-700 transition-colors"
-        >
-          <SendIcon className="h-4 w-4" />
-        </button>
-      </div>
+      {dailyLimitReached ? (
+        <div className="flex items-center justify-center pt-2 border-t border-mist shrink-0">
+          <p className="text-xs text-stone italic py-2.5">{closingApostleName} will be back tomorrow.</p>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 pt-2 border-t border-mist shrink-0">
+          <input
+            type="text"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                void handleSend();
+              }
+            }}
+            placeholder="Tell Peter what's on your mind…"
+            disabled={sending}
+            className="flex-1 rounded-full border border-mist bg-paper px-4 py-2.5 text-sm text-ink placeholder:text-stone/70 disabled:opacity-60"
+          />
+          <button
+            type="button"
+            onClick={() => void handleSend()}
+            disabled={sending || !draft.trim()}
+            aria-label="Send"
+            className="shrink-0 flex h-10 w-10 items-center justify-center rounded-full bg-clay-600 text-paper disabled:opacity-50 disabled:cursor-not-allowed hover:bg-clay-700 transition-colors"
+          >
+            <SendIcon className="h-4 w-4" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -160,8 +192,9 @@ function TeaserChat() {
  * Free tier: a blurred teaser of the chat concept. Premium: a real chat,
  * backed by Claude and Firestore, where Peter is the default voice but
  * Thomas or John may answer instead depending on what the user shares (see
- * src/lib/chat-apostle.ts). */
-export function WatchTab({ uid, isPremium, getIdToken }: WatchTabProps) {
+ * src/lib/chat-apostle.ts). Capped at WATCH_CHAT_DAILY_LIMIT messages/day;
+ * hitting it closes the conversation in-character rather than erroring. */
+export function WatchTab({ uid, isPremium, today, timeZone, getIdToken }: WatchTabProps) {
   return (
     <div className="flex-1 min-h-0 flex flex-col items-center gap-4 p-6">
       <div className="text-center max-w-sm shrink-0">
@@ -173,7 +206,7 @@ export function WatchTab({ uid, isPremium, getIdToken }: WatchTabProps) {
       </div>
 
       {isPremium ? (
-        <ChatInterface uid={uid} getIdToken={getIdToken} />
+        <ChatInterface uid={uid} today={today} timeZone={timeZone} getIdToken={getIdToken} />
       ) : (
         <>
           <UnlockCard

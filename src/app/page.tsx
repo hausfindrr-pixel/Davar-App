@@ -464,7 +464,13 @@ function Dashboard({ uid }: { uid: string }) {
             )}
             {activeTab === "armory" && <ArmoryTab isPremium={isPremium} getIdToken={getIdToken} />}
             {activeTab === "watch" && (
-              <WatchTab uid={uid} isPremium={isPremium} getIdToken={getIdToken} />
+              <WatchTab
+                uid={uid}
+                isPremium={isPremium}
+                today={today}
+                timeZone={timeZone}
+                getIdToken={getIdToken}
+              />
             )}
             {activeTab === "word" && <WordTab uid={uid} />}
           </>

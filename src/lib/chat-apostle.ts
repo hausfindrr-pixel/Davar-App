@@ -95,6 +95,35 @@ Guidelines, always:
 - If asked directly whether you're a real person, answer honestly: you're an AI companion voicing this apostle's perspective inside the Davar app, not a real human, pastor, or licensed counselor.
 - If anything in the user's message suggests real crisis (self-harm, suicidal thoughts, wanting to die), set the normal conversation aside and warmly, directly encourage them to reach out to a real person or a crisis line right now (in the US, 988) — that matters more than continuing as usual.`;
 
+/** How many user messages Peter's Watch will answer per calendar day —
+ * generous (not a stingy trickle) while keeping API cost predictable.
+ * Enforced server-side via a per-user-per-day Firestore counter (see
+ * watch_chat_usage in src/types/firestore.ts), the same pattern as the
+ * free-tier daily lesson cap. Crisis messages (see isCrisisMessage above)
+ * are exempt — safety never waits on a quota. */
+export const WATCH_CHAT_DAILY_LIMIT = 15;
+
+// In-character closes for when the daily limit is hit, instead of a
+// generic rate-limit error. Written in whichever apostle's voice is
+// currently responding (see routeApostle) so it reads as part of the
+// conversation, not a system interruption — deliberately warm, not final:
+// it always promises a return.
+const CLOSING_MESSAGES: string[] = [
+  "I need to go now — there's someone else waiting on me. But I'll be here again tomorrow. Until then, hold onto what we talked about today. Grace carries you further than willpower ever will.",
+  "That's enough for today, my friend. Go rest in what's already true of you — you don't have to earn tomorrow's mercy, it's already waiting. I'll be right here when you come back.",
+  "I have to step away for now, but you're not carrying this alone tonight. Sleep well. Tomorrow is a new mercy, and so am I — waiting for you, same as always.",
+  "Our time's up for today, but don't let that trouble you. What you shared here mattered. Come find me again tomorrow — I'm not going anywhere.",
+];
+
+/** Randomly selects one of the closing-conversation variations. Called
+ * once, when the daily limit is actually hit, and the result is persisted
+ * to Firestore — no need for it to be stable across re-renders like
+ * pickApostleMessage in src/lib/apostles.ts, so a plain random pick is
+ * fine here. */
+export function pickClosingMessage(): string {
+  return CLOSING_MESSAGES[Math.floor(Math.random() * CLOSING_MESSAGES.length)];
+}
+
 /** Builds the system prompt for a given apostle, reusing their existing
  * `characteristic`/`tone` strings (already written for the notification
  * system) so the chat voice matches how each apostle is introduced

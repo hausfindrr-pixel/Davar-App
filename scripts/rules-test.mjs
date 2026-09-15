@@ -381,6 +381,29 @@ await check("alice cannot write directly to her own conversation (server-only)",
   );
 });
 
+// --- watch_chat_usage: server-only, no client access at all ---
+await testEnv.withSecurityRulesDisabled(async (ctx) => {
+  await setDoc(doc(ctx.firestore(), "watch_chat_usage", `${ALICE}_${TODAY}`), {
+    userId: ALICE,
+    date: TODAY,
+    messageCount: 3,
+  });
+});
+
+await check("alice cannot read her own watch_chat_usage counter", async () => {
+  await assertFails(getDoc(doc(aliceDb, "watch_chat_usage", `${ALICE}_${TODAY}`)));
+});
+
+await check("alice cannot write her own watch_chat_usage counter", async () => {
+  await assertFails(
+    setDoc(doc(aliceDb, "watch_chat_usage", `${ALICE}_${TODAY}`), {
+      userId: ALICE,
+      date: TODAY,
+      messageCount: 0,
+    }),
+  );
+});
+
 console.log(`\n${pass} passed, ${fail} failed`);
 await testEnv.cleanup();
 process.exit(fail > 0 ? 1 : 0);

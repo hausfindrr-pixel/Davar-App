@@ -1,7 +1,14 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { FieldValue } from "firebase-admin/firestore";
 import { NextResponse } from "next/server";
-import { CRISIS_RESPONSE, isCrisisMessage, routeApostle, systemPromptFor } from "@/lib/chat-apostle";
+import {
+  CRISIS_RESPONSE,
+  isCrisisMessage,
+  pickClosingMessage,
+  routeApostle,
+  systemPromptFor,
+  WATCH_CHAT_DAILY_LIMIT,
+} from "@/lib/chat-apostle";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { COLLECTIONS, type ChatRole } from "@/types/firestore";
 import type { ApostleId } from "@/lib/apostles";
@@ -11,6 +18,7 @@ export const runtime = "nodejs";
 
 const MAX_MESSAGE_LENGTH = 2000;
 const HISTORY_LIMIT = 20;
+const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 interface StoredMessage {
   role: ChatRole;
@@ -18,13 +26,14 @@ interface StoredMessage {
   text: string;
 }
 
-async function writeMessage(uid: string, message: StoredMessage) {
+async function writeMessage(uid: string, message: StoredMessage, limitReached = false) {
   const ref = adminDb().collection(COLLECTIONS.conversations).doc(uid).collection("messages").doc();
   await ref.set({
     id: ref.id,
     role: message.role,
     apostleId: message.apostleId,
     text: message.text,
+    limitReached,
     createdAt: FieldValue.serverTimestamp(),
   });
 }
@@ -45,11 +54,15 @@ export async function POST(req: Request) {
 
   const body = await req.json().catch(() => null);
   const message = typeof body?.message === "string" ? body.message.trim() : "";
+  const date = typeof body?.date === "string" ? body.date : "";
   if (!message) {
     return NextResponse.json({ error: "Say something first." }, { status: 400 });
   }
   if (message.length > MAX_MESSAGE_LENGTH) {
     return NextResponse.json({ error: "That message is too long." }, { status: 400 });
+  }
+  if (!DATE_KEY_PATTERN.test(date)) {
+    return NextResponse.json({ error: "Invalid date." }, { status: 400 });
   }
 
   // Defense in depth — the UI already gates this tab behind Premium, but
@@ -64,13 +77,35 @@ export async function POST(req: Request) {
 
   // First-layer safety net: a deterministic crisis response never touches
   // the model at all, so it can't be softened, argued with, or missed by a
-  // prompt-injection attempt buried in the user's message.
+  // prompt-injection attempt buried in the user's message. Crisis messages
+  // are exempt from the daily limit below — safety never waits on a quota.
   if (isCrisisMessage(message)) {
     await writeMessage(uid, { role: "assistant", apostleId: "peter", text: CRISIS_RESPONSE });
     return NextResponse.json({ apostleId: "peter", message: CRISIS_RESPONSE, crisis: true });
   }
 
   const apostleId = routeApostle(message);
+
+  // Daily message cap — a per-user-per-day counter, same docId/reset
+  // pattern as daily_lesson_progress. `date` is client-supplied (the
+  // user's local day), the same accepted trade-off already documented on
+  // that collection: enough to stop a normal client from bypassing the
+  // cap by refreshing, not a hardened boundary against a deliberately
+  // forged request — this is a cost control, not a security control.
+  const usageRef = adminDb().collection(COLLECTIONS.watchChatUsage).doc(`${uid}_${date}`);
+  const usageSnap = await usageRef.get();
+  const messageCount = (usageSnap.data()?.messageCount as number | undefined) ?? 0;
+
+  if (messageCount >= WATCH_CHAT_DAILY_LIMIT) {
+    const closing = pickClosingMessage();
+    await writeMessage(uid, { role: "assistant", apostleId, text: closing }, true);
+    return NextResponse.json({ apostleId, message: closing, limitReached: true });
+  }
+
+  await usageRef.set(
+    { userId: uid, date, messageCount: FieldValue.increment(1), updatedAt: FieldValue.serverTimestamp() },
+    { merge: true },
+  );
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {

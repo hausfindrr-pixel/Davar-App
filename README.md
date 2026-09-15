@@ -264,7 +264,8 @@ apostles replies.
   verifies the caller's ID token, re-checks `tier === "premium"` server-side
   (defense in depth beyond the UI gate — the same discipline as the daily
   lesson cap), writes the user's message to Firestore, runs the crisis
-  check, and — if it didn't fire — fetches the last 20 messages as
+  check, and — if it didn't fire — checks the daily message limit (below),
+  and if there's still quota left, fetches the last 20 messages as
   conversation history, routes to an apostle, and calls Claude via the
   official `@anthropic-ai/sdk` (model `claude-opus-5`, `effort: "low"`,
   `max_tokens: 400` — a short chat reply doesn't need more). It checks
@@ -272,20 +273,43 @@ apostles replies.
   a gentle, hard-coded line if the model declines to answer. Both the user's
   message and the reply are written via the Admin SDK, which is why clients
   can't write to `conversations` directly (see "Security rules" above).
+- **Daily message limit.** `WATCH_CHAT_DAILY_LIMIT` (15, in
+  `src/lib/chat-apostle.ts`) caps how many user messages get a real Claude
+  reply per calendar day — generous, not a stingy trickle, but enough to
+  keep API cost predictable. Enforced with a per-user-per-day Firestore
+  counter, `watch_chat_usage/{uid}_{date}` (`FieldValue.increment(1)` via
+  the Admin SDK; `date` is client-supplied, the same accepted trade-off
+  already documented on `daily_lesson_progress` — a cost control, not a
+  security boundary). It's fully server-only: `firestore.rules` denies
+  clients read *and* write on it outright, since nothing client-side ever
+  needs to touch it directly. **Crisis messages are exempt** — the crisis
+  check runs first and always gets a response, cap or no cap. Once the cap
+  is hit, the route skips Claude entirely and instead writes one of four
+  in-character closing lines (`pickClosingMessage()`, randomly chosen, in
+  whichever apostle the message would have routed to) with
+  `limitReached: true` on that message doc — a real bubble in the
+  conversation, not an error banner. The client derives "today's cap is
+  hit" purely by checking whether the *last* stored message carries that
+  flag and falls on today's date (`WatchTab.tsx`) — no separate usage-doc
+  read needed — and swaps the input row for a quiet "{Apostle} will be
+  back tomorrow" note instead of graying out a still-functional box.
 - **The client.** `src/lib/db/conversations.ts` subscribes to a user's
-  message history in order; `src/lib/watch-chat.ts` posts a new message to
-  the route. `WatchTab.tsx` shows the running conversation, an apostle
-  name + small icon (`ApostleAvatar`) next to every assistant bubble, a
-  "…" pending indicator while waiting on a reply, and a visible (not
-  silent) error with the draft text preserved if a send fails.
+  message history in order; `src/lib/watch-chat.ts` posts a new message
+  (with the user's local date, for the daily limit) to the route.
+  `WatchTab.tsx` shows the running conversation, an apostle name + small
+  icon (`ApostleAvatar`) next to every assistant bubble, a "…" pending
+  indicator while waiting on a reply, and a visible (not silent) error
+  with the draft text preserved if a send fails.
 - **What's verified vs. not from this sandbox.** The crisis-detection and
-  apostle-routing logic, the system prompts, the Firestore rules (via
-  `npm run test:rules`), and the chat UI's layout/styling (via a mocked,
-  non-committed dev-preview route and Playwright screenshots) are all
-  checked. **An actual end-to-end call to Claude is not** — this sandbox
-  has no `ANTHROPIC_API_KEY` and `api.anthropic.com` reachability from here
-  is unconfirmed. Verify a real round trip once `ANTHROPIC_API_KEY` is set
-  in your environment.
+  apostle-routing logic, the daily-limit constant and closing-message
+  variety, the system prompts, the Firestore rules (via
+  `npm run test:rules`, including `watch_chat_usage`'s deny-all), and the
+  chat UI's layout/styling in both a normal and a limit-reached state (via
+  a mocked, non-committed dev-preview route and Playwright screenshots) are
+  all checked. **An actual end-to-end call to Claude is not** — this
+  sandbox has no `ANTHROPIC_API_KEY` and `api.anthropic.com` reachability
+  from here is unconfirmed. Verify a real round trip once
+  `ANTHROPIC_API_KEY` is set in your environment.
 - **Environment variable.** Add `ANTHROPIC_API_KEY` (from
   [console.anthropic.com](https://console.anthropic.com/settings/keys)) to
   `.env.local` locally and to Vercel under **Project Settings → Environment
