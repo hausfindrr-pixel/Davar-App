@@ -435,6 +435,7 @@ function Dashboard({ uid }: { uid: string }) {
           <ProfilePage
             uid={uid}
             profile={profile}
+            getIdToken={getIdToken}
             onBack={() => setShowProfile(false)}
             onSignOut={() => void signOut()}
           />

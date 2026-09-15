@@ -12,18 +12,20 @@ service cloud.firestore {
 
     match /users/{uid} {
       allow read: if isOwner(uid);
-      // `tier` and `premiumUntil` can only ever start at "free"/null, and
-      // can never be changed by the client afterward — nothing client-side
-      // should be able to grant itself "premium". Only the Plisio webhook,
-      // writing via the Admin SDK (which bypasses these rules), can change
-      // them.
+      // `tier`, `premiumUntil`, and `planId` can only ever start at
+      // "free"/null/null, and can never be changed by the client
+      // afterward — nothing client-side should be able to grant itself
+      // "premium" or a fake plan. Only the Plisio webhook, writing via the
+      // Admin SDK (which bypasses these rules), can change them.
       allow create: if isOwner(uid) &&
         request.resource.data.uid == uid &&
         request.resource.data.tier == "free" &&
-        request.resource.data.premiumUntil == null;
+        request.resource.data.premiumUntil == null &&
+        request.resource.data.planId == null;
       allow update: if isOwner(uid) &&
         request.resource.data.tier == resource.data.tier &&
-        request.resource.data.premiumUntil == resource.data.premiumUntil;
+        request.resource.data.premiumUntil == resource.data.premiumUntil &&
+        request.resource.data.planId == resource.data.planId;
       allow delete: if false;
     }
 

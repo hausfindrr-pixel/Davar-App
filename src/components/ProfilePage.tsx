@@ -2,14 +2,17 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeftIcon, CameraIcon, UserIcon } from "@/components/icons";
+import { UnlockCard } from "@/components/PremiumGate";
 import { updateHighlightNote, subscribeToHighlights } from "@/lib/db/highlights";
 import { updateUserProfile } from "@/lib/db/users";
+import type { PlanId } from "@/lib/plisio/plans";
 import { uploadProfilePhoto } from "@/lib/storage";
 import type { HighlightColor, UserDoc, UserHighlightDoc } from "@/types/firestore";
 
 type ProfilePageProps = {
   uid: string;
   profile: UserDoc | null;
+  getIdToken: () => Promise<string>;
   onBack: () => void;
   onSignOut: () => void;
 };
@@ -19,6 +22,67 @@ const HIGHLIGHT_ACCENT: Record<HighlightColor, string> = {
   sage: "border-sage-400",
   stone: "border-stone",
 };
+
+const PLAN_LABELS: Record<PlanId, string> = {
+  monthly: "Monthly",
+  yearly: "Yearly",
+};
+
+/** "Your Plan" — the free/premium status card. Plisio payments are
+ * one-time, not an auto-renewing subscription (see the `premiumUntil`
+ * comment in src/types/firestore.ts), so this deliberately says "access
+ * through", never "renews on" — that would claim an auto-charge that
+ * isn't happening. Falls back to a plain "Premium member" label, with no
+ * date, for any grant made before `planId`/a reliable `premiumUntil`
+ * existed, rather than guessing. */
+function PlanCard({ profile, getIdToken }: { profile: UserDoc | null; getIdToken: () => Promise<string> }) {
+  const isPremium = profile?.tier === "premium";
+
+  if (!isPremium) {
+    return (
+      <div className="w-full max-w-sm flex flex-col gap-3">
+        <h2 className="text-sm font-medium text-ink px-1">Your Plan</h2>
+        <div className="rounded-2xl bg-paper border border-mist p-5 flex flex-col gap-2">
+          <span className="self-start rounded-full bg-mist text-stone px-2.5 py-0.5 text-[11px] font-medium tracking-wide">
+            Free
+          </span>
+          <p className="text-xs text-stone leading-relaxed">
+            You&apos;re missing The Armory, Peter&apos;s Watch, and unlimited daily
+            lessons — Premium unlocks the full walk.
+          </p>
+        </div>
+        <UnlockCard
+          title="Upgrade to Premium"
+          description="Unlock The Armory, Peter's Watch, and unlimited daily lessons."
+          getIdToken={getIdToken}
+        />
+      </div>
+    );
+  }
+
+  const planLabel = profile?.planId ? PLAN_LABELS[profile.planId] : null;
+  const accessThrough = profile?.premiumUntil
+    ? `Access through ${profile.premiumUntil.toDate().toLocaleDateString(undefined, {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      })}`
+    : null;
+
+  return (
+    <div className="w-full max-w-sm flex flex-col gap-3">
+      <h2 className="text-sm font-medium text-ink px-1">Your Plan</h2>
+      <div className="rounded-2xl bg-paper border border-mist p-5 flex flex-col gap-1.5">
+        <span className="self-start rounded-full bg-clay-600 text-paper px-2.5 py-0.5 text-[11px] font-medium tracking-wide mb-0.5">
+          Premium
+        </span>
+        {planLabel && <p className="text-sm text-ink/80">{planLabel} plan</p>}
+        {accessThrough && <p className="text-xs text-stone">{accessThrough}</p>}
+        {!planLabel && !accessThrough && <p className="text-sm text-ink/80">Premium member</p>}
+      </div>
+    </div>
+  );
+}
 
 function HighlightNoteCard({ uid, highlight }: { uid: string; highlight: UserHighlightDoc }) {
   const [draft, setDraft] = useState(highlight.notes ?? "");
@@ -77,7 +141,7 @@ function HighlightNoteCard({ uid, highlight }: { uid: string; highlight: UserHig
   );
 }
 
-export function ProfilePage({ uid, profile, onBack, onSignOut }: ProfilePageProps) {
+export function ProfilePage({ uid, profile, getIdToken, onBack, onSignOut }: ProfilePageProps) {
   const [displayName, setDisplayName] = useState(profile?.displayName ?? "");
   const [nameSaving, setNameSaving] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
@@ -205,6 +269,8 @@ export function ProfilePage({ uid, profile, onBack, onSignOut }: ProfilePageProp
           {nameError && <span className="text-xs text-clay-700">{nameError}</span>}
         </div>
       </div>
+
+      <PlanCard profile={profile} getIdToken={getIdToken} />
 
       <div className="w-full max-w-sm flex flex-col gap-3">
         <h2 className="text-sm font-medium text-ink px-1">Highlighted Verses</h2>

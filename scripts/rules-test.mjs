@@ -59,6 +59,7 @@ async function seedUser(uid, tier) {
       timezone: "UTC",
       tier,
       premiumUntil: null,
+      planId: tier === "premium" ? "yearly" : null,
     });
   });
 }
@@ -104,7 +105,24 @@ await check("a brand-new user cannot self-create with a non-null premiumUntil", 
   );
 });
 
-await check("a brand-new user CAN self-create with tier=free, premiumUntil=null", async () => {
+await check("a brand-new user cannot self-create with a non-null planId", async () => {
+  await assertFails(
+    setDoc(doc(eveDb, "users", "eve-uid"), {
+      uid: "eve-uid",
+      email: null,
+      displayName: null,
+      photoURL: null,
+      xp: 0,
+      level: 1,
+      timezone: null,
+      tier: "free",
+      premiumUntil: null,
+      planId: "yearly",
+    }),
+  );
+});
+
+await check("a brand-new user CAN self-create with tier=free, premiumUntil=null, planId=null", async () => {
   await assertSucceeds(
     setDoc(doc(eveDb, "users", "eve-uid"), {
       uid: "eve-uid",
@@ -116,6 +134,7 @@ await check("a brand-new user CAN self-create with tier=free, premiumUntil=null"
       timezone: null,
       tier: "free",
       premiumUntil: null,
+      planId: null,
     }),
   );
 });
@@ -130,6 +149,10 @@ await check("alice cannot grant herself a premiumUntil date via update", async (
       premiumUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
     }),
   );
+});
+
+await check("alice cannot grant herself a planId via update", async () => {
+  await assertFails(updateDoc(doc(aliceDb, "users", ALICE), { planId: "yearly" }));
 });
 
 await check("alice CAN update other fields on her own user doc (e.g. displayName)", async () => {

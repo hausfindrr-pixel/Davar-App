@@ -57,7 +57,7 @@ export async function POST(req: Request) {
   if (uid && isPlanId(plan) && status === "completed") {
     const premiumUntil = Timestamp.fromMillis(Date.now() + PLANS[plan].days * 24 * 60 * 60 * 1000);
     try {
-      await adminDb().collection("users").doc(uid).update({ tier: "premium", premiumUntil });
+      await adminDb().collection("users").doc(uid).update({ tier: "premium", premiumUntil, planId: plan });
       console.log("plisio webhook: upgraded user to premium", { uid, plan, txn_id: payload.txn_id });
     } catch (err) {
       // Log and move on rather than returning non-2xx: Plisio retries

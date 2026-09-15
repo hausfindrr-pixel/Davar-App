@@ -48,17 +48,39 @@ export async function POST(req: Request) {
     fail_invoice_url: `${origin}/premium/failed`,
   });
 
-  let data: { status?: string; data?: { invoice_url?: string; message?: string } } | null = null;
+  let response: Response;
   try {
-    const response = await fetch(`https://api.plisio.net/api/v1/invoices/new?${params.toString()}`);
-    data = await response.json();
+    response = await fetch(`https://api.plisio.net/api/v1/invoices/new?${params.toString()}`);
   } catch (err) {
-    console.error("plisio create-invoice: request to Plisio failed", err);
+    console.error(`plisio create-invoice: network error reaching Plisio (uid=${uid}, plan=${plan})`, err);
+    return NextResponse.json({ error: "Could not reach Plisio." }, { status: 502 });
+  }
+
+  // Read as text first, not response.json() directly — an invalid/rotated
+  // api_key or a Plisio-side outage can come back as an HTML or plain-text
+  // body instead of JSON, and we want that raw body in the logs rather than
+  // just a generic "invalid JSON" parse error with no clue what Plisio
+  // actually said.
+  const rawBody = await response.text();
+  let data: { status?: string; data?: { invoice_url?: string; message?: string; name?: string } } | null = null;
+  try {
+    data = JSON.parse(rawBody);
+  } catch {
+    console.error(
+      `plisio create-invoice: non-JSON response from Plisio (uid=${uid}, plan=${plan}, http ${response.status}): ${rawBody.slice(0, 500)}`,
+    );
     return NextResponse.json({ error: "Could not reach Plisio." }, { status: 502 });
   }
 
   if (data?.status !== "success" || !data.data?.invoice_url) {
-    console.error("plisio create-invoice: Plisio returned an error", data?.data?.message ?? data);
+    // If PLISIO_SECRET_KEY was rotated in the Plisio dashboard but not
+    // updated (and redeployed — a Vercel env var change alone doesn't
+    // reach an already-running function) in Vercel, this is exactly where
+    // it surfaces: Plisio's own error name/message, logged here in full.
+    console.error(
+      `plisio create-invoice: Plisio rejected the request (uid=${uid}, plan=${plan}, http ${response.status}):`,
+      data?.data ?? data,
+    );
     return NextResponse.json({ error: "Could not create an invoice." }, { status: 502 });
   }
 

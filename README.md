@@ -396,6 +396,20 @@ lives here now instead of the main header.
   the verse text stored on the highlight itself (no re-fetch), and a notes
   textarea (`updateHighlightNote`) with its own "Save note" button, dirty
   only enabling once the text actually changes from what's saved.
+- **Your Plan.** A status card (`PlanCard`, inside `ProfilePage.tsx`) driven
+  entirely by the existing `users/{uid}` doc — no new Firestore reads.
+  - **Free**: a "Free" badge, a one-line summary of what Premium adds
+    (The Armory, Peter's Watch, unlimited daily lessons), and the same
+    `UnlockCard` component used on The Armory/Peter's Watch's paywalls —
+    not a separate, near-duplicate upgrade button, the literal same
+    component and checkout flow.
+  - **Premium**: a "Premium" badge, plus `planId` ("Monthly"/"Yearly", if
+    set — see below) and `premiumUntil` ("Access through {date}", if set)
+    each shown only when present. Deliberately says "**access through**",
+    never "renews on" — Plisio payments are one-time, not auto-renewing,
+    so implying a renewal date would be a false claim. If neither field is
+    set (a grant made before `planId` existed, or any other gap), it falls
+    back to a plain "Premium member" — no invented date.
 
 ## Payments (Plisio)
 
@@ -412,10 +426,13 @@ crypto payment gateway — no card processor involved.
 - `POST /api/plisio/webhook` (`src/app/api/plisio/webhook/route.ts`) — Plisio's
   server calls this once a payment completes. It verifies Plisio's HMAC
   signature (`src/lib/plisio/verify.ts`) and, if valid and `status ===
-  "completed"`, writes `tier: "premium"` and a `premiumUntil` expiry on the
-  user's Firestore doc via the Admin SDK (bypassing `firestore.rules`, which
-  is exactly why only this server-side path can grant premium — see the
-  `users` rule above).
+  "completed"`, writes `tier: "premium"`, a `premiumUntil` expiry, and
+  `planId` (`"monthly"` | `"yearly"`, parsed from the same `order_number`
+  the webhook already splits apart) on the user's Firestore doc via the
+  Admin SDK (bypassing `firestore.rules`, which is exactly why only this
+  server-side path can grant premium — see the `users` rule above; `planId`
+  is locked from client writes the same way `tier`/`premiumUntil` are).
+  `planId` powers Profile's "Your Plan" section (see "Profile" above).
 - `/premium/success` and `/premium/failed` — plain pages Plisio redirects the
   browser to after checkout, independent of the webhook (the webhook is what
   actually grants premium; these pages are just user-facing confirmation).
@@ -448,6 +465,56 @@ already sends as `callback_url`/`success_invoice_url`/`fail_invoice_url`:
 - Webhook / callback URL: `/api/plisio/webhook`
 - Success URL: `/premium/success`
 - Failed URL: `/premium/failed`
+
+### Troubleshooting: "Could not start checkout"
+
+If clicking an Unlock button (The Armory, Peter's Watch, or Profile's "Your
+Plan") shows this error instead of redirecting to Plisio:
+
+- **It's not a wiring bug.** Every "Unlock" button in the app — The
+  Armory, Peter's Watch, and Profile's "Your Plan" — renders the exact same
+  `UnlockCard` component (`src/components/PremiumGate.tsx`), which calls
+  the exact same `startCheckout()` (`src/lib/plisio/checkout.ts`) →
+  `POST /api/plisio/create-invoice`. There is no separate/older button left
+  over from the tab restructuring; confirmed by grepping the whole client
+  for every caller of `startCheckout`.
+- **What the message itself tells you.** `startCheckout()` only shows the
+  generic "Could not start checkout." when the response from
+  `/api/plisio/create-invoice` isn't valid JSON (e.g. a 500/timeout page, or
+  the request never reached the route at all) — every error path *inside*
+  the route returns a specific message instead ("Payments aren't configured
+  yet.", "Could not reach Plisio.", "Could not create an invoice.", "Your
+  session has expired — sign in again."). **Open the browser's Network tab,
+  click Unlock, and look at the actual response body/status of the
+  `create-invoice` request** — whichever specific message (or lack of one)
+  it shows narrows this down immediately; this sandbox has no way to open a
+  live browser session against your deployment to check that for you.
+- **Most likely cause, given the key was recently rotated:** Vercel's
+  `PLISIO_SECRET_KEY` either (a) still holds the old/revoked key, or (b)
+  was updated in the dashboard but the project was never redeployed
+  afterward — **Vercel env var changes don't reach an already-running
+  serverless function until the next deployment.** Re-copy the current key
+  from Plisio's dashboard into Vercel's **Project Settings → Environment
+  Variables**, then trigger a fresh deployment (redeploy the latest, or
+  push any commit) — don't just save the env var and assume it's live.
+- **Improved server-side logging** (this change): `create-invoice/route.ts`
+  now reads Plisio's response as text first and logs the raw body/HTTP
+  status on any non-success response — including the specific case of
+  Plisio returning HTML/plain-text instead of JSON, which a bare
+  `response.json()` used to swallow into a generic parse error. After a
+  redeploy, check **Vercel → your project → the latest deployment →
+  Functions/Logs**, filtered to `create-invoice`, for a line like
+  `plisio create-invoice: Plisio rejected the request (uid=..., plan=...,
+  http ...)` — Plisio's own error name/message (e.g. "Invalid api key")
+  will be right there.
+- **Not verifiable from this sandbox.** `api.plisio.net` is blocked by this
+  environment's egress policy (confirmed via a direct test call, same
+  restriction already hit with bible-api.com) — so a live test-invoice
+  creation, and a direct comparison of the key in Vercel against Plisio's
+  dashboard, both need to happen from your own machine/dashboards, not from
+  here. Once `PLISIO_SECRET_KEY` is confirmed current and redeployed,
+  clicking Unlock should redirect to a real Plisio invoice page — that's
+  the concrete "it's fixed" signal to look for.
 
 ### Known limitations
 

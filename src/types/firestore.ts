@@ -1,5 +1,6 @@
 import type { Timestamp } from "firebase/firestore";
 import type { ApostleId } from "@/lib/apostles";
+import type { PlanId } from "@/lib/plisio/plans";
 
 /**
  * Firestore collection names, kept in one place so a rename doesn't require
@@ -44,6 +45,14 @@ export interface UserDoc {
    * that's not built yet.
    */
   premiumUntil: Timestamp | null;
+  /**
+   * Which plan the current premium grant is for — set by the Plisio
+   * webhook alongside tier/premiumUntil, locked from client writes the
+   * same way. `null` for free users and for any premium grant made before
+   * this field existed — the Profile page falls back to a plain "Premium
+   * member" label rather than guessing when this is null.
+   */
+  planId: PlanId | null;
 }
 
 /** streaks/{uid} — one streak-state document per user. */
