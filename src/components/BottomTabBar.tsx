@@ -1,9 +1,9 @@
 "use client";
 
 import type { JSX } from "react";
-import { BookOpenIcon, KeyIcon, ScrollIcon, ShieldIcon, SproutIcon } from "@/components/icons";
+import { BookOpenIcon, KeyIcon, ScrollIcon, ShieldIcon, SproutIcon, UsersIcon } from "@/components/icons";
 
-export type TabId = "today" | "path" | "armory" | "watch" | "word";
+export type TabId = "today" | "path" | "armory" | "watch" | "word" | "disciples";
 
 const TABS: { id: TabId; label: string; icon: (props: { className?: string }) => JSX.Element }[] = [
   { id: "today", label: "Today", icon: SproutIcon },
@@ -11,6 +11,7 @@ const TABS: { id: TabId; label: string; icon: (props: { className?: string }) =>
   { id: "armory", label: "The Armory", icon: ShieldIcon },
   { id: "watch", label: "Peter's Watch", icon: KeyIcon },
   { id: "word", label: "The Word", icon: BookOpenIcon },
+  { id: "disciples", label: "Disciples", icon: UsersIcon },
 ];
 
 type BottomTabBarProps = {
@@ -24,7 +25,7 @@ export function BottomTabBar({ active, onSelect }: BottomTabBarProps) {
       aria-label="Main navigation"
       className="shrink-0 border-t border-mist bg-paper/95 backdrop-blur-sm pb-[max(env(safe-area-inset-bottom),0px)]"
     >
-      <div className="grid grid-cols-5">
+      <div className="grid grid-cols-6">
         {TABS.map(({ id, label, icon: Icon }) => {
           const isActive = id === active;
           return (

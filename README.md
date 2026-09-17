@@ -207,17 +207,18 @@ rather than duplicating).
 
 ## Navigation (bottom tab bar)
 
-The signed-in app (`src/app/page.tsx`, `Dashboard`) is five tabs
+The signed-in app (`src/app/page.tsx`, `Dashboard`) is six tabs
 (`BottomTabBar`, `src/components/BottomTabBar.tsx`) rather than one long
 scroll. Each tab is its own component under `src/components/tabs/`:
 
 | Tab | Component | Access |
 | --- | --- | --- |
 | Today | `TodayTab.tsx` | Everyone — streak, XP, level, the apostle companion message, check-in |
-| The Path | `PathTab.tsx` | Free: capped at `FREE_DAILY_LESSON_LIMIT`/day. Premium: unlimited |
+| The Path | `PathTab.tsx` | Free: lessons capped at `FREE_DAILY_LESSON_LIMIT`/day, prayer journal uncapped. Premium: unlimited lessons |
 | The Armory | `ArmoryTab.tsx` | Free: teaser (see below). Premium: full access |
 | Peter's Watch | `WatchTab.tsx` | Free: teaser. Premium: full access |
 | The Word | `WordTab.tsx` | Everyone, never gated |
+| Disciples | `DisciplesTab.tsx` | Everyone — a "Coming soon" placeholder, no functionality yet |
 
 ### The Path: lesson types
 

@@ -11,6 +11,7 @@ import { PricingSection } from "@/components/PricingSection";
 import { ProfileButton } from "@/components/ProfileButton";
 import { ProfilePage } from "@/components/ProfilePage";
 import { ArmoryTab } from "@/components/tabs/ArmoryTab";
+import { DisciplesTab } from "@/components/tabs/DisciplesTab";
 import { PathTab } from "@/components/tabs/PathTab";
 import { TodayTab } from "@/components/tabs/TodayTab";
 import { WatchTab } from "@/components/tabs/WatchTab";
@@ -514,6 +515,7 @@ function Dashboard({ uid }: { uid: string }) {
               />
             )}
             {activeTab === "word" && <WordTab uid={uid} />}
+            {activeTab === "disciples" && <DisciplesTab />}
           </>
         )}
       </div>
