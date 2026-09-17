@@ -248,6 +248,16 @@ Devotional, Today's Prayer (the app's guided prayer, distinct from the
 user's own free-text prayer journal in The Path) — that change every
 calendar day rather than staying static or repeating.
 
+Today's Verse and Today's Devotional sit on `DailyContentBackdrop`
+(`src/components/DailyContentBackdrop.tsx`) — an illustrated "landscape"
+(soft hills, a sun glow) built from CSS variables pointing at the app's
+existing palette tokens (`--color-sage-200/400`, `--color-clay-50/200/400`)
+rather than a photo or a new image asset, so it stays on-brand and adds no
+binary dependency. It's purely decorative and sits behind the cards, which
+keep their normal solid `bg-paper` treatment on top — the backdrop never
+touches text readability. Today's Prayer stays a plain card below it, not
+inside the illustrated band.
+
 - **Three separate pools**, not pulled from `lessons`: `daily_verses`,
   `daily_devotionals`, `daily_prayers` (`DailyVerseDoc`/
   `DailyDevotionalDoc`/`DailyPrayerDoc` in `src/types/firestore.ts`, seeded
@@ -898,7 +908,7 @@ from their own story:
 | --- | --- | --- |
 | Peter | Accountability / check-in nudges | Bold, restorative — a stumble isn't the end |
 | Matthew | Progress & stats recaps | Precise, detail-oriented |
-| John | Daily gentle encouragement to open Scripture | Warm, relational |
+| John | Daily gentle encouragement — now a permanent fixture on Today (`MascotHero`), not part of the rotation below | Warm, relational |
 | Thomas | Reassurance during doubt / low motivation | Honest about doubt, still points to faith |
 
 - `src/lib/apostles.ts` — the data model: `APOSTLES` (name, one-line
@@ -916,14 +926,25 @@ from their own story:
   *type* applies right now from simple dashboard state, in priority order:
   not checked in today → Peter; checked in but the streak just reset after
   being longer → Thomas; checked in on a 7-day streak milestone → Matthew;
-  otherwise → John (the steady default).
+  otherwise → **null** (no rotating card that day — John's own permanent
+  slot on Today already covers the "steady baseline" role, so there's no
+  encouragement fallback case here anymore).
 - `src/components/ApostleAvatar.tsx` / `ApostleMessageCard.tsx` — the UI
-  surface: each apostle gets a small distinct icon (a key for Peter, a
-  ledger for Matthew, a heart for John, an eye for Thomas) in the existing
+  surface for Peter/Matthew/Thomas: each gets a small distinct icon (a key
+  for Peter, a ledger for Matthew, an eye for Thomas) in the existing
   clay/sage/neutral palette — no new colors — so apostles are told apart by
   glyph, not by introducing new hues. The card shows the apostle's name and
   avatar next to their message on the dashboard (`src/app/page.tsx`,
-  `Dashboard`).
+  `Dashboard`), only when `pickApostleMoment` returns non-null.
+- **John's mascot hero** (`src/components/MascotHero.tsx`) — always
+  visible at the top of Today, using his full-body portrait
+  (`public/apostles/john.png`, the same asset the landing page crops to a
+  square — see "Companion portraits" below) next to a speech-bubble card.
+  The bubble shows the current streak ("Day {n}") plus a short
+  encouragement line, picked the same deterministic way as the rotation
+  above (`pickApostleMessage(APOSTLES.john, ...)`, stable all day, new
+  tomorrow) but always from John's message list — never conditional,
+  never rotated away.
 - **Companion portraits.** The landing page's "Meet your companions" screen
   shows a character portrait per apostle from
   `public/apostles/{peter,matthew,john,thomas}.png` (`CompanionPortrait` in
@@ -977,7 +998,8 @@ src/
                   api/plisio/create-invoice, api/plisio/webhook,
                   api/bible (route handlers — the last proxies bible-api.com)
   components/     UI components (StreakVisual, PlantIcon, PathBookSections,
-                  LessonCard, PricingSection, AuthForm, ApostleAvatar,
+                  LessonCard, MascotHero, DailyContentBackdrop,
+                  PricingSection, AuthForm, ApostleAvatar,
                   ApostleMessageCard, BottomTabBar, PremiumGate (UnlockCard
                   + blurredPreviewClass),
                   ProfileButton, ProfilePage, icons.tsx — shared line icons)

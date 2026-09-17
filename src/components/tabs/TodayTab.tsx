@@ -1,4 +1,6 @@
 import { ApostleMessageCard } from "@/components/ApostleMessageCard";
+import { DailyContentBackdrop } from "@/components/DailyContentBackdrop";
+import { MascotHero } from "@/components/MascotHero";
 import { StreakVisual } from "@/components/StreakVisual";
 import type { ApostleMoment } from "@/lib/apostle-moment";
 import type { DailyDevotionalDoc, DailyPrayerDoc, DailyVerseDoc } from "@/types/firestore";
@@ -12,17 +14,18 @@ type TodayTabProps = {
   checkingIn: boolean;
   onCheckIn: () => void;
   apostleMoment: ApostleMoment | null;
+  mascotMessage: string;
   dailyVerse: DailyVerseDoc | null;
   dailyDevotional: DailyDevotionalDoc | null;
   dailyPrayer: DailyPrayerDoc | null;
 };
 
-/** Today — the app's daily content (verse, devotional, guided prayer,
- * rotating one pick per calendar date — see src/lib/dailyContent.ts),
- * plus streak, XP, level, and the apostle companion's message. The
- * original single-scroll dashboard content, now just one of six tabs. The
- * Path (a separate tab) holds the structured, book-organized lesson
- * library instead — nothing here repeats there, and vice versa. */
+/** Today — John's always-on greeting up top (MascotHero), the app's daily
+ * content (verse, devotional, guided prayer, rotating one pick per
+ * calendar date — see src/lib/dailyContent.ts), Peter/Matthew/Thomas'
+ * situational nudges when one applies (see pickApostleMoment), and streak/
+ * XP/level. The Path (a separate tab) holds the structured, book-organized
+ * lesson library instead — nothing here repeats there, and vice versa. */
 export function TodayTab({
   currentCount,
   longestCount,
@@ -32,34 +35,46 @@ export function TodayTab({
   checkingIn,
   onCheckIn,
   apostleMoment,
+  mascotMessage,
   dailyVerse,
   dailyDevotional,
   dailyPrayer,
 }: TodayTabProps) {
   return (
     <div className="flex-1 flex flex-col items-center gap-6 p-6">
+      <MascotHero streak={currentCount} message={mascotMessage} />
+
       {apostleMoment && (
         <ApostleMessageCard apostle={apostleMoment.apostle} message={apostleMoment.message} />
       )}
 
-      {dailyVerse && (
-        <section className="w-full max-w-sm rounded-2xl bg-paper border border-mist p-5 flex flex-col gap-2">
-          <span className="text-xs font-medium uppercase tracking-wide text-clay-600">
-            Today&apos;s Verse
-          </span>
-          <p className="text-sm text-ink/80 leading-relaxed">&ldquo;{dailyVerse.text}&rdquo;</p>
-          <span className="text-xs text-stone">{dailyVerse.reference}</span>
-        </section>
-      )}
+      {(dailyVerse || dailyDevotional) && (
+        <div className="relative w-full max-w-sm rounded-3xl overflow-hidden">
+          <DailyContentBackdrop />
+          <div className="relative flex flex-col gap-4 p-4">
+            {dailyVerse && (
+              <section className="rounded-2xl bg-paper border border-mist p-5 flex flex-col gap-2">
+                <span className="text-xs font-medium uppercase tracking-wide text-clay-600">
+                  Today&apos;s Verse
+                </span>
+                <p className="text-sm text-ink/80 leading-relaxed">
+                  &ldquo;{dailyVerse.text}&rdquo;
+                </p>
+                <span className="text-xs text-stone">{dailyVerse.reference}</span>
+              </section>
+            )}
 
-      {dailyDevotional && (
-        <section className="w-full max-w-sm rounded-2xl bg-paper border border-mist p-5 flex flex-col gap-2">
-          <span className="text-xs font-medium uppercase tracking-wide text-clay-600">
-            Today&apos;s Devotional
-          </span>
-          <h3 className="text-base font-semibold text-ink">{dailyDevotional.title}</h3>
-          <p className="text-sm text-ink/80 leading-relaxed">{dailyDevotional.text}</p>
-        </section>
+            {dailyDevotional && (
+              <section className="rounded-2xl bg-paper border border-mist p-5 flex flex-col gap-2">
+                <span className="text-xs font-medium uppercase tracking-wide text-clay-600">
+                  Today&apos;s Devotional
+                </span>
+                <h3 className="text-base font-semibold text-ink">{dailyDevotional.title}</h3>
+                <p className="text-sm text-ink/80 leading-relaxed">{dailyDevotional.text}</p>
+              </section>
+            )}
+          </div>
+        </div>
       )}
 
       {dailyPrayer && (

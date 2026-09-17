@@ -17,7 +17,7 @@ import { TodayTab } from "@/components/tabs/TodayTab";
 import { WatchTab } from "@/components/tabs/WatchTab";
 import { WordTab } from "@/components/tabs/WordTab";
 import { pickApostleMoment } from "@/lib/apostle-moment";
-import { APOSTLES, type ApostleId } from "@/lib/apostles";
+import { APOSTLES, pickApostleMessage, type ApostleId } from "@/lib/apostles";
 import { useAuth } from "@/lib/auth-context";
 import { fetchDailyDevotionals, fetchDailyPrayers, fetchDailyVerses } from "@/lib/db/dailyContent";
 import { completeLesson, fetchLessons, subscribeToLessonProgress } from "@/lib/db/lessons";
@@ -400,6 +400,10 @@ function Dashboard({ uid }: { uid: string }) {
         level: profile.level,
       })
     : null;
+  // John's permanent Today greeting — deterministic per user per day (same
+  // pattern as pickApostleMoment's message pick), but always John, never
+  // part of the rotation above.
+  const mascotMessage = pickApostleMessage(APOSTLES.john, `${uid}-${today}-john`);
 
   async function handleCheckIn() {
     setCheckingIn(true);
@@ -508,6 +512,7 @@ function Dashboard({ uid }: { uid: string }) {
                 checkingIn={checkingIn}
                 onCheckIn={handleCheckIn}
                 apostleMoment={apostleMoment}
+                mascotMessage={mascotMessage}
                 dailyVerse={dailyVerse}
                 dailyDevotional={dailyDevotional}
                 dailyPrayer={dailyPrayer}

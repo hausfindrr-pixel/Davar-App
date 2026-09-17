@@ -23,11 +23,12 @@ export interface ApostleMoment {
 }
 
 /**
- * Decides which apostle "speaks" on the dashboard right now. The type is
- * chosen by simple, readable rules about where the user actually is —
- * which apostle within that type is fixed (see APOSTLE_FOR_TYPE) — only the
- * specific message text is picked per-occasion (deterministically per user
- * per day, so it's stable through a session but varies day to day):
+ * Decides which apostle "speaks" on the dashboard right now, or null if
+ * none of the specific moments apply. The type is chosen by simple,
+ * readable rules about where the user actually is — which apostle within
+ * that type is fixed (see APOSTLE_FOR_TYPE) — only the specific message
+ * text is picked per-occasion (deterministically per user per day, so it's
+ * stable through a session but varies day to day):
  *
  *  1. Not checked in yet today → Peter (accountability nudge) — most
  *     actionable, so it takes priority.
@@ -35,9 +36,12 @@ export interface ApostleMoment {
  *     (reassurance) — a broken streak is exactly a low-motivation moment.
  *  3. Checked in, and today lands on a weekly milestone → Matthew
  *     (progress recap).
- *  4. Otherwise → John (daily encouragement), the steady baseline.
+ *  4. Otherwise → null — no specific moment applies today. John's steady,
+ *     every-day encouragement lives in its own permanent spot on Today
+ *     (MascotHero, src/components/MascotHero.tsx) instead of rotating in
+ *     here, so there's no "encouragement" fallback case in this function.
  */
-export function pickApostleMoment(ctx: ApostleMomentContext): ApostleMoment {
+export function pickApostleMoment(ctx: ApostleMomentContext): ApostleMoment | null {
   const streakJustBroken = ctx.currentStreak <= 1 && ctx.longestStreak > 1;
   const isWeeklyMilestone = ctx.currentStreak > 0 && ctx.currentStreak % 7 === 0;
 
@@ -49,7 +53,7 @@ export function pickApostleMoment(ctx: ApostleMomentContext): ApostleMoment {
   } else if (isWeeklyMilestone) {
     type = "progress";
   } else {
-    type = "encouragement";
+    return null;
   }
 
   const apostle = apostleForType(type);
