@@ -6,7 +6,7 @@ import { blurredPreviewClass, UnlockCard } from "@/components/PremiumGate";
 import { BIBLE_BOOKS } from "@/lib/bible";
 import { visibleLessonsForFreeTier } from "@/lib/lessons";
 import type { PlanId } from "@/lib/plisio/plans";
-import { FREE_DAILY_LESSON_LIMIT, type LessonDoc } from "@/types/firestore";
+import { dailyActivityLimit, type LessonDoc } from "@/types/firestore";
 
 type PathBookSectionsProps = {
   lessons: LessonDoc[];
@@ -15,6 +15,9 @@ type PathBookSectionsProps = {
   dayIndex: number;
   completedLessonIds: string[];
   isPremium: boolean;
+  /** Lessons completed + prayers submitted today, combined — see
+   * dailyActivityLimit (src/types/firestore.ts). */
+  todayActivityCount: number;
   /** Hide the "upgrade to unlock more" nag — e.g. right after checkout, while the upgrade is still confirming. */
   suppressUpgradeNag?: boolean;
   onComplete: (lesson: LessonDoc) => Promise<void>;
@@ -34,6 +37,7 @@ export function PathBookSections({
   dayIndex,
   completedLessonIds,
   isPremium,
+  todayActivityCount,
   suppressUpgradeNag = false,
   onComplete,
   onUpgrade,
@@ -44,8 +48,8 @@ export function PathBookSections({
   const [upgradingPlan, setUpgradingPlan] = useState<PlanId | null>(null);
   const [upgradeError, setUpgradeError] = useState<string | null>(null);
 
-  const completedCount = completedLessonIds.length;
-  const atLimit = !isPremium && completedCount >= FREE_DAILY_LESSON_LIMIT;
+  const limit = dailyActivityLimit(isPremium ? "premium" : "free");
+  const atLimit = todayActivityCount >= limit;
 
   const revealedIds = isPremium
     ? null
@@ -94,12 +98,9 @@ export function PathBookSections({
     <section className="w-full max-w-sm flex flex-col gap-3">
       <div className="flex items-center justify-between px-1">
         <h2 className="text-sm font-medium text-ink">The Path</h2>
-        {!isPremium && (
-          <span className="text-xs text-stone">
-            {Math.min(completedCount, FREE_DAILY_LESSON_LIMIT)} of {FREE_DAILY_LESSON_LIMIT} free
-            today
-          </span>
-        )}
+        <span className="text-xs text-stone">
+          {Math.min(todayActivityCount, limit)} of {limit} today
+        </span>
       </div>
 
       <div className="flex flex-col gap-3">
@@ -179,30 +180,34 @@ export function PathBookSections({
         <div className="rounded-2xl bg-clay-50 border border-clay-200 p-4 flex flex-col items-center gap-3 text-center">
           <div>
             <p className="text-sm text-ink">
-              You&apos;ve used all {FREE_DAILY_LESSON_LIMIT} free lessons today.
+              You&apos;ve used all {limit} actions today across lessons and prayers.
             </p>
             <p className="text-xs text-stone mt-1">
-              Come back tomorrow, or upgrade to Premium for unlimited daily lessons.
+              {isPremium
+                ? "Come back tomorrow for another 15."
+                : "Come back tomorrow, or upgrade to Premium for 15 a day."}
             </p>
           </div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              disabled={upgradingPlan !== null}
-              onClick={() => void handleUpgrade("monthly")}
-              className="rounded-full bg-clay-600 text-paper px-4 py-1.5 text-xs font-medium hover:bg-clay-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
-            >
-              {upgradingPlan === "monthly" ? "Redirecting…" : "Monthly $6.99"}
-            </button>
-            <button
-              type="button"
-              disabled={upgradingPlan !== null}
-              onClick={() => void handleUpgrade("yearly")}
-              className="rounded-full border border-clay-400 text-clay-700 px-4 py-1.5 text-xs font-medium hover:bg-clay-100/50 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
-            >
-              {upgradingPlan === "yearly" ? "Redirecting…" : "Yearly $59.99"}
-            </button>
-          </div>
+          {!isPremium && (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={upgradingPlan !== null}
+                onClick={() => void handleUpgrade("monthly")}
+                className="rounded-full bg-clay-600 text-paper px-4 py-1.5 text-xs font-medium hover:bg-clay-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {upgradingPlan === "monthly" ? "Redirecting…" : "Monthly $6.99"}
+              </button>
+              <button
+                type="button"
+                disabled={upgradingPlan !== null}
+                onClick={() => void handleUpgrade("yearly")}
+                className="rounded-full border border-clay-400 text-clay-700 px-4 py-1.5 text-xs font-medium hover:bg-clay-100/50 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {upgradingPlan === "yearly" ? "Redirecting…" : "Yearly $59.99"}
+              </button>
+            </div>
+          )}
           {upgradeError && <p className="text-xs text-clay-700">{upgradeError}</p>}
         </div>
       )}

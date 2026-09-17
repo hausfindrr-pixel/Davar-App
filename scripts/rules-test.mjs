@@ -46,6 +46,11 @@ async function check(name, fn) {
 const ALICE = "alice-uid";
 const BOB = "bob-uid";
 const TODAY = "2026-09-13";
+// A date distinct from TODAY, used by the prayer-journal tests below so
+// they run against a fresh (no-progress-doc-yet) day rather than
+// colliding with alice's TODAY progress doc, which the
+// daily_lesson_progress tests above deliberately drive to its cap.
+const PRAYER_DATE = "2026-09-10";
 
 async function seedUser(uid, tier) {
   await testEnv.withSecurityRulesDisabled(async (ctx) => {
@@ -188,7 +193,7 @@ await check("alice CAN update other fields on her own user doc (e.g. displayName
   );
 });
 
-// --- daily_lesson_progress cap, free tier ---
+// --- daily_lesson_progress cap, free tier (3/day, lessons + prayers combined) ---
 const aliceProgressId = `${ALICE}_${TODAY}`;
 
 await check("alice (free) can complete her 1st lesson today", async () => {
@@ -197,6 +202,7 @@ await check("alice (free) can complete her 1st lesson today", async () => {
       userId: ALICE,
       date: TODAY,
       completedLessonIds: ["lesson-1"],
+      prayerCount: 0,
     }),
   );
 });
@@ -207,56 +213,104 @@ await check("alice (free) can complete her 2nd lesson today", async () => {
       userId: ALICE,
       date: TODAY,
       completedLessonIds: ["lesson-1", "lesson-2"],
+      prayerCount: 0,
     }),
   );
 });
 
-await check("alice (free) can complete her 3rd lesson today", async () => {
+await check("alice (free) can submit a prayer as her 3rd action today (mixed with lessons)", async () => {
   await assertSucceeds(
     updateDoc(doc(aliceDb, "daily_lesson_progress", aliceProgressId), {
       userId: ALICE,
       date: TODAY,
+      completedLessonIds: ["lesson-1", "lesson-2"],
+      prayerCount: 1,
+    }),
+  );
+});
+
+await check("alice (free) is BLOCKED from a 4th action (lesson) today", async () => {
+  await assertFails(
+    updateDoc(doc(aliceDb, "daily_lesson_progress", aliceProgressId), {
+      userId: ALICE,
+      date: TODAY,
       completedLessonIds: ["lesson-1", "lesson-2", "lesson-3"],
+      prayerCount: 1,
     }),
   );
 });
 
-await check("alice (free) is BLOCKED from a 4th lesson today", async () => {
+await check("alice (free) is BLOCKED from a 4th action (prayer) today", async () => {
   await assertFails(
     updateDoc(doc(aliceDb, "daily_lesson_progress", aliceProgressId), {
       userId: ALICE,
       date: TODAY,
-      completedLessonIds: ["lesson-1", "lesson-2", "lesson-3", "lesson-4"],
+      completedLessonIds: ["lesson-1", "lesson-2"],
+      prayerCount: 2,
     }),
   );
 });
 
-await check("alice is still blocked even if she resends the exact same 4th write", async () => {
+await check("alice is still blocked even if she resends the exact same blocked write", async () => {
   await assertFails(
     updateDoc(doc(aliceDb, "daily_lesson_progress", aliceProgressId), {
       userId: ALICE,
       date: TODAY,
-      completedLessonIds: ["lesson-1", "lesson-2", "lesson-3", "lesson-4"],
+      completedLessonIds: ["lesson-1", "lesson-2", "lesson-3"],
+      prayerCount: 1,
     }),
   );
 });
 
-// --- daily_lesson_progress, premium tier bypasses the cap ---
+// --- daily_lesson_progress, premium tier: 15/day, not unlimited ---
 const bobProgressId = `${BOB}_${TODAY}`;
 await testEnv.withSecurityRulesDisabled(async (ctx) => {
   await setDoc(doc(ctx.firestore(), "daily_lesson_progress", bobProgressId), {
     userId: BOB,
     date: TODAY,
     completedLessonIds: ["lesson-1", "lesson-2", "lesson-3"],
+    prayerCount: 0,
   });
 });
 
-await check("bob (premium) CAN complete a 4th lesson today", async () => {
+await check("bob (premium) CAN complete a 4th lesson today (well under 15)", async () => {
   await assertSucceeds(
     updateDoc(doc(bobDb, "daily_lesson_progress", bobProgressId), {
       userId: BOB,
       date: TODAY,
       completedLessonIds: ["lesson-1", "lesson-2", "lesson-3", "lesson-4"],
+      prayerCount: 0,
+    }),
+  );
+});
+
+await testEnv.withSecurityRulesDisabled(async (ctx) => {
+  await setDoc(doc(ctx.firestore(), "daily_lesson_progress", bobProgressId), {
+    userId: BOB,
+    date: TODAY,
+    completedLessonIds: ["l1", "l2", "l3", "l4", "l5", "l6", "l7", "l8", "l9", "l10"],
+    prayerCount: 4,
+  });
+});
+
+await check("bob (premium) CAN take his 15th action today", async () => {
+  await assertSucceeds(
+    updateDoc(doc(bobDb, "daily_lesson_progress", bobProgressId), {
+      userId: BOB,
+      date: TODAY,
+      completedLessonIds: ["l1", "l2", "l3", "l4", "l5", "l6", "l7", "l8", "l9", "l10", "l11"],
+      prayerCount: 4,
+    }),
+  );
+});
+
+await check("bob (premium) is BLOCKED from a 16th action today", async () => {
+  await assertFails(
+    updateDoc(doc(bobDb, "daily_lesson_progress", bobProgressId), {
+      userId: BOB,
+      date: TODAY,
+      completedLessonIds: ["l1", "l2", "l3", "l4", "l5", "l6", "l7", "l8", "l9", "l10", "l11", "l12"],
+      prayerCount: 4,
     }),
   );
 });
@@ -267,7 +321,8 @@ await check("bob cannot write to alice's daily_lesson_progress doc", async () =>
     updateDoc(doc(bobDb, "daily_lesson_progress", aliceProgressId), {
       userId: ALICE,
       date: TODAY,
-      completedLessonIds: ["lesson-1", "lesson-2", "lesson-3", "lesson-x"],
+      completedLessonIds: ["lesson-1", "lesson-2", "lesson-x"],
+      prayerCount: 1,
     }),
   );
 });
@@ -460,6 +515,7 @@ await check("alice can create her own prayer (id field matches the docId)", asyn
     setDoc(doc(aliceDb, "users", ALICE, "prayers", "prayer-1"), {
       id: "prayer-1",
       text: "Thank you for today.",
+      date: PRAYER_DATE,
     }),
   );
 });
@@ -469,6 +525,7 @@ await check("alice cannot create a prayer whose id field doesn't match the docId
     setDoc(doc(aliceDb, "users", ALICE, "prayers", "prayer-2"), {
       id: "wrong-id",
       text: "Thank you for today.",
+      date: PRAYER_DATE,
     }),
   );
 });
@@ -478,6 +535,16 @@ await check("alice cannot create an empty prayer", async () => {
     setDoc(doc(aliceDb, "users", ALICE, "prayers", "prayer-3"), {
       id: "prayer-3",
       text: "",
+      date: PRAYER_DATE,
+    }),
+  );
+});
+
+await check("alice cannot create a prayer without a date field", async () => {
+  await assertFails(
+    setDoc(doc(aliceDb, "users", ALICE, "prayers", "prayer-4"), {
+      id: "prayer-4",
+      text: "Thank you for today.",
     }),
   );
 });
@@ -487,6 +554,7 @@ await check("alice cannot write a prayer under bob's uid", async () => {
     setDoc(doc(aliceDb, "users", BOB, "prayers", "prayer-1"), {
       id: "prayer-1",
       text: "Not mine to write.",
+      date: PRAYER_DATE,
     }),
   );
 });
@@ -505,6 +573,61 @@ await check("alice cannot edit an existing prayer (immutable journal)", async ()
 
 await check("alice cannot delete her own prayer", async () => {
   await assertFails(deleteDoc(doc(aliceDb, "users", ALICE, "prayers", "prayer-1")));
+});
+
+// --- prayers share the daily activity cap with lessons ---
+// Seed 1 action already used today (a lesson) via the progress doc — the
+// rule reads this, not the prayer count, since a prayer doc alone doesn't
+// self-report where the day's running total stands.
+await testEnv.withSecurityRulesDisabled(async (ctx) => {
+  await setDoc(doc(ctx.firestore(), "daily_lesson_progress", `${ALICE}_${PRAYER_DATE}`), {
+    userId: ALICE,
+    date: PRAYER_DATE,
+    completedLessonIds: ["lesson-x"],
+    prayerCount: 0,
+  });
+});
+
+await check("alice (free) can submit a prayer as her 2nd action today", async () => {
+  await assertSucceeds(
+    setDoc(doc(aliceDb, "users", ALICE, "prayers", "prayer-5"), {
+      id: "prayer-5",
+      text: "One more thing, Lord.",
+      date: PRAYER_DATE,
+    }),
+  );
+  // Mirror what submitPrayer's own transaction would also do in the real
+  // app, so the next check starts from the right running total.
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await updateDoc(doc(ctx.firestore(), "daily_lesson_progress", `${ALICE}_${PRAYER_DATE}`), {
+      prayerCount: 1,
+    });
+  });
+});
+
+await check("alice (free) can submit a prayer as her 3rd action today", async () => {
+  await assertSucceeds(
+    setDoc(doc(aliceDb, "users", ALICE, "prayers", "prayer-6"), {
+      id: "prayer-6",
+      text: "Still going.",
+      date: PRAYER_DATE,
+    }),
+  );
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await updateDoc(doc(ctx.firestore(), "daily_lesson_progress", `${ALICE}_${PRAYER_DATE}`), {
+      prayerCount: 2,
+    });
+  });
+});
+
+await check("alice (free) is BLOCKED from a prayer once she's already at 3 actions today", async () => {
+  await assertFails(
+    setDoc(doc(aliceDb, "users", ALICE, "prayers", "prayer-7"), {
+      id: "prayer-7",
+      text: "Should be blocked.",
+      date: PRAYER_DATE,
+    }),
+  );
 });
 
 // --- daily_verses / daily_devotionals / daily_prayers: Today tab content ---

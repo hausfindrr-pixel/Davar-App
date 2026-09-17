@@ -362,6 +362,11 @@ function Dashboard({ uid }: { uid: string }) {
   const dailyVerse = pickForDate(dailyVerses, today);
   const dailyDevotional = pickForDate(dailyDevotionals, today);
   const dailyPrayer = pickForDate(dailyPrayers, today);
+  // Lessons completed + prayers submitted today, combined — see
+  // dailyActivityLimit (src/types/firestore.ts). Today's Verse/Devotional/
+  // Prayer have no completion action, so they're not part of this count.
+  const todayActivityCount =
+    (lessonProgress?.completedLessonIds.length ?? 0) + (lessonProgress?.prayerCount ?? 0);
 
   useEffect(() => {
     const unsubStreak = subscribeToStreak(uid, setStreak);
@@ -468,7 +473,7 @@ function Dashboard({ uid }: { uid: string }) {
           }`}
         >
           {isPremium
-            ? "You're Premium — unlimited daily lessons and the full library are unlocked."
+            ? "You're Premium — 15 lessons and prayers a day, and the full library are unlocked."
             : "Payment received — your upgrade is confirming on the network. This can take a few minutes; this page will update on its own, no need to refresh."}
         </div>
       )}
@@ -526,6 +531,7 @@ function Dashboard({ uid }: { uid: string }) {
                 dayIndex={dayIndex}
                 completedLessonIds={lessonProgress?.completedLessonIds ?? []}
                 isPremium={isPremium}
+                todayActivityCount={todayActivityCount}
                 suppressUpgradeNag={justUpgraded && !isPremium}
                 onComplete={handleCompleteLesson}
                 onUpgrade={handleUpgrade}

@@ -47,13 +47,13 @@ function PlanCard({ profile, getIdToken }: { profile: UserDoc | null; getIdToken
             Free
           </span>
           <p className="text-xs text-stone leading-relaxed">
-            You&apos;re missing The Armory, Peter&apos;s Watch, and unlimited daily
-            lessons — Premium unlocks the full walk.
+            You&apos;re missing The Armory, Peter&apos;s Watch, and full access to
+            15 lessons and prayers a day — Premium unlocks the full walk.
           </p>
         </div>
         <UnlockCard
           title="Upgrade to Premium"
-          description="Unlock The Armory, Peter's Watch, and unlimited daily lessons."
+          description="Unlock The Armory, Peter's Watch, and 15 lessons and prayers a day."
           getIdToken={getIdToken}
         />
       </div>

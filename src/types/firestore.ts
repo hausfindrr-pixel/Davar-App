@@ -195,24 +195,56 @@ export const PRAYER_XP_REWARD = 10;
 export interface PrayerDoc {
   id: string;
   text: string;
+  /** "YYYY-MM-DD" in the user's timezone — lets firestore.rules locate
+   * that day's daily_lesson_progress doc to enforce the shared activity
+   * cap without a separate query (rules can't query/count documents). */
+  date: string;
   createdAt: Timestamp;
 }
 
 /**
  * daily_lesson_progress/{uid}_{date} — one doc per user per day, tracking
- * which lessons they've completed. This is the server-side source of truth
- * for the free-tier daily lesson cap (see firestore.rules); it exists
- * specifically so the limit can't be bypassed by refreshing the page or
- * clearing local state, since it lives in Firestore, not the client.
+ * both which lessons they've completed and how many prayers they've
+ * submitted. This is the server-side source of truth for the daily
+ * activity cap (see firestore.rules and dailyActivityLimit below); it
+ * exists specifically so the limit can't be bypassed by refreshing the
+ * page or clearing local state, since it lives in Firestore, not the
+ * client. Lessons keep their own IDs (so a completed lesson can show
+ * "Completed" rather than just counting toward a total); prayers only need
+ * a count, since the prayer journal itself already lists each prayer's own
+ * text/date via its own subcollection.
  */
 export interface DailyLessonProgressDoc {
   userId: string;
   date: string; // "YYYY-MM-DD", in the user's timezone
   completedLessonIds: string[];
+  prayerCount: number;
   updatedAt: Timestamp;
 }
 
+/**
+ * How many lessons a free-tier user can complete per day of their journey
+ * before that day's batch is revealed in full — a reveal-pacing constant
+ * for The Path (see visibleLessonsForFreeTier, src/lib/lessons.ts), not
+ * the same thing as the daily completion cap below (they happen to share
+ * a value, but a change to one shouldn't imply a change to the other).
+ */
 export const FREE_DAILY_LESSON_LIMIT = 3;
+
+/**
+ * The daily cap on lessons-completed-plus-prayers-submitted, combined,
+ * enforced by daily_lesson_progress's rules (see firestore.rules) and
+ * checked in completeLesson/submitPrayer (src/lib/db/lessons.ts,
+ * src/lib/db/prayers.ts). Applies to The Path's lessons and the prayer
+ * journal — Today's Verse/Devotional/Prayer have no completion action and
+ * aren't part of this count.
+ */
+export const FREE_DAILY_ACTIVITY_LIMIT = 3;
+export const PREMIUM_DAILY_ACTIVITY_LIMIT = 15;
+
+export function dailyActivityLimit(tier: UserTier): number {
+  return tier === "premium" ? PREMIUM_DAILY_ACTIVITY_LIMIT : FREE_DAILY_ACTIVITY_LIMIT;
+}
 
 export type AccountabilityLinkStatus = "pending" | "active" | "ended";
 

@@ -151,24 +151,44 @@ linked:
 firebase deploy --only firestore:rules,storage
 ```
 
-### Free tier & the daily lesson cap
+### The daily activity cap: lessons + prayers, by tier
 
-Free-tier users are capped at `FREE_DAILY_LESSON_LIMIT` (3, in
-`src/types/firestore.ts`) lesson completions per day. This is enforced in
-`firestore.rules`, not just in the UI: `completeLesson()`
-(`src/lib/db/lessons.ts`) checks the limit client-side for a clean result,
-but the actual gate is the `daily_lesson_progress` update rule — growing
-`completedLessonIds` past the limit for a non-`"premium"` user rejects the
-whole transaction (the XP award and check-in write included), so it can't
-be bypassed by refreshing the page or calling Firestore directly. `tier`
+Lesson completions and prayer-journal submissions share one daily cap,
+combined: `FREE_DAILY_ACTIVITY_LIMIT` (3) for free accounts,
+`PREMIUM_DAILY_ACTIVITY_LIMIT` (15) for premium — both in
+`src/types/firestore.ts`, via `dailyActivityLimit(tier)`. Premium used to
+be genuinely unlimited here; it's now a real (much higher) cap, mainly as
+a cost/abuse ceiling rather than a meaningful product restriction.
+
+This is enforced in `firestore.rules`, not just in the UI:
+`completeLesson()` (`src/lib/db/lessons.ts`) and `submitPrayer()`
+(`src/lib/db/prayers.ts`) both check the limit client-side for a clean
+result, but the actual gate is the `daily_lesson_progress` doc's rules —
+one doc per user per day, holding both `completedLessonIds` (a lesson
+completion grows this by exactly 1) and `prayerCount` (a prayer submission
+grows this by exactly 1, `completedLessonIds` untouched) — either write is
+allowed only if `completedLessonIds.size() + prayerCount` was under the
+tier's limit *before* that write, so bypassing the client checks and
+writing directly to Firestore hits the same wall (the XP award and
+check-in write riding along in the same transaction get rejected with it).
+The `users/{uid}/prayers/{prayerId}` create rule enforces the same
+check independently (reading that same progress doc, or treating it as
+zero via `!exists()` for the very first action of a fresh day) — so a
+prayer can't be created without going through the cap just because the
+paired progress-doc write happens to live on a different document. `tier`
 itself is locked: the `users` rule only lets it be created as `"free"` and
 never lets a client change it afterward — the only way to grant `"premium"`
 is the Admin SDK write in the Plisio webhook (see "Payments" below).
 
-Completing a lesson also counts as that day's streak check-in (same
-`computeStreakUpdate` the manual "Check in today" button uses) — lessons
-are the app's actual daily practice, so the streak/plant visual tracks them
-directly instead of requiring a separate, unrelated tap.
+Completing a lesson or submitting a prayer also counts as that day's
+streak check-in (same `computeStreakUpdate` the manual "Check in today"
+button uses) — both are the app's actual daily practice, so the
+streak/plant visual tracks them directly instead of requiring a separate,
+unrelated tap.
+
+Today's Verse/Devotional/Prayer (see "Today: daily content" below) have no
+completion action and aren't part of this cap at all — it only covers The
+Path's lessons and the prayer journal.
 
 Free-tier accounts also only ever *see* `FREE_DAILY_LESSON_LIMIT` lessons
 per day of their journey (`visibleLessonsForFreeTier` in `src/lib/lessons.ts`,
@@ -235,7 +255,7 @@ scroll. Each tab is its own component under `src/components/tabs/`:
 | Tab | Component | Access |
 | --- | --- | --- |
 | Today | `TodayTab.tsx` | Everyone — Today's Verse/Devotional/Prayer (see below), streak, XP, level, the apostle companion message, check-in |
-| The Path | `PathTab.tsx` | Free: lessons capped at `FREE_DAILY_LESSON_LIMIT`/day, revealed round-robin across books, prayer journal uncapped. Premium: every book, every lesson, in order |
+| The Path | `PathTab.tsx` | Free: 3/day combined lesson+prayer cap, lessons revealed round-robin across books. Premium: every book, every lesson, in order, 15/day combined cap — see "The daily activity cap" above |
 | The Armory | `ArmoryTab.tsx` | Free: teaser (see below). Premium: full access |
 | Peter's Watch | `WatchTab.tsx` | Free: teaser. Premium: full access |
 | The Word | `WordTab.tsx` | Everyone, never gated |
@@ -302,16 +322,20 @@ actually have seeded lessons — there's no separate books collection.
   required `lessonBook: string`, an exact `BIBLE_BOOKS` entry name (e.g.
   `"Psalms"`, not `"Psalm"`). `scripts/lessons-data.mjs` sets it per
   lesson, derived from each lesson's `scriptureReference`.
-- **Premium** sees every book fully, every lesson in `order`, no locking.
+- **Premium** sees every book fully, every lesson in `order` — no reveal
+  locking (that's a free-tier-only concept). It still shares the daily
+  activity cap with free tier at a much higher number (15/day vs. 3/day,
+  combined with prayers — see "The daily activity cap" above), so a
+  revealed-but-uncompleted lesson can still show the plain gray "Locked"
+  button (not the blurred book-level lock below) on a day premium hits 15.
 - **Free tier** sees an assorted, round-robin-across-books reveal (see
   "lesson reveal" above) instead of full access to any one book. Opening a
   book that has lessons beyond that reveal shows the revealed lessons
   normally, then the rest blurred (`blurredPreviewClass`) followed by an
   `UnlockCard` scoped to that book — the same paywall pattern as the
-  Armory and Peter's Watch, not a separate one. The daily 3-lesson
-  completion cap (`FREE_DAILY_LESSON_LIMIT`, enforced in
-  `firestore.rules`) is unchanged and independent of this — it still
-  grays out any revealed-but-uncompleted lesson once hit for the day.
+  Armory and Peter's Watch, not a separate one. The daily activity cap
+  (see above) is unchanged and independent of this — it still grays out
+  any revealed-but-uncompleted lesson once hit for the day.
 - **`LessonCard.tsx`** (`src/components/LessonCard.tsx`) holds the actual
   per-lesson card markup (reading summary + Complete button, or
   `FillBlankCard`), extracted out of the old flat `LessonsSection.tsx` so
@@ -590,10 +614,11 @@ lives here now instead of the main header.
 - **Your Plan.** A status card (`PlanCard`, inside `ProfilePage.tsx`) driven
   entirely by the existing `users/{uid}` doc — no new Firestore reads.
   - **Free**: a "Free" badge, a one-line summary of what Premium adds
-    (The Armory, Peter's Watch, unlimited daily lessons), and the same
-    `UnlockCard` component used on The Armory/Peter's Watch's paywalls —
-    not a separate, near-duplicate upgrade button, the literal same
-    component and checkout flow.
+    (The Armory, Peter's Watch, 15 lessons and prayers a day instead of
+    3 — see "The daily activity cap" above), and the same `UnlockCard`
+    component used on The Armory/Peter's Watch's paywalls — not a
+    separate, near-duplicate upgrade button, the literal same component
+    and checkout flow.
   - **Premium**: a "Premium" badge, plus `planId` ("Monthly"/"Yearly", if
     set — see below) and `premiumUntil` ("Access through {date}", if set)
     each shown only when present. Deliberately says "**access through**",

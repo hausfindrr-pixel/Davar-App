@@ -38,13 +38,28 @@ service cloud.firestore {
     // collection, the client writes directly here (no server-side routing
     // logic to protect) — but entries are immutable once created: no
     // update/delete for v1, this is a journal, not an editable note.
+    //
+    // Prayers share the daily activity cap with lesson completions (see
+    // daily_lesson_progress below) — a prayer create is only allowed if
+    // that day's combined lessons+prayers count, read from the progress
+    // doc, is under the tier's limit. `!exists(...)` covers the very first
+    // action of the day, before any progress doc has been created yet.
     match /users/{uid}/prayers/{prayerId} {
       allow read: if isOwner(uid);
       allow create: if isOwner(uid) &&
         request.resource.data.id == prayerId &&
         request.resource.data.text is string &&
         request.resource.data.text.size() > 0 &&
-        request.resource.data.text.size() <= 2000;
+        request.resource.data.text.size() <= 2000 &&
+        request.resource.data.date is string &&
+        (
+          !exists(/databases/$(database)/documents/daily_lesson_progress/$(uid + '_' + request.resource.data.date)) ||
+          (
+            get(/databases/$(database)/documents/daily_lesson_progress/$(uid + '_' + request.resource.data.date)).data.completedLessonIds.size() +
+            get(/databases/$(database)/documents/daily_lesson_progress/$(uid + '_' + request.resource.data.date)).data.prayerCount <
+            (get(/databases/$(database)/documents/users/$(uid)).data.tier == "premium" ? 15 : 3)
+          )
+        );
       allow update, delete: if false;
     }
 
@@ -63,14 +78,21 @@ service cloud.firestore {
       allow write: if false; // managed via the console or the Admin SDK
     }
 
-    // Free-tier daily lesson cap. docId is "{uid}_{date}" — one doc per
-    // user per day, so a new day naturally starts a fresh count. The real
-    // enforcement is here, not in the client: completeLesson() (see
-    // src/lib/db/lessons.ts) checks the limit client-side too for a clean
-    // UX, but if that check were bypassed, growing completedLessonIds past
-    // FREE_DAILY_LESSON_LIMIT (3) below rejects the whole transaction for
-    // a non-premium user — including the XP award and check-in write that
-    // ride along with it in the same transaction.
+    // Daily lesson+prayer activity cap: 3/day free, 15/day premium,
+    // combined (dailyActivityLimit, src/types/firestore.ts). docId is
+    // "{uid}_{date}" — one doc per user per day, so a new day naturally
+    // starts a fresh count. The real enforcement is here, not in the
+    // client: completeLesson()/submitPrayer() (src/lib/db/lessons.ts,
+    // src/lib/db/prayers.ts) check the limit client-side too for a clean
+    // UX, but if that check were bypassed, growing either field past the
+    // tier's limit below rejects the whole transaction — including the XP
+    // award and check-in write that ride along with it.
+    //
+    // Two independent actions write here: a lesson completion grows
+    // completedLessonIds by exactly 1 (prayerCount unchanged), a prayer
+    // submission grows prayerCount by exactly 1 (completedLessonIds
+    // unchanged) — either is allowed as long as the combined total before
+    // the write was under the tier's limit.
     //
     // Known limitation: `date` is client-supplied, same as lastCheckInDate
     // on streaks/{uid} — a client forging an arbitrary date could start a
@@ -83,18 +105,29 @@ service cloud.firestore {
       allow create: if isSignedIn() &&
         request.resource.data.userId == request.auth.uid &&
         docId == request.auth.uid + '_' + request.resource.data.date &&
-        request.resource.data.completedLessonIds.size() == 1;
+        (
+          (request.resource.data.completedLessonIds.size() == 1 && request.resource.data.prayerCount == 0) ||
+          (request.resource.data.completedLessonIds.size() == 0 && request.resource.data.prayerCount == 1)
+        );
 
       allow update: if isSignedIn() &&
         resource.data.userId == request.auth.uid &&
         request.resource.data.userId == request.auth.uid &&
         request.resource.data.date == resource.data.date &&
-        request.resource.data.completedLessonIds.size() ==
-          resource.data.completedLessonIds.size() + 1 &&
-        request.resource.data.completedLessonIds.hasAll(resource.data.completedLessonIds) &&
         (
-          resource.data.completedLessonIds.size() < 3 ||
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.tier == "premium"
+          (
+            request.resource.data.completedLessonIds.size() == resource.data.completedLessonIds.size() + 1 &&
+            request.resource.data.completedLessonIds.hasAll(resource.data.completedLessonIds) &&
+            request.resource.data.prayerCount == resource.data.prayerCount
+          ) ||
+          (
+            request.resource.data.prayerCount == resource.data.prayerCount + 1 &&
+            request.resource.data.completedLessonIds == resource.data.completedLessonIds
+          )
+        ) &&
+        (
+          resource.data.completedLessonIds.size() + resource.data.prayerCount <
+          (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.tier == "premium" ? 15 : 3)
         );
 
       allow delete: if false;

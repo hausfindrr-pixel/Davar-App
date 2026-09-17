@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { BarChartIcon, BookOpenIcon, CheckIcon, CompassIcon, UsersIcon } from "@/components/icons";
 import { SecureCheckoutNote } from "@/components/PremiumGate";
-import { FREE_DAILY_LESSON_LIMIT } from "@/types/firestore";
+import { FREE_DAILY_ACTIVITY_LIMIT, PREMIUM_DAILY_ACTIVITY_LIMIT } from "@/types/firestore";
 
 const MONTHLY_PRICE = 6.99;
 const YEARLY_PRICE = 59.99;
@@ -13,7 +13,7 @@ const YEARLY_SAVINGS_PERCENT = Math.round(
 );
 
 const FREE_FEATURES = [
-  `${FREE_DAILY_LESSON_LIMIT} gamified scripture lessons per day`,
+  `${FREE_DAILY_ACTIVITY_LIMIT} gamified scripture lessons and prayers per day`,
   "Daily Bible verse, always available",
   "Basic streak tracking",
 ];
@@ -26,8 +26,8 @@ const PREMIUM_FEATURE_ROWS = [
   },
   {
     icon: CompassIcon,
-    title: "Unlimited daily lessons",
-    copy: "Go beyond the free tier's 3-per-day cap and follow your curiosity.",
+    title: `${PREMIUM_DAILY_ACTIVITY_LIMIT} lessons and prayers a day`,
+    copy: `Go well beyond the free tier's ${FREE_DAILY_ACTIVITY_LIMIT}-per-day cap and follow your curiosity.`,
   },
   {
     icon: UsersIcon,

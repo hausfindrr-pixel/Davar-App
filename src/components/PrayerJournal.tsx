@@ -2,11 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { submitPrayer, subscribeToPrayers } from "@/lib/db/prayers";
-import type { PrayerDoc } from "@/types/firestore";
+import { dailyActivityLimit, type PrayerDoc } from "@/types/firestore";
 
 type PrayerJournalProps = {
   uid: string;
   timeZone: string;
+  isPremium: boolean;
+  /** Lessons completed + prayers submitted today, combined — the same
+   * count The Path's lesson cap uses (see dailyActivityLimit). */
+  todayActivityCount: number;
 };
 
 function formatPrayerDate(timestamp: PrayerDoc["createdAt"]): string {
@@ -18,8 +22,10 @@ function formatPrayerDate(timestamp: PrayerDoc["createdAt"]): string {
 /** A place to write a free-text prayer, alongside the guided ones in The
  * Path's lesson tracks. Submitting awards XP the same way completing a
  * lesson does (see submitPrayer, src/lib/db/prayers.ts) — same streak/
- * check-in mechanics, just no daily cap. */
-export function PrayerJournal({ uid, timeZone }: PrayerJournalProps) {
+ * check-in mechanics, and shares the same daily activity cap as lessons
+ * (dailyActivityLimit): 3/day free, 15/day premium, combined with lesson
+ * completions. */
+export function PrayerJournal({ uid, timeZone, isPremium, todayActivityCount }: PrayerJournalProps) {
   const [draft, setDraft] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -27,18 +33,25 @@ export function PrayerJournal({ uid, timeZone }: PrayerJournalProps) {
   const [prayers, setPrayers] = useState<PrayerDoc[]>([]);
   const [showPast, setShowPast] = useState(false);
 
+  const limit = dailyActivityLimit(isPremium ? "premium" : "free");
+  const atLimit = todayActivityCount >= limit;
+
   useEffect(() => {
     return subscribeToPrayers(uid, setPrayers);
   }, [uid]);
 
   async function handleSubmit() {
     const text = draft.trim();
-    if (!text || submitting) return;
+    if (!text || submitting || atLimit) return;
     setSubmitting(true);
     setError(null);
     setXpFlash(null);
     try {
       const result = await submitPrayer(uid, timeZone, text);
+      if (result.limitReached) {
+        setError(`You've used all ${limit} actions today across lessons and prayers.`);
+        return;
+      }
       setDraft("");
       setXpFlash(result.xpEarned);
       setTimeout(() => setXpFlash(null), 2500);
@@ -63,21 +76,28 @@ export function PrayerJournal({ uid, timeZone }: PrayerJournalProps) {
           onChange={(e) => setDraft(e.target.value)}
           placeholder="Lord, today I..."
           rows={4}
-          disabled={submitting}
+          disabled={submitting || atLimit}
           className="w-full rounded-xl border border-mist bg-ivory px-3 py-2 text-sm text-ink placeholder:text-stone/70 resize-none disabled:opacity-70"
         />
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            disabled={submitting || !draft.trim()}
-            onClick={() => void handleSubmit()}
-            className="rounded-full bg-clay-600 text-paper px-4 py-1.5 text-xs font-medium hover:bg-clay-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {submitting ? "Saving…" : "Submit prayer"}
-          </button>
-          {xpFlash !== null && <span className="text-xs text-sage-700">+{xpFlash} XP</span>}
-          {error && <span className="text-xs text-clay-700">{error}</span>}
-        </div>
+        {atLimit ? (
+          <p className="text-xs text-stone">
+            You&apos;ve used all {limit} actions today across lessons and prayers.{" "}
+            {isPremium ? "Come back tomorrow." : "Upgrade to Premium for 15 a day."}
+          </p>
+        ) : (
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              disabled={submitting || !draft.trim()}
+              onClick={() => void handleSubmit()}
+              className="rounded-full bg-clay-600 text-paper px-4 py-1.5 text-xs font-medium hover:bg-clay-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {submitting ? "Saving…" : "Submit prayer"}
+            </button>
+            {xpFlash !== null && <span className="text-xs text-sage-700">+{xpFlash} XP</span>}
+            {error && <span className="text-xs text-clay-700">{error}</span>}
+          </div>
+        )}
       </div>
 
       {prayers.length > 0 && (

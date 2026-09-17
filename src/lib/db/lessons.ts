@@ -14,7 +14,7 @@ import { computeStreakUpdate } from "@/lib/streak";
 import { CHECK_IN_XP, levelFromXp } from "@/lib/xp";
 import {
   COLLECTIONS,
-  FREE_DAILY_LESSON_LIMIT,
+  dailyActivityLimit,
   type DailyLessonProgressDoc,
   type LessonDoc,
   type StreakDoc,
@@ -52,12 +52,14 @@ export interface CompleteLessonResult {
 
 /**
  * Records a lesson completion for `uid` "today" (in `timeZone`) and awards
- * its XP. Free-tier users are capped at FREE_DAILY_LESSON_LIMIT per day —
- * enforced here as a quick client-side check for a clean result, but the
- * real gate is the daily_lesson_progress update rule in firestore.rules:
- * if a client bypassed this check and tried anyway, that rule rejects the
- * whole transaction (including the XP award and check-in), so the limit
- * holds even against a client that isn't using this function honestly.
+ * its XP. Users are capped at dailyActivityLimit(tier) lessons-plus-prayers
+ * per day, combined with the prayer journal's submissions (see
+ * submitPrayer, src/lib/db/prayers.ts) — enforced here as a quick
+ * client-side check for a clean result, but the real gate is the
+ * daily_lesson_progress update rule in firestore.rules: if a client
+ * bypassed this check and tried anyway, that rule rejects the whole
+ * transaction (including the XP award and check-in), so the limit holds
+ * even against a client that isn't using this function honestly.
  *
  * A lesson is the app's daily practice, so completing one also counts as
  * today's streak check-in (via the same computeStreakUpdate the manual
@@ -84,12 +86,13 @@ export async function completeLesson(
       ? (progressSnap.data() as DailyLessonProgressDoc)
       : null;
     const completedLessonIds = prevProgress?.completedLessonIds ?? [];
+    const prayerCount = prevProgress?.prayerCount ?? 0;
     const user = userSnap.exists() ? (userSnap.data() as UserDoc) : undefined;
     const tier = user?.tier ?? "free";
     const prevXp = user?.xp ?? 0;
     const prevLevel = user?.level ?? 1;
 
-    if (tier !== "premium" && completedLessonIds.length >= FREE_DAILY_LESSON_LIMIT) {
+    if (completedLessonIds.length + prayerCount >= dailyActivityLimit(tier)) {
       return {
         limitReached: true,
         completedLessonIds,
@@ -100,16 +103,21 @@ export async function completeLesson(
     }
 
     const nextCompletedLessonIds = [...completedLessonIds, lesson.id];
-    const progressFields = {
-      userId: uid,
-      date: today,
-      completedLessonIds: nextCompletedLessonIds,
-      updatedAt: serverTimestamp(),
-    };
     if (progressSnap.exists()) {
-      tx.update(progressRef, progressFields);
+      tx.update(progressRef, {
+        userId: uid,
+        date: today,
+        completedLessonIds: nextCompletedLessonIds,
+        updatedAt: serverTimestamp(),
+      });
     } else {
-      tx.set(progressRef, progressFields);
+      tx.set(progressRef, {
+        userId: uid,
+        date: today,
+        completedLessonIds: nextCompletedLessonIds,
+        prayerCount: 0,
+        updatedAt: serverTimestamp(),
+      });
     }
 
     const prevStreak = streakSnap.exists() ? (streakSnap.data() as StreakDoc) : null;
