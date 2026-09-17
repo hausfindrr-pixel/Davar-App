@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { BarChartIcon, BookOpenIcon, CheckIcon, CompassIcon, UsersIcon } from "@/components/icons";
+import { SecureCheckoutNote } from "@/components/PremiumGate";
 import { FREE_DAILY_LESSON_LIMIT } from "@/types/firestore";
 
 const MONTHLY_PRICE = 6.99;
@@ -148,17 +149,20 @@ export function PricingSection({ onGetStarted }: PricingSectionProps) {
             ))}
           </div>
 
-          <div className="flex flex-col items-center gap-1.5">
-            <button
-              type="button"
-              onClick={onGetStarted}
-              className="w-full rounded-full bg-clay-600 text-paper py-2.5 text-center text-sm font-medium hover:bg-clay-700 transition-colors"
-            >
-              Start free for 7 days
-            </button>
-            <span className="text-xs text-paper/60">
-              No charge until your trial ends — cancel anytime.
-            </span>
+          <div className="flex flex-col items-center gap-3">
+            <div className="flex flex-col items-center gap-1.5 w-full">
+              <button
+                type="button"
+                onClick={onGetStarted}
+                className="w-full rounded-full bg-clay-600 text-paper py-2.5 text-center text-sm font-medium hover:bg-clay-700 transition-colors"
+              >
+                Start your walk
+              </button>
+              <span className="text-xs text-paper/60">
+                No charge until your trial ends — cancel anytime.
+              </span>
+            </div>
+            <SecureCheckoutNote />
           </div>
         </div>
       </div>

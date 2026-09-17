@@ -337,6 +337,16 @@ verses or check-in rows underneath are blurred, not hidden outright, so a
 free user can see enough to want it rather than hitting an immediate
 popup.
 
+`UnlockCard` also renders `SecureCheckoutNote` (same file) just below its
+buttons — a small `bg-clay-50` note with a shield icon, framed around the
+user's benefit ("keeps fees low... no card details ever stored") rather
+than as an apology for using crypto, or a technical explanation of how
+Plisio works. It's exported separately so `PricingSection.tsx` (the
+landing page's pre-signup pricing card, which can't use `UnlockCard`
+itself — there's no signed-in user yet to check out) shows the identical
+note under its own CTA, so the expectation is set the first time anyone
+sees a payment button, not just at checkout.
+
 ### The Word
 
 A general Bible reader, free for everyone, never gated. Verse text comes

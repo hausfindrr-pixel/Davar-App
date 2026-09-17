@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { LockIcon } from "@/components/icons";
+import { LockIcon, ShieldIcon } from "@/components/icons";
 import { startCheckout } from "@/lib/plisio/checkout";
 import type { PlanId } from "@/lib/plisio/plans";
 
@@ -10,6 +10,28 @@ type UnlockCardProps = {
   description: string;
   getIdToken: () => Promise<string>;
 };
+
+/**
+ * A short, reassuring note about how payment works — shown wherever an
+ * Unlock/checkout button appears (both here in UnlockCard and on the
+ * landing page's PricingSection) so the expectation is set up front
+ * rather than only discovered at Plisio's hosted checkout. Framed around
+ * the user's benefit (lower fees, no stored card details), not as an
+ * apology or a technical aside — and a shield, not a coin, so it reads as
+ * "secure" rather than introducing "crypto" as an unfamiliar hurdle.
+ */
+export function SecureCheckoutNote() {
+  return (
+    <div className="w-full max-w-sm flex items-start gap-2 rounded-xl bg-clay-50 px-3.5 py-2.5 text-left">
+      <ShieldIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-clay-600" />
+      <p className="text-[11px] leading-relaxed text-ink/70">
+        <span className="font-medium text-ink/85">Secure checkout.</span> Davar
+        uses crypto payments to keep fees low and your subscription
+        affordable, with no card details ever stored on our end.
+      </p>
+    </div>
+  );
+}
 
 /**
  * The consistent "Unlock with Premium" CTA card used by both premium-gated
@@ -60,6 +82,7 @@ export function UnlockCard({ title, description, getIdToken }: UnlockCardProps) 
           {upgradingPlan === "yearly" ? "Redirecting…" : "Yearly $59.99"}
         </button>
       </div>
+      <SecureCheckoutNote />
       {error && <p className="text-xs text-clay-700">{error}</p>}
     </div>
   );
