@@ -23,7 +23,6 @@ import { completeLesson, fetchLessons, subscribeToLessonProgress } from "@/lib/d
 import { checkIn, subscribeToStreak } from "@/lib/db/streaks";
 import { subscribeToUser } from "@/lib/db/users";
 import { dateKeyInTimeZone, daysBetweenKeys } from "@/lib/date";
-import { visibleLessonsForFreeTier } from "@/lib/lessons";
 import { daysUntilExpiry, shouldShowRenewalReminder } from "@/lib/premium";
 import { startCheckout } from "@/lib/plisio/checkout";
 import type { PlanId } from "@/lib/plisio/plans";
@@ -350,7 +349,6 @@ function Dashboard({ uid }: { uid: string }) {
   const dayIndex = profile?.createdAt
     ? daysBetweenKeys(dateKeyInTimeZone(profile.createdAt.toDate(), timeZone), today)
     : 0;
-  const visibleLessons = isPremium ? lessons : visibleLessonsForFreeTier(lessons, dayIndex);
   const showRenewalReminder = shouldShowRenewalReminder(isPremium, profile?.premiumUntil ?? null);
   const daysUntilPremiumEnds = daysUntilExpiry(profile?.premiumUntil ?? null);
 
@@ -496,12 +494,14 @@ function Dashboard({ uid }: { uid: string }) {
               <PathTab
                 uid={uid}
                 timeZone={timeZone}
-                lessons={visibleLessons}
+                lessons={lessons}
+                dayIndex={dayIndex}
                 completedLessonIds={lessonProgress?.completedLessonIds ?? []}
                 isPremium={isPremium}
                 suppressUpgradeNag={justUpgraded && !isPremium}
                 onComplete={handleCompleteLesson}
                 onUpgrade={handleUpgrade}
+                getIdToken={getIdToken}
               />
             )}
             {activeTab === "armory" && <ArmoryTab isPremium={isPremium} getIdToken={getIdToken} />}

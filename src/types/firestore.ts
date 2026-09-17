@@ -81,6 +81,13 @@ interface LessonDocBase {
   track: LessonTrack;
   order: number;
   scriptureReference: string | null;
+  /**
+   * Which book of the Bible this lesson belongs to — the exact `name` of an
+   * entry in `BIBLE_BOOKS` (src/lib/bible.ts), e.g. "Genesis" or "Psalms".
+   * Drives The Path's book-organized sections; there's no separate books
+   * collection, BIBLE_BOOKS is reused as the canonical ordering.
+   */
+  lessonBook: string;
   xpReward: number;
   estimatedMinutes: number;
   createdAt: Timestamp;

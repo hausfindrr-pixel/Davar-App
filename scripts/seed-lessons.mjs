@@ -45,11 +45,17 @@ const db = getFirestore();
 
 for (const lesson of lessons) {
   const { id, ...fields } = lesson;
-  await db
-    .collection("lessons")
-    .doc(id)
-    .set({ id, ...fields, createdAt: FieldValue.serverTimestamp() });
-  console.log(`seeded lessons/${id}`);
+  const ref = db.collection("lessons").doc(id);
+  // merge: true so re-running this to backfill a new field (e.g. lessonBook)
+  // onto existing docs doesn't blow away fields it doesn't know about; the
+  // createdAt stamp is only added on first creation so it isn't reset on
+  // every re-run either.
+  const snap = await ref.get();
+  const payload = snap.exists
+    ? { id, ...fields }
+    : { id, ...fields, createdAt: FieldValue.serverTimestamp() };
+  await ref.set(payload, { merge: true });
+  console.log(`seeded lessons/${id}${snap.exists ? " (updated)" : " (created)"}`);
 }
 
 console.log(`Done — seeded ${lessons.length} lessons.`);

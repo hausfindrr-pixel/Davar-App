@@ -168,9 +168,13 @@ directly instead of requiring a separate, unrelated tap.
 Free-tier accounts also only ever *see* `FREE_DAILY_LESSON_LIMIT` lessons
 per day of their journey (`visibleLessonsForFreeTier` in `src/lib/lessons.ts`,
 keyed off the user's account-creation date) — rather than the whole
-library with most of it shown as permanently "Locked". Premium accounts see
-the full library immediately, matching the "Full gamified lesson library"
-pricing copy.
+library with most of it shown as permanently "Locked". As of the book
+restructure below, that reveal is **round-robin across books** (one lesson
+per book, in canonical Bible order, repeating) rather than the flat seed
+order — so a free user's first few days span several books instead of
+working straight through whichever book happens to sort first. Premium
+accounts see the full library immediately, matching the "Full gamified
+lesson library" pricing copy.
 
 Run `npm run test:rules` to check `firestore.rules` against a local
 Firestore emulator (`scripts/rules-test.mjs`, using
@@ -203,7 +207,10 @@ This writes the week of lessons in `scripts/lessons-data.mjs` (scripture,
 prayer, and devotional tracks) via `scripts/seed-lessons.mjs`. Edit that data
 file and re-run the script to add more — each lesson's `id` is also its
 Firestore document ID, so re-running is idempotent (it overwrites by ID
-rather than duplicating).
+rather than duplicating). The script writes with `{ merge: true }` and only
+stamps `createdAt` on first creation (checked via a `get()` before the
+write) — re-running it to backfill a new field onto existing docs updates
+just that field rather than silently resetting `createdAt` on every run.
 
 ## Navigation (bottom tab bar)
 
@@ -214,11 +221,48 @@ scroll. Each tab is its own component under `src/components/tabs/`:
 | Tab | Component | Access |
 | --- | --- | --- |
 | Today | `TodayTab.tsx` | Everyone — streak, XP, level, the apostle companion message, check-in |
-| The Path | `PathTab.tsx` | Free: lessons capped at `FREE_DAILY_LESSON_LIMIT`/day, prayer journal uncapped. Premium: unlimited lessons |
+| The Path | `PathTab.tsx` | Free: lessons capped at `FREE_DAILY_LESSON_LIMIT`/day, revealed round-robin across books, prayer journal uncapped. Premium: every book, every lesson, in order |
 | The Armory | `ArmoryTab.tsx` | Free: teaser (see below). Premium: full access |
 | Peter's Watch | `WatchTab.tsx` | Free: teaser. Premium: full access |
 | The Word | `WordTab.tsx` | Everyone, never gated |
 | Disciples | `DisciplesTab.tsx` | Everyone — a "Coming soon" placeholder, no functionality yet |
+
+### The Path: organized by book
+
+The lesson library is grouped into book sections (Genesis, John,
+Philippians, ...) rather than a flat feed — `PathBookSections.tsx`
+(`src/components/PathBookSections.tsx`, mounted by `PathTab.tsx`), a
+single-open accordion using the same interaction pattern as
+`ArmoryTab.tsx`. Section order follows `BIBLE_BOOKS`'
+(`src/lib/bible.ts`) canonical order, filtered to only the books that
+actually have seeded lessons — there's no separate books collection.
+
+- **Schema:** every `LessonDoc` (`src/types/firestore.ts`) now has a
+  required `lessonBook: string`, an exact `BIBLE_BOOKS` entry name (e.g.
+  `"Psalms"`, not `"Psalm"`). `scripts/lessons-data.mjs` sets it per
+  lesson, derived from each lesson's `scriptureReference`.
+- **Premium** sees every book fully, every lesson in `order`, no locking.
+- **Free tier** sees an assorted, round-robin-across-books reveal (see
+  "lesson reveal" above) instead of full access to any one book. Opening a
+  book that has lessons beyond that reveal shows the revealed lessons
+  normally, then the rest blurred (`blurredPreviewClass`) followed by an
+  `UnlockCard` scoped to that book — the same paywall pattern as the
+  Armory and Peter's Watch, not a separate one. The daily 3-lesson
+  completion cap (`FREE_DAILY_LESSON_LIMIT`, enforced in
+  `firestore.rules`) is unchanged and independent of this — it still
+  grays out any revealed-but-uncompleted lesson once hit for the day.
+- **`LessonCard.tsx`** (`src/components/LessonCard.tsx`) holds the actual
+  per-lesson card markup (reading summary + Complete button, or
+  `FillBlankCard`), extracted out of the old flat `LessonsSection.tsx` so
+  both the revealed and blurred-locked-preview states in
+  `PathBookSections.tsx` render lessons identically.
+- **Migration:** the 10 already-seeded lessons need `lessonBook` backfilled
+  onto their existing docs — re-run `npm run seed:lessons` (now safe to
+  re-run after the merge fix above: it only touches the fields present in
+  `lessons-data.mjs`, `createdAt` is preserved on existing docs). Until
+  that's run against production, existing lesson docs have no
+  `lessonBook`, so they won't appear in any book section — see "Seeding
+  lessons" above.
 
 ### The Path: lesson types
 
@@ -235,7 +279,7 @@ scroll. Each tab is its own component under `src/components/tabs/`:
   relying on storage order), lets the user tap words to fill blanks in
   order or tap a filled blank to clear it back, and on a wrong attempt
   shows a gentle "Not quite — take another look and try again" with a
-  reset — never a locked-out failure state. `LessonsSection.tsx` branches
+  reset — never a locked-out failure state. `LessonCard.tsx` branches
   on `isFillBlankLesson(lesson)` to render `FillBlankCard` instead of the
   plain summary + Complete button; the completion/XP backend
   (`completeLesson`, `src/lib/db/lessons.ts`) needed **zero changes** —
@@ -245,7 +289,7 @@ scroll. Each tab is its own component under `src/components/tabs/`:
 **No migration needed for the 7 existing seeded lessons.** `lessonType` is
 optional on `ReadingLessonDoc` specifically so a document written before
 this field existed (all 7 of them) is still valid — every read path
-(`isFillBlankLesson`, `LessonsSection`) treats a missing `lessonType` as
+(`isFillBlankLesson`, `LessonCard`) treats a missing `lessonType` as
 `"reading"`. This is a deliberately additive schema change: nothing had to
 be backfilled, and nothing will break if it never is.
 
@@ -881,9 +925,10 @@ src/
                   premium/success, premium/failed (post-checkout pages)
                   api/plisio/create-invoice, api/plisio/webhook,
                   api/bible (route handlers — the last proxies bible-api.com)
-  components/     UI components (StreakVisual, PlantIcon, LessonsSection,
-                  PricingSection, AuthForm, ApostleAvatar, ApostleMessageCard,
-                  BottomTabBar, PremiumGate (UnlockCard + blurredPreviewClass),
+  components/     UI components (StreakVisual, PlantIcon, PathBookSections,
+                  LessonCard, PricingSection, AuthForm, ApostleAvatar,
+                  ApostleMessageCard, BottomTabBar, PremiumGate (UnlockCard
+                  + blurredPreviewClass),
                   ProfileButton, ProfilePage, icons.tsx — shared line icons)
                   tabs/ — TodayTab, PathTab, ArmoryTab, WatchTab, WordTab
                   (see "Navigation" above)
