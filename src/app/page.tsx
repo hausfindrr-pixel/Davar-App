@@ -23,6 +23,7 @@ import { checkIn, subscribeToStreak } from "@/lib/db/streaks";
 import { subscribeToUser } from "@/lib/db/users";
 import { dateKeyInTimeZone, daysBetweenKeys } from "@/lib/date";
 import { visibleLessonsForFreeTier } from "@/lib/lessons";
+import { daysUntilExpiry, shouldShowRenewalReminder } from "@/lib/premium";
 import { startCheckout } from "@/lib/plisio/checkout";
 import type { PlanId } from "@/lib/plisio/plans";
 import type {
@@ -336,6 +337,8 @@ function Dashboard({ uid }: { uid: string }) {
   const [checkingIn, setCheckingIn] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("today");
   const [showProfile, setShowProfile] = useState(false);
+  const [renewing, setRenewing] = useState(false);
+  const [renewError, setRenewError] = useState<string | null>(null);
   const { user, signOut } = useAuth();
   const searchParams = useSearchParams();
   const justUpgraded = searchParams.get("upgraded") === "1";
@@ -347,6 +350,8 @@ function Dashboard({ uid }: { uid: string }) {
     ? daysBetweenKeys(dateKeyInTimeZone(profile.createdAt.toDate(), timeZone), today)
     : 0;
   const visibleLessons = isPremium ? lessons : visibleLessonsForFreeTier(lessons, dayIndex);
+  const showRenewalReminder = shouldShowRenewalReminder(isPremium, profile?.premiumUntil ?? null);
+  const daysUntilPremiumEnds = daysUntilExpiry(profile?.premiumUntil ?? null);
 
   useEffect(() => {
     const unsubStreak = subscribeToStreak(uid, setStreak);
@@ -400,6 +405,21 @@ function Dashboard({ uid }: { uid: string }) {
     await startCheckout(plan, await getIdToken());
   }
 
+  // Renews the same plan the user is already on (falling back to monthly
+  // for a legacy grant with no planId recorded) — a fresh Plisio invoice,
+  // same checkout flow as everywhere else, just pre-picked rather than
+  // asking them to choose again.
+  async function handleRenew() {
+    setRenewing(true);
+    setRenewError(null);
+    try {
+      await handleUpgrade(profile?.planId ?? "monthly");
+    } catch (err) {
+      setRenewError(err instanceof Error ? err.message : "Could not start checkout.");
+      setRenewing(false);
+    }
+  }
+
   return (
     <main className="h-dvh flex flex-col bg-ivory overflow-hidden">
       <header className="shrink-0 flex flex-col items-center gap-1 text-center pt-4 px-6">
@@ -427,6 +447,24 @@ function Dashboard({ uid }: { uid: string }) {
           {isPremium
             ? "You're Premium — unlimited daily lessons and the full library are unlocked."
             : "Payment received — your upgrade is confirming on the network. This can take a few minutes; this page will update on its own, no need to refresh."}
+        </div>
+      )}
+
+      {showRenewalReminder && (
+        <div className="shrink-0 mx-6 mt-3 rounded-2xl border border-clay-200 bg-clay-50 p-4 text-center text-sm text-ink/80">
+          <p>
+            Your Premium access ends in {daysUntilPremiumEnds}{" "}
+            {daysUntilPremiumEnds === 1 ? "day" : "days"} — renew to keep it.
+          </p>
+          <button
+            type="button"
+            disabled={renewing}
+            onClick={() => void handleRenew()}
+            className="mt-2 rounded-full bg-clay-600 text-paper px-4 py-1.5 text-xs font-medium hover:bg-clay-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            {renewing ? "Redirecting…" : "Renew now"}
+          </button>
+          {renewError && <p className="mt-2 text-xs text-clay-700">{renewError}</p>}
         </div>
       )}
 

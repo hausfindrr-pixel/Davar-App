@@ -37,12 +37,19 @@ export interface UserDoc {
    */
   tier: UserTier;
   /**
+   * When the current "premium" grant started — set by the Plisio webhook
+   * alongside tier/premiumUntil/planId, locked from client writes the same
+   * way. Exists mainly so premiumUntil's math (premiumSince + plan length)
+   * is traceable, rather than only ever showing the computed end date.
+   */
+  premiumSince: Timestamp | null;
+  /**
    * When a "premium" grant expires — set by the Plisio webhook alongside
    * `tier`, locked from client writes the same way. Crypto payments via
    * Plisio are one-time, not an auto-renewing subscription like Stripe, so
-   * this is the record of how long a given payment's access lasts. Nothing
-   * currently reads this to auto-downgrade back to "free" once it passes —
-   * that's not built yet.
+   * this is the record of how long a given payment's access lasts.
+   * `src/app/api/cron/expire-premium/route.ts` runs daily via Vercel Cron
+   * and downgrades `tier` back to "free" once this passes.
    */
   premiumUntil: Timestamp | null;
   /**

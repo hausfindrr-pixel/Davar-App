@@ -58,6 +58,7 @@ async function seedUser(uid, tier) {
       level: 1,
       timezone: "UTC",
       tier,
+      premiumSince: null,
       premiumUntil: null,
       planId: tier === "premium" ? "yearly" : null,
     });
@@ -122,8 +123,8 @@ await check("a brand-new user cannot self-create with a non-null planId", async 
   );
 });
 
-await check("a brand-new user CAN self-create with tier=free, premiumUntil=null, planId=null", async () => {
-  await assertSucceeds(
+await check("a brand-new user cannot self-create with a non-null premiumSince", async () => {
+  await assertFails(
     setDoc(doc(eveDb, "users", "eve-uid"), {
       uid: "eve-uid",
       email: null,
@@ -133,11 +134,33 @@ await check("a brand-new user CAN self-create with tier=free, premiumUntil=null,
       level: 1,
       timezone: null,
       tier: "free",
+      premiumSince: new Date(),
       premiumUntil: null,
       planId: null,
     }),
   );
 });
+
+await check(
+  "a brand-new user CAN self-create with tier=free, premiumSince=null, premiumUntil=null, planId=null",
+  async () => {
+    await assertSucceeds(
+      setDoc(doc(eveDb, "users", "eve-uid"), {
+        uid: "eve-uid",
+        email: null,
+        displayName: null,
+        photoURL: null,
+        xp: 0,
+        level: 1,
+        timezone: null,
+        tier: "free",
+        premiumSince: null,
+        premiumUntil: null,
+        planId: null,
+      }),
+    );
+  },
+);
 
 await check("alice cannot upgrade her own tier to premium via update", async () => {
   await assertFails(updateDoc(doc(aliceDb, "users", ALICE), { tier: "premium" }));
@@ -153,6 +176,10 @@ await check("alice cannot grant herself a premiumUntil date via update", async (
 
 await check("alice cannot grant herself a planId via update", async () => {
   await assertFails(updateDoc(doc(aliceDb, "users", ALICE), { planId: "yearly" }));
+});
+
+await check("alice cannot grant herself a premiumSince date via update", async () => {
+  await assertFails(updateDoc(doc(aliceDb, "users", ALICE), { premiumSince: new Date() }));
 });
 
 await check("alice CAN update other fields on her own user doc (e.g. displayName)", async () => {

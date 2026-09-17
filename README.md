@@ -436,13 +436,16 @@ crypto payment gateway — no card processor involved.
 - `POST /api/plisio/webhook` (`src/app/api/plisio/webhook/route.ts`) — Plisio's
   server calls this once a payment completes. It verifies Plisio's HMAC
   signature (`src/lib/plisio/verify.ts`) and, if valid and `status ===
-  "completed"`, writes `tier: "premium"`, a `premiumUntil` expiry, and
-  `planId` (`"monthly"` | `"yearly"`, parsed from the same `order_number`
-  the webhook already splits apart) on the user's Firestore doc via the
-  Admin SDK (bypassing `firestore.rules`, which is exactly why only this
-  server-side path can grant premium — see the `users` rule above; `planId`
-  is locked from client writes the same way `tier`/`premiumUntil` are).
-  `planId` powers Profile's "Your Plan" section (see "Profile" above).
+  "completed"`, writes `tier: "premium"`, `premiumSince` (now), `premiumUntil`
+  (`premiumSince` + 30 days for monthly or 365 for yearly — both computed
+  from the same `Timestamp.now()` call, so the relationship between them is
+  exact, not approximate), and `planId` (`"monthly"` | `"yearly"`, parsed
+  from the same `order_number` the webhook already splits apart) on the
+  user's Firestore doc via the Admin SDK (bypassing `firestore.rules`,
+  which is exactly why only this server-side path can grant premium — see
+  the `users` rule above; all four are locked from client writes the same
+  way). `premiumUntil`/`planId` power Profile's "Your Plan" section (see
+  "Profile" above) and the expiry cron below.
 - `/premium/success` and `/premium/failed` — plain pages Plisio redirects the
   browser to after checkout, independent of the webhook (the webhook is what
   actually grants premium; these pages are just user-facing confirmation).
@@ -499,6 +502,78 @@ already sends as `callback_url`/`success_invoice_url`/`fail_invoice_url`:
 - Webhook / callback URL: `/api/plisio/webhook`
 - Success URL: `/premium/success`
 - Failed URL: `/premium/failed`
+
+### Premium expiry
+
+Plisio payments are one-time invoices, not an auto-renewing subscription —
+without something checking `premiumUntil`, a user who pays once would stay
+Premium forever. Two pieces close that gap:
+
+- **The daily cron.** `GET /api/cron/expire-premium`
+  (`src/app/api/cron/expire-premium/route.ts`), scheduled once a day by
+  Vercel Cron via the `crons` entry in `vercel.json`
+  (`"schedule": "0 6 * * *"`, 06:00 UTC — Vercel may shift this slightly on
+  the Hobby plan, which batches cron triggers for cost reasons). It queries
+  `users` where `tier == "premium"` — a single equality filter, deliberately
+  not combined with a range filter on `premiumUntil` in the query itself,
+  since that combination needs a Firestore composite index and this project
+  has already been bitten once by config that was written but never
+  actually deployed (see "Known limitations" below) — then filters to
+  actually-expired users in code (`isPremiumExpired`, `src/lib/premium.ts`)
+  and batch-writes `tier: "free"` for each (Firestore batches cap at 500
+  writes, so it chunks). `premiumSince`/`premiumUntil`/`planId` are left in
+  place as a historical record of the last grant, not cleared.
+- **Securing it.** The route requires `Authorization: Bearer
+  ${CRON_SECRET}` (a new env var — see below) — Vercel automatically
+  attaches this header on cron-triggered invocations once `CRON_SECRET` is
+  set, so add it to Vercel the same way as the other env vars. Without a
+  matching header the route returns 401, so a random request to the URL
+  can't trigger a mass downgrade.
+- **The renewal reminder.** `Dashboard` (`src/app/page.tsx`) shows an
+  in-app banner ("Your Premium access ends in N days — renew to keep it")
+  during the last `RENEWAL_REMINDER_WINDOW_DAYS` (3, `src/lib/premium.ts`)
+  days before `premiumUntil`, with a "Renew now" button that starts a
+  fresh checkout for the same `planId` the user is already on (falling
+  back to monthly if `planId` is unset — a legacy grant from before that
+  field existed). No push notification — that infrastructure doesn't
+  exist in this app; an in-app banner is what the feature request's
+  fallback option asked for when push isn't already set up.
+- **`src/lib/premium.ts`** holds all three pieces of logic
+  (`daysUntilExpiry`, `shouldShowRenewalReminder`, `isPremiumExpired`) as
+  dependency-free pure functions — no Firestore import either way — so the
+  identical day-counting math runs on both the client (the banner) and the
+  server (the cron), and so it's unit-testable without a database.
+
+**Environment variable:**
+
+| Variable | Used by | Notes |
+| --- | --- | --- |
+| `CRON_SECRET` | `/api/cron/expire-premium` | Any long random string (e.g. `openssl rand -hex 32`). Add it to Vercel **before** the cron job's first scheduled run — Vercel only attaches the `Authorization` header automatically once this env var exists. |
+
+**Verified from this sandbox** by seeding six users into the Firestore
+emulator (two expired premium grants of different plans, one still
+active, one expiring soon but not yet, one free, and one premium grant
+with no `premiumUntil` at all — a legacy-data edge case) and running the
+actual compiled route against them through a real local production
+server: it correctly downgraded exactly the two expired users and left
+the other four untouched (confirmed independently by re-reading Firestore
+afterward, not just trusting the route's own response), and re-running it
+immediately after downgraded zero more — idempotent, as a job re-triggered
+by a retry or a manual re-run needs to be. The auth check was verified
+too: no header and a wrong secret both correctly return 401.
+
+**Not verifiable from this sandbox:** whether Vercel has actually
+registered and is triggering the cron job in production — that's
+Vercel-side state with no local equivalent (this sandbox has no Vercel
+dashboard or API access; see the "Could not start checkout" troubleshooting
+entries above for the same limitation hit repeatedly with Plisio/Firebase
+config). **After deploying, confirm it yourself:** Vercel dashboard → your
+project → **Settings → Cron Jobs** (or the **Cron Jobs** tab) should list
+`/api/cron/expire-premium` with a next-run time; after it's fired at least
+once, its invocation shows up there with a status, and in **Deployments →
+[latest] → Functions/Logs** filtered to `cron/expire-premium` you should
+see the `cron expire-premium: checked N premium users, downgraded M` line
+this route logs on every run.
 
 ### Fixed: "Could not start checkout" was a `jose` ESM/CJS crash, not credentials
 
@@ -635,13 +710,12 @@ format under "Environment variables" above.
   IP-allowlisted production server, so this has not been exercised against
   an actual Plisio payment yet. Watch the webhook's logs closely on your
   first real transaction.
-- **No expiry enforcement.** `premiumUntil` is stored on the user doc when a
-  payment completes, but nothing currently checks it or downgrades a user
-  back to `"free"` once it passes — the data model is ready for that, but
-  the enforcement (e.g. a scheduled Cloud Function) doesn't exist yet.
 - **No subscription/recurring billing.** Each payment is a one-time crypto
   invoice; there's no automatic renewal — a user re-runs checkout manually
-  when their `premiumUntil` is approaching.
+  (the renewal-reminder banner's "Renew now" button, or any Unlock button)
+  when their `premiumUntil` is approaching or has passed. Expiry itself
+  *is* enforced now — see "Premium expiry" above — this limitation is only
+  about there being no auto-charge.
 
 ## Apostle Companion
 

@@ -55,9 +55,16 @@ export async function POST(req: Request) {
   const status = typeof payload.status === "string" ? payload.status : null;
 
   if (uid && isPlanId(plan) && status === "completed") {
-    const premiumUntil = Timestamp.fromMillis(Date.now() + PLANS[plan].days * 24 * 60 * 60 * 1000);
+    // Anchor premiumUntil to the SAME instant stored as premiumSince,
+    // rather than computing it independently — keeps the "premiumSince +
+    // plan length = premiumUntil" relationship exact, not just approximate.
+    const premiumSince = Timestamp.now();
+    const premiumUntil = Timestamp.fromMillis(premiumSince.toMillis() + PLANS[plan].days * 24 * 60 * 60 * 1000);
     try {
-      await adminDb().collection("users").doc(uid).update({ tier: "premium", premiumUntil, planId: plan });
+      await adminDb()
+        .collection("users")
+        .doc(uid)
+        .update({ tier: "premium", premiumSince, premiumUntil, planId: plan });
       console.log("plisio webhook: upgraded user to premium", { uid, plan, txn_id: payload.txn_id });
     } catch (err) {
       // Log and move on rather than returning non-2xx: Plisio retries
