@@ -454,6 +454,59 @@ await check("alice cannot write her own watch_chat_usage counter", async () => {
   );
 });
 
+// --- users/{uid}/prayers: the custom prayer journal ---
+await check("alice can create her own prayer (id field matches the docId)", async () => {
+  await assertSucceeds(
+    setDoc(doc(aliceDb, "users", ALICE, "prayers", "prayer-1"), {
+      id: "prayer-1",
+      text: "Thank you for today.",
+    }),
+  );
+});
+
+await check("alice cannot create a prayer whose id field doesn't match the docId", async () => {
+  await assertFails(
+    setDoc(doc(aliceDb, "users", ALICE, "prayers", "prayer-2"), {
+      id: "wrong-id",
+      text: "Thank you for today.",
+    }),
+  );
+});
+
+await check("alice cannot create an empty prayer", async () => {
+  await assertFails(
+    setDoc(doc(aliceDb, "users", ALICE, "prayers", "prayer-3"), {
+      id: "prayer-3",
+      text: "",
+    }),
+  );
+});
+
+await check("alice cannot write a prayer under bob's uid", async () => {
+  await assertFails(
+    setDoc(doc(aliceDb, "users", BOB, "prayers", "prayer-1"), {
+      id: "prayer-1",
+      text: "Not mine to write.",
+    }),
+  );
+});
+
+await check("bob cannot read alice's prayers", async () => {
+  await assertFails(getDoc(doc(bobDb, "users", ALICE, "prayers", "prayer-1")));
+});
+
+await check("alice can read her own prayer", async () => {
+  await assertSucceeds(getDoc(doc(aliceDb, "users", ALICE, "prayers", "prayer-1")));
+});
+
+await check("alice cannot edit an existing prayer (immutable journal)", async () => {
+  await assertFails(updateDoc(doc(aliceDb, "users", ALICE, "prayers", "prayer-1"), { text: "edited" }));
+});
+
+await check("alice cannot delete her own prayer", async () => {
+  await assertFails(deleteDoc(doc(aliceDb, "users", ALICE, "prayers", "prayer-1")));
+});
+
 console.log(`\n${pass} passed, ${fail} failed`);
 await testEnv.cleanup();
 process.exit(fail > 0 ? 1 : 0);

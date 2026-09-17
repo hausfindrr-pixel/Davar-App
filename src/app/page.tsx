@@ -493,6 +493,8 @@ function Dashboard({ uid }: { uid: string }) {
             )}
             {activeTab === "path" && (
               <PathTab
+                uid={uid}
+                timeZone={timeZone}
                 lessons={visibleLessons}
                 completedLessonIds={lessonProgress?.completedLessonIds ?? []}
                 isPremium={isPremium}

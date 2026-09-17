@@ -216,6 +216,35 @@ scroll. Each tab is its own component under `src/components/tabs/`:
 | Peter's Watch | `WatchTab.tsx` | Free: teaser. Premium: full access |
 | The Word | `WordTab.tsx` | Everyone, never gated |
 
+### The Path: prayer journal
+
+Below the lesson feed, `PathTab.tsx` renders `PrayerJournal.tsx` — a place
+to write a free-text prayer instead of only reading guided ones. Submitting
+awards XP the same way completing a lesson does: `submitPrayer`
+(`src/lib/db/prayers.ts`) runs the same shape of transaction as
+`completeLesson` (`src/lib/db/lessons.ts`) — a write, a streak check-in
+(only once per day; a second prayer the same day still saves, it just
+doesn't re-award the streak bonus), and a `check_ins` record (using the
+`"prayer"` `CheckInType`, which already existed in the schema — this
+feature seems to have been anticipated). Unlike lessons, there's **no
+daily cap** on prayer submissions, free or premium — nothing in the
+feature asked for one, so none was added.
+
+- **Storage:** `users/{uid}/prayers/{prayerId}` — a subcollection, not a
+  flat top-level collection with a `userId` field, mirroring
+  `conversations/{uid}/messages`'s pattern (ownership via the uid path
+  segment). Unlike that collection, the client writes here directly (no
+  server-side routing logic to protect), but entries are **immutable**
+  once created — `firestore.rules` denies `update`/`delete` entirely; this
+  is a journal, not an editable note, and v1 doesn't need editing.
+- **"My Prayers"** is a collapsible list under the input, newest first,
+  subscribed live via `subscribeToPrayers`.
+- **Verified**: 8 new emulator rules tests (own-uid write, id-must-match-
+  docId, empty-text rejected, cross-user write denied, immutable), plus a
+  full transactional test against the emulator (not just rules in
+  isolation) confirming the prayer, streak, and XP all commit together
+  correctly in one atomic write.
+
 ### The Armory
 
 Scripture grouped by struggle — "the sword of the Spirit, which is the word

@@ -32,6 +32,22 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // A user's own free-text prayer journal. docId is auto-generated
+    // client-side (doc() with no ID); ownership comes from the uid path
+    // segment, same pattern as conversations/{uid}/messages. Unlike that
+    // collection, the client writes directly here (no server-side routing
+    // logic to protect) — but entries are immutable once created: no
+    // update/delete for v1, this is a journal, not an editable note.
+    match /users/{uid}/prayers/{prayerId} {
+      allow read: if isOwner(uid);
+      allow create: if isOwner(uid) &&
+        request.resource.data.id == prayerId &&
+        request.resource.data.text is string &&
+        request.resource.data.text.size() > 0 &&
+        request.resource.data.text.size() <= 2000;
+      allow update, delete: if false;
+    }
+
     match /streaks/{uid} {
       allow read, write: if isOwner(uid);
     }

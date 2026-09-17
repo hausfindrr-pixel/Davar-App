@@ -102,6 +102,20 @@ export interface CheckInDoc {
   notes: string | null;
 }
 
+export const PRAYER_XP_REWARD = 10;
+
+/**
+ * users/{uid}/prayers/{prayerId} — a user's own free-text prayers, newest
+ * first. A subcollection (ownership via the uid path segment, same pattern
+ * as conversations/{uid}/messages) rather than a flat top-level collection
+ * with a userId field, since there's no cross-user query need here.
+ */
+export interface PrayerDoc {
+  id: string;
+  text: string;
+  createdAt: Timestamp;
+}
+
 /**
  * daily_lesson_progress/{uid}_{date} — one doc per user per day, tracking
  * which lessons they've completed. This is the server-side source of truth
