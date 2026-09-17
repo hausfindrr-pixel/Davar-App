@@ -150,18 +150,13 @@ export function PricingSection({ onGetStarted }: PricingSectionProps) {
           </div>
 
           <div className="flex flex-col items-center gap-3">
-            <div className="flex flex-col items-center gap-1.5 w-full">
-              <button
-                type="button"
-                onClick={onGetStarted}
-                className="w-full rounded-full bg-clay-600 text-paper py-2.5 text-center text-sm font-medium hover:bg-clay-700 transition-colors"
-              >
-                Start your walk
-              </button>
-              <span className="text-xs text-paper/60">
-                No charge until your trial ends — cancel anytime.
-              </span>
-            </div>
+            <button
+              type="button"
+              onClick={onGetStarted}
+              className="w-full rounded-full bg-clay-600 text-paper py-2.5 text-center text-sm font-medium hover:bg-clay-700 transition-colors"
+            >
+              Start your walk
+            </button>
             <SecureCheckoutNote />
           </div>
         </div>
