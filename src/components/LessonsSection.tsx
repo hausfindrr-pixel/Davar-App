@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { FillBlankCard } from "@/components/FillBlankCard";
 import type { PlanId } from "@/lib/plisio/plans";
-import { FREE_DAILY_LESSON_LIMIT, type LessonDoc } from "@/types/firestore";
+import { FREE_DAILY_LESSON_LIMIT, isFillBlankLesson, type LessonDoc } from "@/types/firestore";
 
 type LessonsSectionProps = {
   lessons: LessonDoc[];
@@ -83,6 +84,7 @@ export function LessonsSection({
           const isDone = completedLessonIds.includes(lesson.id);
           const isLocked = atLimit && !isDone;
           const isPending = pendingId === lesson.id;
+          const fillBlank = isFillBlankLesson(lesson);
 
           return (
             <div
@@ -96,31 +98,49 @@ export function LessonsSection({
               {lesson.scriptureReference && (
                 <span className="text-sm text-stone">{lesson.scriptureReference}</span>
               )}
-              <p className="text-sm text-ink/80 leading-relaxed">{lesson.summary}</p>
+
+              {fillBlank ? (
+                // FillBlankCard owns its own check/complete flow (word bank,
+                // correct/incorrect feedback) — it calls handleComplete
+                // itself once the answer is right, rather than the plain
+                // "Complete" button below, which doesn't apply here.
+                <FillBlankCard
+                  lesson={lesson}
+                  isDone={isDone}
+                  isLocked={isLocked}
+                  isPending={isPending}
+                  onComplete={() => handleComplete(lesson)}
+                />
+              ) : (
+                <p className="text-sm text-ink/80 leading-relaxed">{lesson.summary}</p>
+              )}
+
               <div className="flex items-center justify-between mt-1">
                 <span className="text-xs text-stone">
                   {lesson.estimatedMinutes} min · +{lesson.xpReward} XP
                 </span>
-                <button
-                  type="button"
-                  disabled={isDone || isLocked || isPending}
-                  onClick={() => void handleComplete(lesson)}
-                  className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed ${
-                    isDone
-                      ? "bg-sage-50 text-sage-700"
+                {!fillBlank && (
+                  <button
+                    type="button"
+                    disabled={isDone || isLocked || isPending}
+                    onClick={() => void handleComplete(lesson)}
+                    className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed ${
+                      isDone
+                        ? "bg-sage-50 text-sage-700"
+                        : isLocked
+                          ? "bg-mist text-stone"
+                          : "bg-clay-600 text-paper hover:bg-clay-700 disabled:opacity-70"
+                    }`}
+                  >
+                    {isDone
+                      ? "Completed"
                       : isLocked
-                        ? "bg-mist text-stone"
-                        : "bg-clay-600 text-paper hover:bg-clay-700 disabled:opacity-70"
-                  }`}
-                >
-                  {isDone
-                    ? "Completed"
-                    : isLocked
-                      ? "Locked"
-                      : isPending
-                        ? "Saving…"
-                        : "Complete"}
-                </button>
+                        ? "Locked"
+                        : isPending
+                          ? "Saving…"
+                          : "Complete"}
+                  </button>
+                )}
               </div>
             </div>
           );

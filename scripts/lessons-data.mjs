@@ -1,8 +1,11 @@
 /**
  * Seed content for the `lessons` collection — a first week of daily
- * discipleship content mixing scripture, prayer, and devotional tracks.
- * Matches the LessonDoc shape in src/types/firestore.ts, minus `createdAt`
- * (the seed script stamps that on write).
+ * discipleship content mixing scripture, prayer, and devotional tracks,
+ * plus a few Duolingo-style fill-in-the-blank lessons. Matches the
+ * ReadingLessonDoc/FillBlankLessonDoc shapes in src/types/firestore.ts,
+ * minus `createdAt` (the seed script stamps that on write). Fill-blank
+ * entries mark each blank in `template` with the literal "_____" — see
+ * BLANK_TOKEN in that same file.
  */
 export const lessons = [
   {
@@ -81,5 +84,45 @@ export const lessons = [
       "A week that started with God speaking the world into order ends with His love holding you in it — nothing in your list, and nothing outside it, is stronger than this. Read the closing verses aloud as a closing word over your week.",
     xpReward: 15,
     estimatedMinutes: 8,
+  },
+  {
+    id: "day-08-fillblank-john-3-16",
+    title: "For God So Loved",
+    track: "scripture",
+    order: 8,
+    scriptureReference: "John 3:16",
+    lessonType: "fillBlank",
+    template:
+      "For God so _____ the world that he gave his one and only Son, that whoever _____ in him shall not perish but have eternal life.",
+    answers: ["loved", "believes"],
+    wordBank: ["loved", "believes", "made", "trusts", "hopes"],
+    xpReward: 15,
+    estimatedMinutes: 3,
+  },
+  {
+    id: "day-09-fillblank-philippians-4-13",
+    title: "Through Christ Who Strengthens",
+    track: "scripture",
+    order: 9,
+    scriptureReference: "Philippians 4:13",
+    lessonType: "fillBlank",
+    template: "I can do all _____ through Christ who _____ me.",
+    answers: ["things", "strengthens"],
+    wordBank: ["things", "strengthens", "prayers", "forgives", "helps"],
+    xpReward: 15,
+    estimatedMinutes: 3,
+  },
+  {
+    id: "day-10-fillblank-psalm-23-1",
+    title: "The Lord Is My Shepherd",
+    track: "scripture",
+    order: 10,
+    scriptureReference: "Psalm 23:1",
+    lessonType: "fillBlank",
+    template: "The Lord is my _____; I shall not _____.",
+    answers: ["shepherd", "want"],
+    wordBank: ["shepherd", "want", "guide", "need", "fear"],
+    xpReward: 15,
+    estimatedMinutes: 3,
   },
 ];

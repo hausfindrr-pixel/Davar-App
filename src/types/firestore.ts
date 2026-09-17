@@ -75,17 +75,52 @@ export interface StreakDoc {
 
 export type LessonTrack = "scripture" | "prayer" | "devotional";
 
-/** lessons/{lessonId} */
-export interface LessonDoc {
+interface LessonDocBase {
   id: string;
   title: string;
   track: LessonTrack;
   order: number;
   scriptureReference: string | null;
-  summary: string;
   xpReward: number;
   estimatedMinutes: number;
   createdAt: Timestamp;
+}
+
+/**
+ * lessons/{lessonId} — the original read-and-complete type. `lessonType`
+ * is optional and defaults to "reading" when absent (every read path —
+ * fetchLessons, LessonsSection — treats a missing value that way): the 7
+ * lessons seeded before fill-in-the-blank existed don't have this field
+ * at all, and don't need a migration to write it in. New reading lessons
+ * can set it explicitly or just omit it; both are equivalent.
+ */
+export interface ReadingLessonDoc extends LessonDocBase {
+  lessonType?: "reading";
+  summary: string;
+}
+
+/**
+ * lessons/{lessonId} — Duolingo-style fill-in-the-blank. `template` is the
+ * verse with each blank marked by the literal substring `BLANK_TOKEN`
+ * ("_____"); `answers` gives the correct word for each blank, in order
+ * (same length as the number of blanks in `template`); `wordBank` is
+ * `answers` plus a few decoy words — FillBlankCard shuffles it for
+ * display, so storage order doesn't matter.
+ */
+export interface FillBlankLessonDoc extends LessonDocBase {
+  lessonType: "fillBlank";
+  template: string;
+  answers: string[];
+  wordBank: string[];
+}
+
+export type LessonDoc = ReadingLessonDoc | FillBlankLessonDoc;
+
+/** The exact substring `template` uses to mark each blank. */
+export const BLANK_TOKEN = "_____";
+
+export function isFillBlankLesson(lesson: LessonDoc): lesson is FillBlankLessonDoc {
+  return lesson.lessonType === "fillBlank";
 }
 
 export type CheckInType = "lesson" | "prayer" | "reading" | "custom";

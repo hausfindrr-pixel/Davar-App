@@ -97,7 +97,10 @@ Types for every collection live in `src/types/firestore.ts`:
 
 - **`users/{uid}`** — profile, XP, level, `tier` (`"free"` | `"premium"`)
 - **`streaks/{uid}`** — current/longest streak count, last check-in date, streak freezes
-- **`lessons/{lessonId}`** — scripture/prayer/devotional content items
+- **`lessons/{lessonId}`** — scripture/prayer/devotional content items; two
+  shapes discriminated by `lessonType` (see "The Path: lesson types" below)
+- **`users/{uid}/prayers/{prayerId}`** — a user's own free-text prayers (see
+  "The Path: prayer journal" below)
 - **`check_ins/{checkInId}`** — a completed lesson, prayer, reading, etc. for a given day
 - **`daily_lesson_progress/{uid}_{date}`** — which lessons a user completed on a given day; the server-side source of truth for the free-tier daily lesson cap
 - **`accountability_links/{linkId}`** — a pending/active/ended pairing between two users
@@ -215,6 +218,49 @@ scroll. Each tab is its own component under `src/components/tabs/`:
 | The Armory | `ArmoryTab.tsx` | Free: teaser (see below). Premium: full access |
 | Peter's Watch | `WatchTab.tsx` | Free: teaser. Premium: full access |
 | The Word | `WordTab.tsx` | Everyone, never gated |
+
+### The Path: lesson types
+
+`LessonDoc` (`src/types/firestore.ts`) is a discriminated union on a new
+`lessonType` field:
+
+- **`ReadingLessonDoc`** (`lessonType?: "reading"`, optional) — the
+  original read-and-complete shape (`summary`, a "Complete" button).
+- **`FillBlankLessonDoc`** (`lessonType: "fillBlank"`) — Duolingo-style:
+  `template` is the verse with each blank marked by the literal substring
+  `BLANK_TOKEN` (`"_____"`); `answers` gives the correct word per blank,
+  in order; `wordBank` is `answers` plus a few decoy words. `FillBlankCard`
+  (`src/components/FillBlankCard.tsx`) shuffles the bank for display (not
+  relying on storage order), lets the user tap words to fill blanks in
+  order or tap a filled blank to clear it back, and on a wrong attempt
+  shows a gentle "Not quite — take another look and try again" with a
+  reset — never a locked-out failure state. `LessonsSection.tsx` branches
+  on `isFillBlankLesson(lesson)` to render `FillBlankCard` instead of the
+  plain summary + Complete button; the completion/XP backend
+  (`completeLesson`, `src/lib/db/lessons.ts`) needed **zero changes** —
+  it only ever touched `lesson.id`/`lesson.xpReward`, which exist on both
+  shapes.
+
+**No migration needed for the 7 existing seeded lessons.** `lessonType` is
+optional on `ReadingLessonDoc` specifically so a document written before
+this field existed (all 7 of them) is still valid — every read path
+(`isFillBlankLesson`, `LessonsSection`) treats a missing `lessonType` as
+`"reading"`. This is a deliberately additive schema change: nothing had to
+be backfilled, and nothing will break if it never is.
+
+`scripts/lessons-data.mjs` now also seeds 3 sample fill-in-the-blank
+lessons (`day-08`–`day-10`: John 3:16, Philippians 4:13, Psalm 23:1) via
+the same `npm run seed:lessons` — no seed-script changes needed either,
+since it already spreads whatever fields are present on each lesson
+object onto the Firestore doc. **Verified** (beyond the emulator, since
+`lessons` itself needs the same Admin SDK credential the original seeding
+did): each new lesson's blank count matches its `answers.length`, every
+answer appears in its own `wordBank`, and `wordBank` has no accidental
+duplicates — checked directly against the seed data, not just eyeballed.
+The interactive flow itself (tap words, wrong-answer feedback, correct-
+answer completion firing exactly once) was verified with Playwright
+driving the actual rendered component through both a wrong and a correct
+attempt.
 
 ### The Path: prayer journal
 
