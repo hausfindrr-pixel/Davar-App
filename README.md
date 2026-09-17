@@ -112,6 +112,9 @@ Types for every collection live in `src/types/firestore.ts`:
   history: `role` (`"user"` | `"assistant"`), `apostleId` (`null` for the
   user's own messages), `text`, `createdAt`. Read-only from the client —
   see "Peter's Watch: AI chat" below.
+- **`daily_verses/{id}`, `daily_devotionals/{id}`, `daily_prayers/{id}`** —
+  the Today tab's app-provided daily content, three separate pools (see
+  "Today: daily content" below).
 
 `COLLECTIONS` in that same file holds the collection name constants.
 
@@ -128,8 +131,10 @@ no separate carve-out needed. `conversations/{uid}/messages/{messageId}` is
 readable only by `{uid}` and **not writable by any client at all** — only
 the Admin SDK (via `/api/watch-chat`) writes to it, so the crisis-detection
 and apostle-routing logic in that route can't be bypassed by writing
-straight to Firestore. `storage.rules` covers profile photos the same way
-(see "Profile" below).
+straight to Firestore. `daily_verses`, `daily_devotionals`, and
+`daily_prayers` are read-only for any signed-in user, the same rule shape
+as `lessons`. `storage.rules` covers profile photos the same way (see
+"Profile" below).
 
 **Whenever you change either rules file, you have to deploy it yourself** —
 editing it here only changes what's in the repo, not what's enforced on
@@ -183,34 +188,43 @@ a service account needed. It covers the tier lock, the lesson cap itself
 (3rd allowed, 4th denied for free, allowed for premium), and cross-user
 isolation. Re-run it after touching `firestore.rules`.
 
-### Seeding lessons
+### Seeding lessons and daily content
 
-**If The Path is showing "No lessons yet" with nothing appearing, this is
-almost certainly why:** `lessons` is intentionally locked to read-only for
-clients (see the rule above), so nobody — including this app's own
-deploy — can seed it automatically. It has to be run once, by hand, with an
-admin credential:
+**If The Path is showing "No lessons yet" (or Today's Verse/Devotional/
+Prayer cards aren't appearing) with nothing showing, this is almost
+certainly why:** `lessons`, `daily_verses`, `daily_devotionals`, and
+`daily_prayers` are all intentionally locked to read-only for clients (see
+the rules above), so nobody — including this app's own deploy — can seed
+them automatically. Each has to be run once, by hand, with an admin
+credential:
 
 1. Firebase console → **Project settings → Service accounts → Generate new
    private key**. Save the downloaded file as `serviceAccountKey.json` at
    the repo root (gitignored — never commit it).
-2. `npm run seed:lessons`
+2. `npm run seed:lessons` and `npm run seed:daily-content`
 
-Until that's been run against your actual project, `lessons` has zero
-documents in it — confirmed directly against production more than once in
-this app's history — so `fetchLessons()` (`src/lib/db/lessons.ts`) and the
-free-tier reveal logic (`visibleLessonsForFreeTier`,
-`src/lib/lessons.ts`) both work correctly, there's simply nothing for them
-to return yet.
+Until those have been run against your actual project, both collections
+have zero documents in them — confirmed directly against production more
+than once in this app's history for `lessons` — so `fetchLessons()`
+(`src/lib/db/lessons.ts`), the free-tier reveal logic
+(`visibleLessonsForFreeTier`, `src/lib/lessons.ts`), and
+`fetchDailyVerses`/`fetchDailyDevotionals`/`fetchDailyPrayers`
+(`src/lib/db/dailyContent.ts`) all work correctly, there's simply nothing
+for them to return yet. **`lessonBook` specifically**: if `lessons` was
+seeded before the book-restructure work below, those existing docs won't
+have a `lessonBook` field until `npm run seed:lessons` is re-run — until
+then they won't appear in any book section.
 
-This writes the week of lessons in `scripts/lessons-data.mjs` (scripture,
-prayer, and devotional tracks) via `scripts/seed-lessons.mjs`. Edit that data
-file and re-run the script to add more — each lesson's `id` is also its
-Firestore document ID, so re-running is idempotent (it overwrites by ID
-rather than duplicating). The script writes with `{ merge: true }` and only
-stamps `createdAt` on first creation (checked via a `get()` before the
-write) — re-running it to backfill a new field onto existing docs updates
-just that field rather than silently resetting `createdAt` on every run.
+`scripts/seed-lessons.mjs` writes `scripts/lessons-data.mjs` (scripture,
+prayer, and devotional tracks, now tagged with `lessonBook`);
+`scripts/seed-daily-content.mjs` writes `scripts/daily-content-data.mjs`
+(the Today tab's three pools — see "Today: daily content" below). Edit
+either data file and re-run its script to add more — each entry's `id` is
+also its Firestore document ID, so re-running is idempotent. Both scripts
+write with `{ merge: true }` and only stamp `createdAt` on first creation
+(checked via a `get()` before the write) — re-running either to backfill a
+new field onto existing docs updates just that field rather than silently
+resetting `createdAt` on every run.
 
 ## Navigation (bottom tab bar)
 
@@ -220,12 +234,49 @@ scroll. Each tab is its own component under `src/components/tabs/`:
 
 | Tab | Component | Access |
 | --- | --- | --- |
-| Today | `TodayTab.tsx` | Everyone — streak, XP, level, the apostle companion message, check-in |
+| Today | `TodayTab.tsx` | Everyone — Today's Verse/Devotional/Prayer (see below), streak, XP, level, the apostle companion message, check-in |
 | The Path | `PathTab.tsx` | Free: lessons capped at `FREE_DAILY_LESSON_LIMIT`/day, revealed round-robin across books, prayer journal uncapped. Premium: every book, every lesson, in order |
 | The Armory | `ArmoryTab.tsx` | Free: teaser (see below). Premium: full access |
 | Peter's Watch | `WatchTab.tsx` | Free: teaser. Premium: full access |
 | The Word | `WordTab.tsx` | Everyone, never gated |
 | Disciples | `DisciplesTab.tsx` | Everyone — a "Coming soon" placeholder, no functionality yet |
+
+### Today: daily content
+
+The Today tab shows three app-provided picks — Today's Verse, Today's
+Devotional, Today's Prayer (the app's guided prayer, distinct from the
+user's own free-text prayer journal in The Path) — that change every
+calendar day rather than staying static or repeating.
+
+- **Three separate pools**, not pulled from `lessons`: `daily_verses`,
+  `daily_devotionals`, `daily_prayers` (`DailyVerseDoc`/
+  `DailyDevotionalDoc`/`DailyPrayerDoc` in `src/types/firestore.ts`, seeded
+  from `scripts/daily-content-data.mjs` via `npm run seed:daily-content`).
+  Keeping these structurally separate from the lesson library is what
+  guarantees Today and The Path never show the same content on the same
+  day — there's no shared ID space for a pick to collide against.
+- **Rotation:** `pickForDate(pool, dateKey)` (`src/lib/dailyContent.ts`)
+  is a pure, pool-size-modulo-day-of-year function — deterministic (the
+  same date always yields the same pick, so refreshing doesn't change it
+  mid-day) and non-repeating until the whole pool has cycled through
+  (unlike picking at random, which could hand back the same verse two
+  days running). It indexes by each item's own `order` field after
+  sorting, not by array/query position, so the rotation already shown to
+  users doesn't shift retroactively if more content is appended to a pool
+  later. Fetched once per session the same way `fetchLessons` is
+  (`src/lib/db/dailyContent.ts`), then picked client-side — no extra
+  Firestore read per pick.
+- **Global, not per-user.** Every signed-in user sees the same verse/
+  devotional/prayer on a given date, rather than each user getting their
+  own independent rotation. Nothing else in the daily-content data model
+  tracks a per-user "seen" history the way it would need to for a
+  personalized rotation, and building one just for this would add a new
+  per-user subcollection and write path for content that isn't XP-bearing
+  or otherwise personalized — the standard "Verse of the Day" shape this
+  mirrors is global for the same reason. Revisit this if the content ever
+  needs to be personalized.
+- **No XP, no completion state, read-only for v1** — these are things to
+  read, not tasks to complete, unlike lessons.
 
 ### The Path: organized by book
 
@@ -934,11 +985,15 @@ src/
                   (see "Navigation" above)
   lib/            firebase.ts (client SDK init, incl. Storage), firebase-admin.ts
                   (server-only Admin SDK init), auth-context.tsx, streak.ts,
-                  xp.ts, date.ts (pure logic), apostles.ts, apostle-moment.ts
+                  xp.ts, date.ts (pure logic), lessons.ts (free-tier reveal),
+                  dailyContent.ts (pickForDate rotation — see "Today: daily
+                  content" above), apostles.ts, apostle-moment.ts
                   (see "Apostle Companion" above), armory.ts (Armory content),
-                  bible.ts (book list + /api/bible client), storage.ts
+                  bible.ts (book list + /api/bible client, also BIBLE_BOOKS
+                  for The Path's book ordering), storage.ts
                   (profile photo upload), db/ (Firestore reads/writes,
-                  including highlights.ts and accountability.ts),
+                  including highlights.ts, accountability.ts, and
+                  dailyContent.ts),
                   plisio/ (plans.ts, checkout.ts, verify.ts — see "Payments" below)
   types/          firestore.ts (Firestore document types)
 public/
@@ -952,6 +1007,8 @@ public/
 firestore.rules   Security rules matching the schema above
 storage.rules     Security rules for profile photo uploads (see "Profile" above)
 scripts/          seed-lessons.mjs + lessons-data.mjs (Admin SDK lesson seeding),
+                  seed-daily-content.mjs + daily-content-data.mjs (Admin SDK
+                  Today-tab daily-content seeding),
                   rules-test.mjs (firestore.rules tests, npm run test:rules),
                   plisio-verify.test.mjs (webhook signature tests, npm run test:plisio)
 ```

@@ -16,6 +16,9 @@ export const COLLECTIONS = {
   userHighlights: "user_highlights",
   conversations: "conversations",
   watchChatUsage: "watch_chat_usage",
+  dailyVerses: "daily_verses",
+  dailyDevotionals: "daily_devotionals",
+  dailyPrayers: "daily_prayers",
 } as const;
 
 export type UserTier = "free" | "premium";
@@ -128,6 +131,43 @@ export const BLANK_TOKEN = "_____";
 
 export function isFillBlankLesson(lesson: LessonDoc): lesson is FillBlankLessonDoc {
   return lesson.lessonType === "fillBlank";
+}
+
+/**
+ * daily_verses/{id}, daily_devotionals/{id}, daily_prayers/{id} — Today
+ * tab's app-provided daily content, kept as three separate pools (not
+ * pulled from `lessons`) so Today and The Path structurally never draw
+ * from the same content on any given day. `order` is a stable position
+ * used by the rotation (src/lib/dailyContent.ts) — not the array/query
+ * position — so appending new content later doesn't shift historical
+ * picks. Read-only for signed-in users (see firestore.rules); managed via
+ * the console or the Admin SDK, same as `lessons`.
+ */
+export interface DailyVerseDoc {
+  id: string;
+  order: number;
+  reference: string;
+  text: string;
+  createdAt: Timestamp;
+}
+
+/** daily_devotionals/{id} — see DailyVerseDoc. */
+export interface DailyDevotionalDoc {
+  id: string;
+  order: number;
+  title: string;
+  text: string;
+  createdAt: Timestamp;
+}
+
+/** daily_prayers/{id} — see DailyVerseDoc. The app's guided prayer of the
+ * day, distinct from a user's own free-text prayer journal (PrayerDoc). */
+export interface DailyPrayerDoc {
+  id: string;
+  order: number;
+  title: string;
+  text: string;
+  createdAt: Timestamp;
 }
 
 export type CheckInType = "lesson" | "prayer" | "reading" | "custom";

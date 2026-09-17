@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "seed:lessons": "node scripts/seed-lessons.mjs",
+    "seed:daily-content": "node scripts/seed-daily-content.mjs",
     "test:rules": "firebase emulators:exec --only firestore --project demo-davar-test \"node scripts/rules-test.mjs\"",
     "test:plisio": "node --experimental-strip-types scripts/plisio-verify.test.mjs"
   },

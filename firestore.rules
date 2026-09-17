@@ -132,6 +132,25 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Today tab's app-provided daily content — three separate pools kept
+    // structurally distinct from `lessons` so Today and The Path never
+    // draw from the same content on a given day. Read-only for clients,
+    // same as `lessons`: managed via the console or the Admin SDK.
+    match /daily_verses/{id} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    match /daily_devotionals/{id} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    match /daily_prayers/{id} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
     // Peter's Watch's daily message-limit counter. Purely a server-side
     // implementation detail of /api/watch-chat (Admin SDK only, which
     // bypasses these rules entirely) — the client never reads or writes

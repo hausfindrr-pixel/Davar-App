@@ -507,6 +507,77 @@ await check("alice cannot delete her own prayer", async () => {
   await assertFails(deleteDoc(doc(aliceDb, "users", ALICE, "prayers", "prayer-1")));
 });
 
+// --- daily_verses / daily_devotionals / daily_prayers: Today tab content ---
+await testEnv.withSecurityRulesDisabled(async (ctx) => {
+  await setDoc(doc(ctx.firestore(), "daily_verses", "verse-01"), {
+    id: "verse-01",
+    order: 1,
+    reference: "Isaiah 41:10",
+    text: "So do not fear, for I am with you.",
+  });
+  await setDoc(doc(ctx.firestore(), "daily_devotionals", "devotional-01"), {
+    id: "devotional-01",
+    order: 1,
+    title: "Small Beginnings",
+    text: "Nothing about today has to be dramatic to matter.",
+  });
+  await setDoc(doc(ctx.firestore(), "daily_prayers", "prayer-daily-01"), {
+    id: "prayer-daily-01",
+    order: 1,
+    title: "For Today",
+    text: "Lord, thank you for this day.",
+  });
+});
+
+await check("alice (signed in) can read a daily verse", async () => {
+  await assertSucceeds(getDoc(doc(aliceDb, "daily_verses", "verse-01")));
+});
+
+await check("an unauthenticated client cannot read a daily verse", async () => {
+  await assertFails(getDoc(doc(anonDb, "daily_verses", "verse-01")));
+});
+
+await check("alice cannot write a daily verse", async () => {
+  await assertFails(
+    setDoc(doc(aliceDb, "daily_verses", "verse-02"), {
+      id: "verse-02",
+      order: 2,
+      reference: "Joshua 1:9",
+      text: "Be strong and courageous.",
+    }),
+  );
+});
+
+await check("alice (signed in) can read a daily devotional", async () => {
+  await assertSucceeds(getDoc(doc(aliceDb, "daily_devotionals", "devotional-01")));
+});
+
+await check("alice cannot write a daily devotional", async () => {
+  await assertFails(
+    setDoc(doc(aliceDb, "daily_devotionals", "devotional-02"), {
+      id: "devotional-02",
+      order: 2,
+      title: "Fake",
+      text: "Not managed content.",
+    }),
+  );
+});
+
+await check("alice (signed in) can read a daily prayer", async () => {
+  await assertSucceeds(getDoc(doc(aliceDb, "daily_prayers", "prayer-daily-01")));
+});
+
+await check("alice cannot write a daily prayer", async () => {
+  await assertFails(
+    setDoc(doc(aliceDb, "daily_prayers", "prayer-daily-02"), {
+      id: "prayer-daily-02",
+      order: 2,
+      title: "Fake",
+      text: "Not managed content.",
+    }),
+  );
+});
+
 console.log(`\n${pass} passed, ${fail} failed`);
 await testEnv.cleanup();
 process.exit(fail > 0 ? 1 : 0);

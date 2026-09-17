@@ -19,15 +19,20 @@ import { WordTab } from "@/components/tabs/WordTab";
 import { pickApostleMoment } from "@/lib/apostle-moment";
 import { APOSTLES, type ApostleId } from "@/lib/apostles";
 import { useAuth } from "@/lib/auth-context";
+import { fetchDailyDevotionals, fetchDailyPrayers, fetchDailyVerses } from "@/lib/db/dailyContent";
 import { completeLesson, fetchLessons, subscribeToLessonProgress } from "@/lib/db/lessons";
 import { checkIn, subscribeToStreak } from "@/lib/db/streaks";
 import { subscribeToUser } from "@/lib/db/users";
 import { dateKeyInTimeZone, daysBetweenKeys } from "@/lib/date";
+import { pickForDate } from "@/lib/dailyContent";
 import { daysUntilExpiry, shouldShowRenewalReminder } from "@/lib/premium";
 import { startCheckout } from "@/lib/plisio/checkout";
 import type { PlanId } from "@/lib/plisio/plans";
 import type {
+  DailyDevotionalDoc,
   DailyLessonProgressDoc,
+  DailyPrayerDoc,
+  DailyVerseDoc,
   LessonDoc,
   StreakDoc,
   UserDoc,
@@ -334,6 +339,9 @@ function Dashboard({ uid }: { uid: string }) {
   const [profile, setProfile] = useState<UserDoc | null>(null);
   const [lessons, setLessons] = useState<LessonDoc[]>([]);
   const [lessonProgress, setLessonProgress] = useState<DailyLessonProgressDoc | null>(null);
+  const [dailyVerses, setDailyVerses] = useState<DailyVerseDoc[]>([]);
+  const [dailyDevotionals, setDailyDevotionals] = useState<DailyDevotionalDoc[]>([]);
+  const [dailyPrayers, setDailyPrayers] = useState<DailyPrayerDoc[]>([]);
   const [checkingIn, setCheckingIn] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("today");
   const [showProfile, setShowProfile] = useState(false);
@@ -351,6 +359,9 @@ function Dashboard({ uid }: { uid: string }) {
     : 0;
   const showRenewalReminder = shouldShowRenewalReminder(isPremium, profile?.premiumUntil ?? null);
   const daysUntilPremiumEnds = daysUntilExpiry(profile?.premiumUntil ?? null);
+  const dailyVerse = pickForDate(dailyVerses, today);
+  const dailyDevotional = pickForDate(dailyDevotionals, today);
+  const dailyPrayer = pickForDate(dailyPrayers, today);
 
   useEffect(() => {
     const unsubStreak = subscribeToStreak(uid, setStreak);
@@ -358,6 +369,15 @@ function Dashboard({ uid }: { uid: string }) {
     fetchLessons()
       .then(setLessons)
       .catch(() => setLessons([]));
+    fetchDailyVerses()
+      .then(setDailyVerses)
+      .catch(() => setDailyVerses([]));
+    fetchDailyDevotionals()
+      .then(setDailyDevotionals)
+      .catch(() => setDailyDevotionals([]));
+    fetchDailyPrayers()
+      .then(setDailyPrayers)
+      .catch(() => setDailyPrayers([]));
     return () => {
       unsubStreak();
       unsubUser();
@@ -488,6 +508,9 @@ function Dashboard({ uid }: { uid: string }) {
                 checkingIn={checkingIn}
                 onCheckIn={handleCheckIn}
                 apostleMoment={apostleMoment}
+                dailyVerse={dailyVerse}
+                dailyDevotional={dailyDevotional}
+                dailyPrayer={dailyPrayer}
               />
             )}
             {activeTab === "path" && (
