@@ -310,7 +310,7 @@ inside the illustrated band.
 - **No XP, no completion state, read-only for v1** — these are things to
   read, not tasks to complete, unlike lessons.
 
-### The Path: organized by book
+### The Path: organized by book, as a roadmap
 
 The lesson library is grouped into book sections (Genesis, John,
 Philippians, ...) rather than a flat feed — `PathBookSections.tsx`
@@ -320,36 +320,44 @@ single-open accordion using the same interaction pattern as
 (`src/lib/bible.ts`) canonical order, filtered to only the books that
 actually have seeded lessons — there's no separate books collection.
 
-- **Schema:** every `LessonDoc` (`src/types/firestore.ts`) now has a
-  required `lessonBook: string`, an exact `BIBLE_BOOKS` entry name (e.g.
-  `"Psalms"`, not `"Psalm"`). `scripts/lessons-data.mjs` sets it per
-  lesson, derived from each lesson's `scriptureReference`.
-- **Premium** sees every book fully, every lesson in `order` — no reveal
-  locking (that's a free-tier-only concept). It still shares the daily
-  activity cap with free tier at a much higher number (15/day vs. 3/day,
-  combined with prayers — see "The daily activity cap" above), so a
-  revealed-but-uncompleted lesson can still show the plain gray "Locked"
-  button (not the blurred book-level lock below) on a day premium hits 15.
-- **Free tier** sees an assorted, round-robin-across-books reveal (see
-  "lesson reveal" above) instead of full access to any one book. Opening a
-  book that has lessons beyond that reveal shows the revealed lessons
-  normally, then the rest blurred (`blurredPreviewClass`) followed by an
-  `UnlockCard` scoped to that book — the same paywall pattern as the
-  Armory and Peter's Watch, not a separate one. The daily activity cap
-  (see above) is unchanged and independent of this — it still grays out
-  any revealed-but-uncompleted lesson once hit for the day.
+- **Schema:** every `LessonDoc` (`src/types/firestore.ts`) has a required
+  `lessonBook: string`, an exact `BIBLE_BOOKS` entry name (e.g. `"Psalms"`,
+  not `"Psalm"`). `scripts/lessons-data.mjs` sets it per lesson.
+- **Inside an open book**, stories render as a winding roadmap
+  (`RoadmapPath.tsx`, `src/components/RoadmapPath.tsx`) — alternating
+  left/right nodes down the accordion body, connected by a curved SVG
+  line, instead of a flat card list. Node state comes from
+  `roadmapNodeStates` (`src/lib/roadmap.ts`), a pure function returning
+  one of four states per lesson:
+  - **`completed`** — filled, checkmark.
+  - **`current`** — the first not-yet-completed *revealed* story: emphasized
+    (larger, ringed) so it's obvious what to do next.
+  - **`sequenceLocked`** — revealed, but an earlier story in the same book
+    isn't done yet. Users progress in order within a book; there's no
+    skipping ahead, for either tier.
+  - **`paywallLocked`** — beyond the free tier's reveal cursor entirely.
+  
+  `sequenceLocked` and `paywallLocked` intentionally render identically
+  (a plain gray locked circle) — the per-book `UnlockCard` below already
+  explains the paywall case in words, so nodes only need to communicate
+  *that* they're locked, not *why*. Only `completed`/`current` nodes are
+  tappable; tapping swaps the roadmap for that story's detail (the same
+  `LessonCard` used everywhere else) with a "back to path" button, rather
+  than trying to fit full narrative text inside a small node.
+- **Revealed lessons in a book are always a prefix** of that book's
+  ordered list (`visibleLessonsForFreeTier`'s round-robin picks each
+  book's own lessons in order, one per round), so `roadmapNodeStates`
+  never has to reconcile "revealed but out of order" — it's a simple
+  linear scan once the revealed subset is known.
+- **Premium** sees every book fully revealed — no `paywallLocked` nodes —
+  but still walks each book's roadmap in order (`sequenceLocked` still
+  applies) and still shares the daily activity cap with free tier, just
+  much higher (15/day vs. 3/day — see "The daily activity cap" above).
 - **`LessonCard.tsx`** (`src/components/LessonCard.tsx`) holds the actual
   per-lesson card markup (reading summary + Complete button, or
-  `FillBlankCard`), extracted out of the old flat `LessonsSection.tsx` so
-  both the revealed and blurred-locked-preview states in
-  `PathBookSections.tsx` render lessons identically.
-- **Migration:** the 10 already-seeded lessons need `lessonBook` backfilled
-  onto their existing docs — re-run `npm run seed:lessons` (now safe to
-  re-run after the merge fix above: it only touches the fields present in
-  `lessons-data.mjs`, `createdAt` is preserved on existing docs). Until
-  that's run against production, existing lesson docs have no
-  `lessonBook`, so they won't appear in any book section — see "Seeding
-  lessons" above.
+  `FillBlankCard`) — reused unchanged as the roadmap's detail-panel
+  content, so a tapped story renders identically to how lessons always
+  have.
 
 ### The Path: event-based stories
 
@@ -1047,7 +1055,7 @@ src/
                   api/plisio/create-invoice, api/plisio/webhook,
                   api/bible (route handlers — the last proxies bible-api.com)
   components/     UI components (StreakVisual, PlantIcon, PathBookSections,
-                  LessonCard, MascotHero, DailyContentBackdrop,
+                  RoadmapPath, LessonCard, MascotHero, DailyContentBackdrop,
                   PricingSection, AuthForm, ApostleAvatar,
                   ApostleMessageCard, BottomTabBar, PremiumGate (UnlockCard
                   + blurredPreviewClass),

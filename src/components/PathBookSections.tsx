@@ -1,11 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { ArrowLeftIcon } from "@/components/icons";
 import { LessonCard } from "@/components/LessonCard";
-import { blurredPreviewClass, UnlockCard } from "@/components/PremiumGate";
+import { UnlockCard } from "@/components/PremiumGate";
+import { RoadmapPath } from "@/components/RoadmapPath";
 import { BIBLE_BOOKS } from "@/lib/bible";
 import { visibleLessonsForFreeTier } from "@/lib/lessons";
 import type { PlanId } from "@/lib/plisio/plans";
+import { roadmapNodeStates } from "@/lib/roadmap";
 import { dailyActivityLimit, type LessonDoc } from "@/types/firestore";
 
 type PathBookSectionsProps = {
@@ -25,13 +28,18 @@ type PathBookSectionsProps = {
   getIdToken: () => Promise<string>;
 };
 
-/** The Path's lesson library, grouped into book sections (Genesis, John,
+/** The Path's story library, grouped into book sections (Genesis, John,
  * Philippians, ...) in canonical Bible order — same single-open-accordion
- * pattern as ArmoryTab. Premium sees every book fully, in order. Free tier
- * sees an assorted, round-robin-across-books reveal (visibleLessonsForFreeTier);
- * opening a book that has lessons beyond that reveal shows them blurred with
- * an UnlockCard, the same paywall pattern used in the Armory and Peter's
- * Watch. */
+ * pattern as ArmoryTab. Inside an open book, stories render as a winding
+ * roadmap (RoadmapPath) instead of a flat list: users walk it in order —
+ * only the first not-yet-completed, revealed story is tappable ("current"),
+ * everything after is locked until it's done (roadmapNodeStates,
+ * src/lib/roadmap.ts). Free tier additionally can't reveal a whole book at
+ * once (visibleLessonsForFreeTier's round-robin-across-books reveal) —
+ * revealed-but-locked-by-paywall nodes show inert with the per-book
+ * UnlockCard below, same pattern as the Armory and Peter's Watch. Tapping
+ * an unlocked node swaps the roadmap for that story's detail (LessonCard)
+ * with a "back to path" button. */
 export function PathBookSections({
   lessons,
   dayIndex,
@@ -44,6 +52,7 @@ export function PathBookSections({
   getIdToken,
 }: PathBookSectionsProps) {
   const [openBook, setOpenBook] = useState<string | null>(null);
+  const [openLessonId, setOpenLessonId] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [upgradingPlan, setUpgradingPlan] = useState<PlanId | null>(null);
   const [upgradeError, setUpgradeError] = useState<string | null>(null);
@@ -65,6 +74,12 @@ export function PathBookSections({
     list.sort((a, b) => a.order - b.order);
   }
   const bookNames = BIBLE_BOOKS.map((book) => book.name).filter((name) => byBook.has(name));
+  const openLesson = lessons.find((lesson) => lesson.id === openLessonId) ?? null;
+
+  function selectBook(name: string) {
+    setOpenBook(openBook === name ? null : name);
+    setOpenLessonId(null);
+  }
 
   async function handleComplete(lesson: LessonDoc) {
     setPendingId(lesson.id);
@@ -106,19 +121,18 @@ export function PathBookSections({
       <div className="flex flex-col gap-3">
         {bookNames.map((name) => {
           const bookLessons = byBook.get(name)!;
-          const revealed = revealedIds
-            ? bookLessons.filter((lesson) => revealedIds.has(lesson.id))
-            : bookLessons;
-          const locked = revealedIds
-            ? bookLessons.filter((lesson) => !revealedIds.has(lesson.id))
-            : [];
+          const hasPaywallLocked = bookLessons.some(
+            (lesson) => revealedIds !== null && !revealedIds.has(lesson.id),
+          );
           const isOpen = openBook === name;
+          const states = roadmapNodeStates(bookLessons, completedLessonIds, revealedIds);
+          const showingDetail = isOpen && openLesson && bookLessons.some((l) => l.id === openLesson.id);
 
           return (
             <div key={name} className="rounded-2xl bg-paper border border-mist overflow-hidden">
               <button
                 type="button"
-                onClick={() => setOpenBook(isOpen ? null : name)}
+                onClick={() => selectBook(name)}
                 className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left"
               >
                 <div>
@@ -132,41 +146,38 @@ export function PathBookSections({
 
               {isOpen && (
                 <div className="flex flex-col gap-3 px-5 pb-5">
-                  {revealed.map((lesson) => {
-                    const isDone = completedLessonIds.includes(lesson.id);
-                    return (
-                      <LessonCard
-                        key={lesson.id}
-                        lesson={lesson}
-                        isDone={isDone}
-                        isLocked={atLimit && !isDone}
-                        isPending={pendingId === lesson.id}
-                        onComplete={() => handleComplete(lesson)}
-                      />
-                    );
-                  })}
-
-                  {locked.length > 0 && (
+                  {showingDetail && openLesson ? (
                     <>
-                      <div
-                        className={`flex flex-col gap-3 border-t border-mist pt-3 ${blurredPreviewClass}`}
+                      <button
+                        type="button"
+                        onClick={() => setOpenLessonId(null)}
+                        className="flex items-center gap-1.5 text-xs text-stone self-start"
                       >
-                        {locked.map((lesson) => (
-                          <LessonCard
-                            key={lesson.id}
-                            lesson={lesson}
-                            isDone={false}
-                            isLocked
-                            isPending={false}
-                            onComplete={() => Promise.resolve()}
-                          />
-                        ))}
-                      </div>
-                      <UnlockCard
-                        title={`Unlock all of ${name}`}
-                        description={`Get every lesson in ${name}, in order, plus full access to the rest of the library.`}
-                        getIdToken={getIdToken}
+                        <ArrowLeftIcon className="h-3.5 w-3.5" />
+                        Back to path
+                      </button>
+                      <LessonCard
+                        lesson={openLesson}
+                        isDone={completedLessonIds.includes(openLesson.id)}
+                        isLocked={atLimit && !completedLessonIds.includes(openLesson.id)}
+                        isPending={pendingId === openLesson.id}
+                        onComplete={() => handleComplete(openLesson)}
                       />
+                    </>
+                  ) : (
+                    <>
+                      <RoadmapPath
+                        lessons={bookLessons}
+                        states={states}
+                        onSelect={(lesson) => setOpenLessonId(lesson.id)}
+                      />
+                      {hasPaywallLocked && (
+                        <UnlockCard
+                          title={`Unlock all of ${name}`}
+                          description={`Get every lesson in ${name}, in order, plus full access to the rest of the library.`}
+                          getIdToken={getIdToken}
+                        />
+                      )}
                     </>
                   )}
                 </div>
