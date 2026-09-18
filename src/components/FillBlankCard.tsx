@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { CONTENT_TYPE_META } from "@/lib/contentType";
 import { BLANK_TOKEN, type FillBlankLessonDoc } from "@/types/firestore";
 
 type FillBlankCardProps = {
@@ -28,6 +29,7 @@ function shuffled<T>(items: T[]): T[] {
  * try again" and a reset, never a locked-out failure state, matching this
  * app's never-shaming tone everywhere else. */
 export function FillBlankCard({ lesson, isDone, isLocked, isPending, onComplete }: FillBlankCardProps) {
+  const meta = CONTENT_TYPE_META[lesson.track];
   const segments = useMemo(() => lesson.template.split(BLANK_TOKEN), [lesson.template]);
   const blankCount = segments.length - 1;
   const bankWords = useMemo(() => shuffled(lesson.wordBank), [lesson.wordBank]);
@@ -119,14 +121,14 @@ export function FillBlankCard({ lesson, isDone, isLocked, isPending, onComplete 
                 type="button"
                 disabled={!interactive || blanks[i] === null}
                 onClick={() => clearBlank(i)}
-                className={`inline-flex min-w-[4.5rem] items-center justify-center rounded-lg border px-2 py-0.5 text-sm font-medium transition-colors ${
+                className={`inline-flex min-w-[4.5rem] items-center justify-center rounded-lg border-2 px-2.5 py-1 text-sm font-bold transition-colors ${
                   blanks[i] === null
-                    ? "border-dashed border-clay-300 text-transparent select-none"
+                    ? `border-dashed ${meta.currentBorderClass} text-transparent select-none`
                     : feedback === "correct"
-                      ? "border-sage-400 bg-sage-50 text-sage-700"
+                      ? "border-sage-600 bg-sage-600 text-paper"
                       : feedback === "incorrect"
-                        ? "border-clay-400 bg-clay-50 text-clay-700"
-                        : "border-clay-400 bg-clay-50 text-ink hover:bg-clay-100/60"
+                        ? `border-transparent ${meta.incorrectBgClass} text-paper`
+                        : `border-transparent ${meta.buttonClass}`
                 }`}
               >
                 {blanks[i] ?? "___"}
@@ -144,7 +146,11 @@ export function FillBlankCard({ lesson, isDone, isLocked, isPending, onComplete 
               type="button"
               disabled={usedIndices.has(i) || isLocked}
               onClick={() => placeWord(i, word)}
-              className="rounded-full border border-mist bg-ivory px-3 py-1 text-sm text-ink disabled:opacity-30 disabled:cursor-not-allowed hover:bg-mist/40 transition-colors"
+              className={`rounded-full px-3.5 py-1.5 text-sm font-bold transition-colors disabled:cursor-not-allowed ${
+                usedIndices.has(i) || isLocked
+                  ? "bg-mist text-stone/50"
+                  : meta.buttonClass
+              }`}
             >
               {word}
             </button>
@@ -154,11 +160,13 @@ export function FillBlankCard({ lesson, isDone, isLocked, isPending, onComplete 
 
       {feedback === "incorrect" && (
         <div className="flex items-center gap-3">
-          <p className="text-xs text-clay-700">Not quite — take another look and try again.</p>
+          <p className={`text-xs font-medium ${meta.labelClass}`}>
+            Not quite — take another look and try again.
+          </p>
           <button
             type="button"
             onClick={handleTryAgain}
-            className="text-xs font-medium text-clay-700 underline shrink-0"
+            className={`text-xs font-bold underline shrink-0 ${meta.labelClass}`}
           >
             Try again
           </button>
@@ -176,7 +184,7 @@ export function FillBlankCard({ lesson, isDone, isLocked, isPending, onComplete 
           type="button"
           disabled={!interactive || isPending}
           onClick={() => void handleCheck()}
-          className="self-start rounded-full bg-clay-600 text-paper px-4 py-1.5 text-xs font-medium hover:bg-clay-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+          className={`self-start rounded-full px-4 py-1.5 text-xs font-bold transition-colors disabled:opacity-70 disabled:cursor-not-allowed ${meta.buttonClass}`}
         >
           Check answer
         </button>

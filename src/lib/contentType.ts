@@ -33,6 +33,11 @@ export interface ContentTypeMeta {
   solidBgClass: string;
   /** The card's "Continue" pill/button — solidBgClass plus text + hover. */
   buttonClass: string;
+  /** A deeper solid shade of the same family, used for the verse-activity
+   * word bank's "incorrect" state (FillBlankCard) — bold enough to read
+   * clearly against paper, but still the track's own color rather than an
+   * alarming red, matching this app's never-shaming tone. */
+  incorrectBgClass: string;
 }
 
 export const CONTENT_TYPE_META: Record<LessonTrack, ContentTypeMeta> = {
@@ -46,6 +51,7 @@ export const CONTENT_TYPE_META: Record<LessonTrack, ContentTypeMeta> = {
     currentRingClass: "ring-clay-100",
     solidBgClass: "bg-clay-600",
     buttonClass: "bg-clay-600 text-paper hover:bg-clay-700",
+    incorrectBgClass: "bg-clay-700",
   },
   prayer: {
     label: "Prayer",
@@ -57,6 +63,7 @@ export const CONTENT_TYPE_META: Record<LessonTrack, ContentTypeMeta> = {
     currentRingClass: "ring-dusk-100",
     solidBgClass: "bg-dusk-600",
     buttonClass: "bg-dusk-600 text-paper hover:bg-dusk-700",
+    incorrectBgClass: "bg-dusk-700",
   },
   devotional: {
     label: "Devotion",
@@ -68,6 +75,7 @@ export const CONTENT_TYPE_META: Record<LessonTrack, ContentTypeMeta> = {
     currentRingClass: "ring-gold-100",
     solidBgClass: "bg-gold-600",
     buttonClass: "bg-gold-600 text-paper hover:bg-gold-700",
+    incorrectBgClass: "bg-gold-700",
   },
 };
 
