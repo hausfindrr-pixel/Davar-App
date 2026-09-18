@@ -30,6 +30,21 @@
   --color-sage-400: #96b584;
   --color-sage-600: #6d9157;
   --color-sage-700: #577544;
+
+  /* Content-type accents for The Path's Lessons/Prayer/Devotion tabs —
+     same muted, dusty character as clay/sage, not brighter or more
+     saturated, just a different hue each. */
+  --color-dusk-50: #eef0f7;
+  --color-dusk-200: #c9d0e8;
+  --color-dusk-400: #8b96c4;
+  --color-dusk-600: #6570a3;
+  --color-dusk-700: #4f5a87;
+
+  --color-gold-50: #fbf6e3;
+  --color-gold-200: #e8d48a;
+  --color-gold-400: #c9a83f;
+  --color-gold-600: #a9862a;
+  --color-gold-700: #8a6c1f;
 }
 
 @media (prefers-color-scheme: dark) {

@@ -254,3 +254,32 @@ export function ArrowLeftIcon({ className }: IconProps) {
     </svg>
   );
 }
+
+/** A heart — The Path's Prayer tab, offered from the heart. */
+export function HeartIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className}>
+      <path
+        d="M12 20s-7-4.35-7-9.5C5 7.5 7 6 9 6c1.3 0 2.4.7 3 1.8.6-1.1 1.7-1.8 3-1.8 2 0 4 1.5 4 4.5 0 5.15-7 9.5-7 9.5Z"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/** A sunrise — The Path's Devotion tab, a quiet daily moment. */
+export function SunIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className}>
+      <circle cx="12" cy="13" r="4.5" stroke="currentColor" strokeWidth="1.7" />
+      <path
+        d="M12 4.5v2M12 20.5v-1M4.5 13h2M19.5 13h-2M6.5 6.5l1.4 1.4M17.5 6.5l-1.4 1.4"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}

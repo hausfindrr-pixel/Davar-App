@@ -1,4 +1,5 @@
 import { BIBLE_BOOKS } from "@/lib/bible";
+import { CONTENT_TYPE_ORDER } from "@/lib/contentType";
 import type { LessonDoc } from "@/types/firestore";
 
 /** Groups lessons by `lessonBook`, each book's list sorted by `order`, and
@@ -69,13 +70,16 @@ export interface NextStory {
 
 /**
  * The single story to feature as "next up" across the whole Path — the
- * "current" node of the first book (in canonical order) that has one.
- * Several books can each have their own current node at once (the
- * free-tier reveal is round-robin across books), so this picks by the
- * roadmap's own top-to-bottom order rather than anything date-based —
- * it's a pointer into the user's own progress, not a separate rotation
- * pool (see the "Today: story teaser" README section for why). Returns
- * null once every revealed book is fully caught up.
+ * "current" node of the first (book, track) roadmap, in canonical book
+ * order then CONTENT_TYPE_ORDER, that has one. Each book's tracks
+ * (Lessons/Prayer/Devotion) are their own independent roadmap in the UI
+ * (PathBookSections), so this scans the same way rather than mixing
+ * tracks into one combined sequence. Several roadmaps can each have their
+ * own current node at once (the free-tier reveal is round-robin across
+ * books), so this picks by the roadmap's own top-to-bottom order rather
+ * than anything date-based — it's a pointer into the user's own progress,
+ * not a separate rotation pool (see the "Today: story teaser" README
+ * section for why). Returns null once everything revealed is caught up.
  */
 export function nextStoryAcrossBooks(
   lessons: LessonDoc[],
@@ -85,9 +89,13 @@ export function nextStoryAcrossBooks(
   const { bookNames, byBook } = groupLessonsByBook(lessons);
   for (const book of bookNames) {
     const bookLessons = byBook.get(book)!;
-    const states = roadmapNodeStates(bookLessons, completedLessonIds, revealedIds);
-    const current = bookLessons.find((lesson) => states.get(lesson.id) === "current");
-    if (current) return { lesson: current, book };
+    for (const track of CONTENT_TYPE_ORDER) {
+      const trackLessons = bookLessons.filter((lesson) => lesson.track === track);
+      if (trackLessons.length === 0) continue;
+      const states = roadmapNodeStates(trackLessons, completedLessonIds, revealedIds);
+      const current = trackLessons.find((lesson) => states.get(lesson.id) === "current");
+      if (current) return { lesson: current, book };
+    }
   }
   return null;
 }

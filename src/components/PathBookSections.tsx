@@ -5,10 +5,11 @@ import { ArrowLeftIcon } from "@/components/icons";
 import { LessonCard } from "@/components/LessonCard";
 import { UnlockCard } from "@/components/PremiumGate";
 import { RoadmapPath } from "@/components/RoadmapPath";
+import { CONTENT_TYPE_META, CONTENT_TYPE_ORDER } from "@/lib/contentType";
 import { visibleLessonsForFreeTier } from "@/lib/lessons";
 import type { PlanId } from "@/lib/plisio/plans";
 import { groupLessonsByBook, roadmapNodeStates } from "@/lib/roadmap";
-import { dailyActivityLimit, type LessonDoc } from "@/types/firestore";
+import { dailyActivityLimit, type LessonDoc, type LessonTrack } from "@/types/firestore";
 
 /** A request from outside (the Today tab's "Continue Your Story" teaser)
  * to jump straight to a specific book/story. `nonce` only exists so two
@@ -36,15 +37,21 @@ type PathBookSectionsProps = {
 
 /** The Path's story library, grouped into book sections (Genesis, John,
  * Philippians, ...) in canonical Bible order — same single-open-accordion
- * pattern as ArmoryTab. Inside an open book, stories render as a winding
- * roadmap (RoadmapPath) instead of a flat list: users walk it in order —
- * only the first not-yet-completed, revealed story is tappable ("current"),
+ * pattern as ArmoryTab. Inside an open book, content is split into three
+ * collapsible tabs by track (CONTENT_TYPE_ORDER: Lessons/Prayer/Devotion,
+ * src/lib/contentType.ts), each with its own accent color — today only
+ * Lessons (track "scripture") has real content, so Prayer and Devotion
+ * show a muted "Coming soon" row instead of an empty collapsible.
+ *
+ * Within a track with content, stories render as a winding roadmap
+ * (RoadmapPath) instead of a flat list: users walk it in order — only the
+ * first not-yet-completed, revealed story is tappable ("current"),
  * everything after is locked until it's done (roadmapNodeStates,
  * src/lib/roadmap.ts). Free tier additionally can't reveal a whole book at
  * once (visibleLessonsForFreeTier's round-robin-across-books reveal) —
  * revealed-but-locked-by-paywall nodes show inert with the per-book
  * UnlockCard below, same pattern as the Armory and Peter's Watch. Tapping
- * an unlocked node swaps the roadmap for that story's detail (LessonCard)
+ * an unlocked node swaps the tabs for that story's detail (LessonCard)
  * with a "back to path" button. */
 export function PathBookSections({
   lessons,
@@ -59,6 +66,7 @@ export function PathBookSections({
   getIdToken,
 }: PathBookSectionsProps) {
   const [openBook, setOpenBook] = useState<string | null>(null);
+  const [openTrack, setOpenTrack] = useState<LessonTrack | null>(null);
   const [openLessonId, setOpenLessonId] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [upgradingPlan, setUpgradingPlan] = useState<PlanId | null>(null);
@@ -81,18 +89,29 @@ export function PathBookSections({
   const { bookNames, byBook } = groupLessonsByBook(lessons);
 
   let effectiveOpenBook = openBook;
+  let effectiveOpenTrack = openTrack;
   let effectiveOpenLessonId = openLessonId;
   if (focusRequest && focusRequest.nonce !== handledFocusNonce) {
+    const focusedLesson = lessons.find((lesson) => lesson.id === focusRequest.lessonId);
     effectiveOpenBook = focusRequest.book;
+    effectiveOpenTrack = focusedLesson?.track ?? null;
     effectiveOpenLessonId = focusRequest.lessonId;
     setHandledFocusNonce(focusRequest.nonce);
     setOpenBook(focusRequest.book);
+    setOpenTrack(focusedLesson?.track ?? null);
     setOpenLessonId(focusRequest.lessonId);
   }
   const openLesson = lessons.find((lesson) => lesson.id === effectiveOpenLessonId) ?? null;
 
   function selectBook(name: string) {
-    setOpenBook(openBook === name ? null : name);
+    const opening = openBook !== name;
+    setOpenBook(opening ? name : null);
+    setOpenTrack(null);
+    setOpenLessonId(null);
+  }
+
+  function selectTrack(track: LessonTrack) {
+    setOpenTrack(effectiveOpenTrack === track ? null : track);
     setOpenLessonId(null);
   }
 
@@ -139,9 +158,17 @@ export function PathBookSections({
           const hasPaywallLocked = bookLessons.some(
             (lesson) => revealedIds !== null && !revealedIds.has(lesson.id),
           );
-          const isOpen = effectiveOpenBook === name;
-          const states = roadmapNodeStates(bookLessons, completedLessonIds, revealedIds);
-          const showingDetail = isOpen && openLesson && bookLessons.some((l) => l.id === openLesson.id);
+          const isBookOpen = effectiveOpenBook === name;
+          const showingDetail = isBookOpen && openLesson && bookLessons.some((l) => l.id === openLesson.id);
+          const completedInBook = bookLessons.filter((l) => completedLessonIds.includes(l.id)).length;
+          const progress = bookLessons.length > 0 ? completedInBook / bookLessons.length : 0;
+
+          const byTrack = new Map<LessonTrack, LessonDoc[]>();
+          for (const lesson of bookLessons) {
+            const list = byTrack.get(lesson.track) ?? [];
+            list.push(lesson);
+            byTrack.set(lesson.track, list);
+          }
 
           return (
             <div key={name} className="rounded-2xl bg-paper border border-mist overflow-hidden">
@@ -150,16 +177,24 @@ export function PathBookSections({
                 onClick={() => selectBook(name)}
                 className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left"
               >
-                <div>
+                <div className="flex-1 min-w-0">
                   <h3 className="text-base font-semibold text-ink">{name}</h3>
-                  <p className="text-xs text-stone mt-0.5">
-                    {bookLessons.length} lesson{bookLessons.length === 1 ? "" : "s"}
-                  </p>
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <div className="h-1.5 flex-1 max-w-24 rounded-full bg-mist overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-clay-600"
+                        style={{ width: `${Math.round(progress * 100)}%` }}
+                      />
+                    </div>
+                    <span className="text-xs text-stone shrink-0">
+                      {completedInBook}/{bookLessons.length}
+                    </span>
+                  </div>
                 </div>
-                <span className="text-stone text-xs shrink-0">{isOpen ? "–" : "+"}</span>
+                <span className="text-stone text-xs shrink-0">{isBookOpen ? "–" : "+"}</span>
               </button>
 
-              {isOpen && (
+              {isBookOpen && (
                 <div className="flex flex-col gap-3 px-5 pb-5">
                   {showingDetail && openLesson ? (
                     <>
@@ -181,11 +216,70 @@ export function PathBookSections({
                     </>
                   ) : (
                     <>
-                      <RoadmapPath
-                        lessons={bookLessons}
-                        states={states}
-                        onSelect={(lesson) => setOpenLessonId(lesson.id)}
-                      />
+                      {CONTENT_TYPE_ORDER.map((track) => {
+                        const meta = CONTENT_TYPE_META[track];
+                        const trackLessons = byTrack.get(track) ?? [];
+                        const Icon = meta.icon;
+
+                        if (trackLessons.length === 0) {
+                          return (
+                            <div
+                              key={track}
+                              className="flex items-center gap-3 rounded-xl border border-mist px-4 py-3 opacity-60"
+                            >
+                              <span
+                                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${meta.badgeClass}`}
+                              >
+                                <Icon className="h-4 w-4" />
+                              </span>
+                              <div>
+                                <p className="text-sm font-medium text-ink">{meta.label}</p>
+                                <p className="text-xs text-stone">Coming soon</p>
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        const isTrackOpen = effectiveOpenTrack === track;
+                        const states = roadmapNodeStates(trackLessons, completedLessonIds, revealedIds);
+
+                        return (
+                          <div key={track} className="rounded-xl border border-mist overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => selectTrack(track)}
+                              className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left"
+                            >
+                              <div className="flex items-center gap-3">
+                                <span
+                                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${meta.badgeClass}`}
+                                >
+                                  <Icon className="h-4 w-4" />
+                                </span>
+                                <div>
+                                  <p className="text-sm font-medium text-ink">{meta.label}</p>
+                                  <p className="text-xs text-stone">
+                                    {trackLessons.length} lesson{trackLessons.length === 1 ? "" : "s"}
+                                  </p>
+                                </div>
+                              </div>
+                              <span className="text-stone text-xs shrink-0">{isTrackOpen ? "–" : "+"}</span>
+                            </button>
+
+                            {isTrackOpen && (
+                              <div className="px-4 pb-4">
+                                <RoadmapPath
+                                  lessons={trackLessons}
+                                  states={states}
+                                  accent={meta}
+                                  onSelect={(lesson) => setOpenLessonId(lesson.id)}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+
                       {hasPaywallLocked && (
                         <UnlockCard
                           title={`Unlock all of ${name}`}

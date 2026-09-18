@@ -1,4 +1,5 @@
-import { CheckIcon, LockIcon, ScrollIcon } from "@/components/icons";
+import { CheckIcon, LockIcon } from "@/components/icons";
+import type { ContentTypeMeta } from "@/lib/contentType";
 import type { RoadmapNodeState } from "@/lib/roadmap";
 import type { LessonDoc } from "@/types/firestore";
 
@@ -11,6 +12,11 @@ const RIGHT_X = 226;
 type RoadmapPathProps = {
   lessons: LessonDoc[];
   states: Map<string, RoadmapNodeState>;
+  /** Drives node/connector color — the content type's own accent (Lessons:
+   * clay, Prayer: dusk, Devotion: gold — see src/lib/contentType.ts) so
+   * each tab reads as its own color identity rather than one fixed hue
+   * everywhere. */
+  accent: ContentTypeMeta;
   onSelect: (lesson: LessonDoc) => void;
 };
 
@@ -21,9 +27,11 @@ type RoadmapPathProps = {
  * "paywallLocked" nodes are inert circles with a lock glyph — the per-book
  * UnlockCard below already explains the paywall case in words, so nodes
  * themselves don't need to distinguish why they're locked, just that they
- * are. */
-export function RoadmapPath({ lessons, states, onSelect }: RoadmapPathProps) {
+ * are. Locked nodes/connectors stay neutral (mist) regardless of accent —
+ * richness belongs to what's active, not to what's out of reach yet. */
+export function RoadmapPath({ lessons, states, accent, onSelect }: RoadmapPathProps) {
   const height = (lessons.length - 1) * ROW_HEIGHT + NODE_SIZE + 32;
+  const Icon = accent.icon;
 
   const positions = lessons.map((lesson, index) => ({
     lesson,
@@ -49,7 +57,7 @@ export function RoadmapPath({ lessons, states, onSelect }: RoadmapPathProps) {
               key={to.lesson.id}
               d={`M ${from.x} ${from.y} C ${from.x} ${midY} ${to.x} ${midY} ${to.x} ${to.y}`}
               fill="none"
-              stroke={walked ? "var(--color-sage-400)" : "var(--color-mist)"}
+              stroke={walked ? `var(${accent.connectorVar})` : "var(--color-mist)"}
               strokeWidth={walked ? 3 : 2}
               strokeDasharray={walked ? undefined : "5 5"}
               strokeLinecap="round"
@@ -81,9 +89,9 @@ export function RoadmapPath({ lessons, states, onSelect }: RoadmapPathProps) {
               aria-label={lesson.title}
               className={`flex items-center justify-center rounded-full border-2 transition-transform ${
                 state === "completed"
-                  ? "bg-clay-600 border-clay-600 text-paper"
+                  ? `${accent.nodeBgClass} text-paper`
                   : isCurrent
-                    ? "bg-clay-600 border-clay-200 text-paper scale-110 ring-4 ring-clay-100"
+                    ? `${accent.nodeBgClass} text-paper scale-110 ring-4 ${accent.nodeRingClass}`
                     : "bg-mist border-mist text-stone opacity-70 cursor-not-allowed"
               }`}
               style={{ height: NODE_SIZE, width: NODE_SIZE }}
@@ -91,7 +99,7 @@ export function RoadmapPath({ lessons, states, onSelect }: RoadmapPathProps) {
               {state === "completed" ? (
                 <CheckIcon className="h-6 w-6" />
               ) : isTappable ? (
-                <ScrollIcon className="h-6 w-6" />
+                <Icon className="h-6 w-6" />
               ) : (
                 <LockIcon className="h-5 w-5" />
               )}

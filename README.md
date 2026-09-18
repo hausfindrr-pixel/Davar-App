@@ -387,6 +387,55 @@ actually have seeded lessons — there's no separate books collection.
   content, so a tapped story renders identically to how lessons always
   have.
 
+### The Path: content-type tabs and color identity
+
+Inside an open book, content splits into three collapsible tabs by
+`LessonDoc.track` (`"scripture" | "prayer" | "devotional"` — a field that
+already existed, previously just a small badge; this is a new grouping
+over the same data, not a schema change) — `CONTENT_TYPE_ORDER` and
+`CONTENT_TYPE_META` in `src/lib/contentType.ts`:
+
+| Track | Tab label | Icon | Accent |
+| --- | --- | --- | --- |
+| `scripture` | Lessons | `ScrollIcon` | `clay` (existing) |
+| `prayer` | Prayer | `HeartIcon` | `dusk` (new) |
+| `devotional` | Devotion | `SunIcon` | `gold` (new) |
+
+- **Two new accent color families** in `globals.css` (`--color-dusk-*`,
+  `--color-gold-*`), built to the same 50/200/400/600/700 ramp shape and
+  muted, dusty character as the existing `clay`/`sage` tokens — richer
+  variety without stepping outside the "Dawn Light" palette's saturation
+  level. `RoadmapPath.tsx` takes an `accent: ContentTypeMeta` prop now
+  (previously hardcoded to clay) so each tab's roadmap — node fill, ring,
+  and connector color — reads as its own color identity. Locked
+  nodes/connectors stay neutral `mist` regardless of accent on purpose:
+  richness belongs to what's active, not to what's out of reach.
+- **Tailwind class strings are all literal**, defined once in
+  `CONTENT_TYPE_META` rather than assembled at runtime (`` `bg-${accent}-600` ``
+  never works — Tailwind's build-time scanner can't see it) — every
+  consumer just indexes into the shared object. The SVG connector color is
+  the one exception: it's a `var(--color-x-400)` CSS custom property
+  reference resolved by the browser at paint time, so that one *is* built
+  dynamically from `accent.connectorVar` safely.
+- **Only `scripture` has real content today** — all 10 seeded stories are
+  that track (see "event-based stories" below). A track with zero lessons
+  in a given book renders as a muted, non-interactive "Coming soon" row
+  (icon badge + label, no chevron, not collapsible) rather than being
+  hidden — every book shows all three tabs consistently, and the new
+  accent colors are visible (even if inactive) well before any Prayer/
+  Devotion content exists to populate them.
+- **Book headers gained a small progress bar** (`bg-clay-600` fill over
+  `bg-mist`, plus an "N/M" count) in place of plain "N lessons" text —
+  ties the one new bit of book-header color to something meaningful
+  (completion), rather than being pure decoration. This stays `clay`
+  regardless of a book's tracks, since it reflects the whole book's
+  progress across all three, not one track's identity.
+- **`nextStoryAcrossBooks`** (`src/lib/roadmap.ts`, the Today teaser's
+  source — see "Today: story teaser" above) scans `(book, track)` pairs in
+  `CONTENT_TYPE_ORDER` now, matching exactly what `PathBookSections`
+  renders as independent per-track roadmaps, rather than treating a whole
+  book's lessons (mixed tracks) as one combined sequence.
+
 ### The Path: event-based stories
 
 Lesson content is narrative Bible events (Creation, the Red Sea, David and
@@ -1093,6 +1142,9 @@ src/
   lib/            firebase.ts (client SDK init, incl. Storage), firebase-admin.ts
                   (server-only Admin SDK init), auth-context.tsx, streak.ts,
                   xp.ts, date.ts (pure logic), lessons.ts (free-tier reveal),
+                  roadmap.ts (per-track node states, nextStoryAcrossBooks),
+                  contentType.ts (Lessons/Prayer/Devotion tab metadata —
+                  see "content-type tabs and color identity" above),
                   dailyContent.ts (pickForDate rotation — see "Today: daily
                   content" above), apostles.ts, apostle-moment.ts
                   (see "Apostle Companion" above), armory.ts (Armory content),
