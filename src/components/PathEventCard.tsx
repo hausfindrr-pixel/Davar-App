@@ -13,16 +13,18 @@ type PathEventCardProps = {
  * image-placeholder area up top stands in for illustrations to come
  * later; today it's the content type's icon on a tinted gradient. Only
  * "completed"/"current" cards are tappable; "sequenceLocked" names the
- * specific story blocking it, "paywallLocked" points at Premium — both
- * read as a plain locked card, dimmed, rather than the old small locked
- * node, since there's room here to say why. */
+ * specific story blocking it, reading as a plain locked card, dimmed,
+ * rather than the old small locked node, since there's room here to say
+ * why. Premium-only: free tier never sees a locked card at all — its
+ * single visible event is always "current" (strict per-tier visibility,
+ * see PathEventList). */
 export function PathEventCard({ event, onSelect }: PathEventCardProps) {
   const { lesson, book, state, blockingTitle } = event;
   const meta = CONTENT_TYPE_META[lesson.track];
   const Icon = meta.icon;
   const isTappable = state === "completed" || state === "current";
   const isCurrent = state === "current";
-  const isLocked = state === "sequenceLocked" || state === "paywallLocked";
+  const isLocked = state === "sequenceLocked";
 
   return (
     <button
@@ -94,12 +96,6 @@ export function PathEventCard({ event, onSelect }: PathEventCardProps) {
           <div className="mt-1 flex items-center gap-1.5 text-xs text-stone">
             <LockIcon className="h-3.5 w-3.5 shrink-0" />
             <span>Complete &ldquo;{blockingTitle}&rdquo; first</span>
-          </div>
-        )}
-        {state === "paywallLocked" && (
-          <div className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-clay-700">
-            <LockIcon className="h-3.5 w-3.5 shrink-0" />
-            <span>Unlock with Premium</span>
           </div>
         )}
       </div>

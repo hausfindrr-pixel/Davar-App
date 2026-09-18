@@ -21,14 +21,18 @@ import { APOSTLES, pickApostleMessage, type ApostleId } from "@/lib/apostles";
 import { useAuth } from "@/lib/auth-context";
 import type { PathFocusRequest } from "@/components/PathEventList";
 import { fetchDailyDevotionals, fetchDailyPrayers, fetchDailyVerses } from "@/lib/db/dailyContent";
-import { completeLesson, fetchLessons, subscribeToLessonProgress } from "@/lib/db/lessons";
+import {
+  completeLesson,
+  fetchAllCompletedLessonIds,
+  fetchLessons,
+  subscribeToLessonProgress,
+} from "@/lib/db/lessons";
 import { checkIn, subscribeToStreak } from "@/lib/db/streaks";
 import { subscribeToUser } from "@/lib/db/users";
-import { dateKeyInTimeZone, daysBetweenKeys } from "@/lib/date";
+import { dateKeyInTimeZone } from "@/lib/date";
 import { pickForDate } from "@/lib/dailyContent";
-import { visibleLessonsForFreeTier } from "@/lib/lessons";
 import { daysUntilExpiry, shouldShowRenewalReminder } from "@/lib/premium";
-import { nextStoryAcrossBooks, type NextStory } from "@/lib/roadmap";
+import { nextEventForFreeTier, nextStoryAcrossBooks, type NextStory } from "@/lib/roadmap";
 import { startCheckout } from "@/lib/plisio/checkout";
 import type { PlanId } from "@/lib/plisio/plans";
 import type {
@@ -342,6 +346,7 @@ function Dashboard({ uid }: { uid: string }) {
   const [profile, setProfile] = useState<UserDoc | null>(null);
   const [lessons, setLessons] = useState<LessonDoc[]>([]);
   const [lessonProgress, setLessonProgress] = useState<DailyLessonProgressDoc | null>(null);
+  const [allTimeCompletedLessonIds, setAllTimeCompletedLessonIds] = useState<string[]>([]);
   const [dailyVerses, setDailyVerses] = useState<DailyVerseDoc[]>([]);
   const [dailyDevotionals, setDailyDevotionals] = useState<DailyDevotionalDoc[]>([]);
   const [dailyPrayers, setDailyPrayers] = useState<DailyPrayerDoc[]>([]);
@@ -358,29 +363,25 @@ function Dashboard({ uid }: { uid: string }) {
   const timeZone = profile?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
   const today = dateKeyInTimeZone(new Date(), timeZone);
   const isPremium = profile?.tier === "premium";
-  const dayIndex = profile?.createdAt
-    ? daysBetweenKeys(dateKeyInTimeZone(profile.createdAt.toDate(), timeZone), today)
-    : 0;
   const showRenewalReminder = shouldShowRenewalReminder(isPremium, profile?.premiumUntil ?? null);
   const daysUntilPremiumEnds = daysUntilExpiry(profile?.premiumUntil ?? null);
   const dailyVerse = pickForDate(dailyVerses, today);
   const dailyDevotional = pickForDate(dailyDevotionals, today);
   const dailyPrayer = pickForDate(dailyPrayers, today);
-  // Lessons completed + prayers submitted today, combined — see
-  // dailyActivityLimit (src/types/firestore.ts). Today's Verse/Devotional/
-  // Prayer have no completion action, so they're not part of this count.
-  const todayActivityCount =
-    (lessonProgress?.completedLessonIds.length ?? 0) + (lessonProgress?.prayerCount ?? 0);
-  const revealedLessonIds = isPremium
-    ? null
-    : new Set(visibleLessonsForFreeTier(lessons, dayIndex).map((lesson) => lesson.id));
+  // Event lessons completed today and prayers submitted today — each has
+  // its own separate cap (dailyEventLimit, dailyPrayerLimit —
+  // src/types/firestore.ts). Today's Verse/Devotional/Prayer have no
+  // completion action, so they're not part of either count.
+  const todayEventCount = lessonProgress?.completedLessonIds.length ?? 0;
+  const todayPrayerCount = lessonProgress?.prayerCount ?? 0;
   // A pointer into The Path's own roadmap, not a separate rotation pool —
   // see NextStoryTeaser and the "Today: story teaser" README section.
-  const nextStory = nextStoryAcrossBooks(
-    lessons,
-    lessonProgress?.completedLessonIds ?? [],
-    revealedLessonIds,
-  );
+  // Premium has one "current" node per (book, track) group; free tier has
+  // exactly one system-wide active event (nextEventForFreeTier) — both are
+  // derived from the all-time completed set, not today's.
+  const nextStory: NextStory | null = isPremium
+    ? nextStoryAcrossBooks(lessons, allTimeCompletedLessonIds)
+    : nextEventForFreeTier(lessons, allTimeCompletedLessonIds);
 
   function handleContinueStory(story: NextStory) {
     setActiveTab("path");
@@ -412,6 +413,12 @@ function Dashboard({ uid }: { uid: string }) {
     return subscribeToLessonProgress(uid, today, setLessonProgress);
   }, [uid, today]);
 
+  useEffect(() => {
+    fetchAllCompletedLessonIds(uid)
+      .then(setAllTimeCompletedLessonIds)
+      .catch(() => setAllTimeCompletedLessonIds([]));
+  }, [uid]);
+
   const checkedInToday = streak?.lastCheckInDate === today;
   const apostleMoment = profile
     ? pickApostleMoment({
@@ -440,6 +447,12 @@ function Dashboard({ uid }: { uid: string }) {
 
   async function handleCompleteLesson(lesson: LessonDoc) {
     await completeLesson(uid, timeZone, lesson);
+    // Refetch the all-time set rather than optimistically appending
+    // lesson.id — completeLesson may have no-opped (limitReached), and the
+    // Path's gating must reflect what was actually recorded server-side.
+    fetchAllCompletedLessonIds(uid)
+      .then(setAllTimeCompletedLessonIds)
+      .catch(() => {});
   }
 
   async function getIdToken(): Promise<string> {
@@ -492,7 +505,7 @@ function Dashboard({ uid }: { uid: string }) {
           }`}
         >
           {isPremium
-            ? "You're Premium — 15 lessons and prayers a day, and the full library are unlocked."
+            ? "You're Premium — 3 stories and 15 prayers a day, and the full library, are unlocked."
             : "Payment received — your upgrade is confirming on the network. This can take a few minutes; this page will update on its own, no need to refresh."}
         </div>
       )}
@@ -549,15 +562,15 @@ function Dashboard({ uid }: { uid: string }) {
                 uid={uid}
                 timeZone={timeZone}
                 lessons={lessons}
-                dayIndex={dayIndex}
+                allTimeCompletedLessonIds={allTimeCompletedLessonIds}
                 completedLessonIds={lessonProgress?.completedLessonIds ?? []}
                 isPremium={isPremium}
-                todayActivityCount={todayActivityCount}
+                todayEventCount={todayEventCount}
+                todayPrayerCount={todayPrayerCount}
                 suppressUpgradeNag={justUpgraded && !isPremium}
                 focusRequest={pathFocusRequest}
                 onComplete={handleCompleteLesson}
                 onUpgrade={handleUpgrade}
-                getIdToken={getIdToken}
               />
             )}
             {activeTab === "armory" && <ArmoryTab isPremium={isPremium} getIdToken={getIdToken} />}

@@ -7,6 +7,7 @@ import {
   query,
   runTransaction,
   serverTimestamp,
+  where,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { dateKeyInTimeZone } from "@/lib/date";
@@ -14,7 +15,7 @@ import { computeStreakUpdate } from "@/lib/streak";
 import { CHECK_IN_XP, levelFromXp } from "@/lib/xp";
 import {
   COLLECTIONS,
-  dailyActivityLimit,
+  dailyEventLimit,
   type DailyLessonProgressDoc,
   type LessonDoc,
   type StreakDoc,
@@ -29,6 +30,28 @@ export async function fetchLessons(): Promise<LessonDoc[]> {
 
 function progressDocId(uid: string, date: string): string {
   return `${uid}_${date}`;
+}
+
+/**
+ * Every lesson `uid` has EVER completed, across all of their
+ * daily_lesson_progress docs (one per calendar day) — not just today's. The
+ * Path's gating (roadmapNodeStates, flattenPathEvents, nextEventForFreeTier
+ * — src/lib/roadmap.ts) needs this all-time set, not the day-scoped one
+ * subscribeToLessonProgress returns, since a lesson completed yesterday
+ * should still count as done today. Allowed by the existing
+ * daily_lesson_progress read rule (`resource.data.userId ==
+ * request.auth.uid`), which covers this query the same as a single-doc get.
+ */
+export async function fetchAllCompletedLessonIds(uid: string): Promise<string[]> {
+  const snap = await getDocs(
+    query(collection(db!, COLLECTIONS.dailyLessonProgress), where("userId", "==", uid)),
+  );
+  const ids = new Set<string>();
+  for (const docSnap of snap.docs) {
+    const progress = docSnap.data() as DailyLessonProgressDoc;
+    for (const id of progress.completedLessonIds) ids.add(id);
+  }
+  return [...ids];
 }
 
 export function subscribeToLessonProgress(
@@ -52,8 +75,8 @@ export interface CompleteLessonResult {
 
 /**
  * Records a lesson completion for `uid` "today" (in `timeZone`) and awards
- * its XP. Users are capped at dailyActivityLimit(tier) lessons-plus-prayers
- * per day, combined with the prayer journal's submissions (see
+ * its XP. Users are capped at dailyEventLimit(tier) lesson completions per
+ * day — a separate cap from the prayer journal's submissions (see
  * submitPrayer, src/lib/db/prayers.ts) — enforced here as a quick
  * client-side check for a clean result, but the real gate is the
  * daily_lesson_progress update rule in firestore.rules: if a client
@@ -86,13 +109,12 @@ export async function completeLesson(
       ? (progressSnap.data() as DailyLessonProgressDoc)
       : null;
     const completedLessonIds = prevProgress?.completedLessonIds ?? [];
-    const prayerCount = prevProgress?.prayerCount ?? 0;
     const user = userSnap.exists() ? (userSnap.data() as UserDoc) : undefined;
     const tier = user?.tier ?? "free";
     const prevXp = user?.xp ?? 0;
     const prevLevel = user?.level ?? 1;
 
-    if (completedLessonIds.length + prayerCount >= dailyActivityLimit(tier)) {
+    if (completedLessonIds.length >= dailyEventLimit(tier)) {
       return {
         limitReached: true,
         completedLessonIds,

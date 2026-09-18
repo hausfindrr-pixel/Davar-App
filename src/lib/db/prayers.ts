@@ -14,7 +14,7 @@ import { CHECK_IN_XP, levelFromXp } from "@/lib/xp";
 import {
   COLLECTIONS,
   PRAYER_XP_REWARD,
-  dailyActivityLimit,
+  dailyPrayerLimit,
   type DailyLessonProgressDoc,
   type PrayerDoc,
   type StreakDoc,
@@ -47,10 +47,11 @@ export interface SubmitPrayerResult {
  * does — same transaction shape as completeLesson in src/lib/db/lessons.ts:
  * the prayer write, a streak check-in (only once per day — a second
  * prayer the same day still saves, just doesn't re-award the streak XP),
- * and a check_ins record, all in one transaction. Prayers share the same
- * daily activity cap as lessons (dailyActivityLimit, src/types/firestore.ts)
- * via the same daily_lesson_progress doc — counted, not ID-tracked, since a
- * prayer doesn't need an "already done" check the way a lesson does.
+ * and a check_ins record, all in one transaction. Prayers have their own
+ * daily cap (dailyPrayerLimit, src/types/firestore.ts), tracked in the same
+ * daily_lesson_progress doc as lessons but counted separately — counted,
+ * not ID-tracked, since a prayer doesn't need an "already done" check the
+ * way a lesson does.
  */
 export async function submitPrayer(uid: string, timeZone: string, text: string): Promise<SubmitPrayerResult> {
   const trimmed = text.trim();
@@ -72,14 +73,13 @@ export async function submitPrayer(uid: string, timeZone: string, text: string):
     const prevProgress = progressSnap.exists()
       ? (progressSnap.data() as DailyLessonProgressDoc)
       : null;
-    const completedLessonIds = prevProgress?.completedLessonIds ?? [];
     const prayerCount = prevProgress?.prayerCount ?? 0;
     const user = userSnap.exists() ? (userSnap.data() as UserDoc) : undefined;
     const tier = user?.tier ?? "free";
     const prevXp = user?.xp ?? 0;
     const prevLevel = user?.level ?? 1;
 
-    if (completedLessonIds.length + prayerCount >= dailyActivityLimit(tier)) {
+    if (prayerCount >= dailyPrayerLimit(tier)) {
       return { limitReached: true, xpEarned: 0, newXp: prevXp, newLevel: prevLevel };
     }
 

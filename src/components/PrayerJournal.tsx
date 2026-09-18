@@ -2,15 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { submitPrayer, subscribeToPrayers } from "@/lib/db/prayers";
-import { dailyActivityLimit, type PrayerDoc } from "@/types/firestore";
+import { dailyPrayerLimit, type PrayerDoc } from "@/types/firestore";
 
 type PrayerJournalProps = {
   uid: string;
   timeZone: string;
   isPremium: boolean;
-  /** Lessons completed + prayers submitted today, combined — the same
-   * count The Path's lesson cap uses (see dailyActivityLimit). */
-  todayActivityCount: number;
+  /** Prayers submitted today — its own cap, separate from The Path's event
+   * completions (see dailyPrayerLimit). */
+  todayPrayerCount: number;
 };
 
 function formatPrayerDate(timestamp: PrayerDoc["createdAt"]): string {
@@ -22,10 +22,9 @@ function formatPrayerDate(timestamp: PrayerDoc["createdAt"]): string {
 /** A place to write a free-text prayer, alongside the guided ones in The
  * Path's lesson tracks. Submitting awards XP the same way completing a
  * lesson does (see submitPrayer, src/lib/db/prayers.ts) — same streak/
- * check-in mechanics, and shares the same daily activity cap as lessons
- * (dailyActivityLimit): 3/day free, 15/day premium, combined with lesson
- * completions. */
-export function PrayerJournal({ uid, timeZone, isPremium, todayActivityCount }: PrayerJournalProps) {
+ * check-in mechanics, but its own daily cap (dailyPrayerLimit): 3/day
+ * free, 15/day premium, separate from The Path's event-completion cap. */
+export function PrayerJournal({ uid, timeZone, isPremium, todayPrayerCount }: PrayerJournalProps) {
   const [draft, setDraft] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,8 +32,8 @@ export function PrayerJournal({ uid, timeZone, isPremium, todayActivityCount }: 
   const [prayers, setPrayers] = useState<PrayerDoc[]>([]);
   const [showPast, setShowPast] = useState(false);
 
-  const limit = dailyActivityLimit(isPremium ? "premium" : "free");
-  const atLimit = todayActivityCount >= limit;
+  const limit = dailyPrayerLimit(isPremium ? "premium" : "free");
+  const atLimit = todayPrayerCount >= limit;
 
   useEffect(() => {
     return subscribeToPrayers(uid, setPrayers);
@@ -49,7 +48,7 @@ export function PrayerJournal({ uid, timeZone, isPremium, todayActivityCount }: 
     try {
       const result = await submitPrayer(uid, timeZone, text);
       if (result.limitReached) {
-        setError(`You've used all ${limit} actions today across lessons and prayers.`);
+        setError(`You've written all ${limit} prayers for today.`);
         return;
       }
       setDraft("");
@@ -81,7 +80,7 @@ export function PrayerJournal({ uid, timeZone, isPremium, todayActivityCount }: 
         />
         {atLimit ? (
           <p className="text-xs text-stone">
-            You&apos;ve used all {limit} actions today across lessons and prayers.{" "}
+            You&apos;ve written all {limit} prayers for today.{" "}
             {isPremium ? "Come back tomorrow." : "Upgrade to Premium for 15 a day."}
           </p>
         ) : (

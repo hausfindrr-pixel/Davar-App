@@ -196,8 +196,8 @@ export interface PrayerDoc {
   id: string;
   text: string;
   /** "YYYY-MM-DD" in the user's timezone — lets firestore.rules locate
-   * that day's daily_lesson_progress doc to enforce the shared activity
-   * cap without a separate query (rules can't query/count documents). */
+   * that day's daily_lesson_progress doc to enforce the daily prayer cap
+   * without a separate query (rules can't query/count documents). */
   date: string;
   createdAt: Timestamp;
 }
@@ -205,14 +205,22 @@ export interface PrayerDoc {
 /**
  * daily_lesson_progress/{uid}_{date} — one doc per user per day, tracking
  * both which lessons they've completed and how many prayers they've
- * submitted. This is the server-side source of truth for the daily
- * activity cap (see firestore.rules and dailyActivityLimit below); it
- * exists specifically so the limit can't be bypassed by refreshing the
+ * submitted *that day*. This is the server-side source of truth for the
+ * daily caps (see firestore.rules, dailyEventLimit, dailyPrayerLimit
+ * below) — it exists so the limits can't be bypassed by refreshing the
  * page or clearing local state, since it lives in Firestore, not the
  * client. Lessons keep their own IDs (so a completed lesson can show
  * "Completed" rather than just counting toward a total); prayers only need
  * a count, since the prayer journal itself already lists each prayer's own
  * text/date via its own subcollection.
+ *
+ * This doc is per-*day*, not per-user-lifetime — `completedLessonIds` here
+ * only ever holds what was completed on this specific date. Whether a
+ * lesson has EVER been completed (which drives The Path's gating — see
+ * "The Path: completion-gated rotation" in the README) comes from
+ * aggregating `completedLessonIds` across every one of a user's
+ * daily_lesson_progress docs (fetchAllCompletedLessonIds,
+ * src/lib/db/lessons.ts), not from any single day's doc.
  */
 export interface DailyLessonProgressDoc {
   userId: string;
@@ -223,27 +231,27 @@ export interface DailyLessonProgressDoc {
 }
 
 /**
- * How many lessons a free-tier user can complete per day of their journey
- * before that day's batch is revealed in full — a reveal-pacing constant
- * for The Path (see visibleLessonsForFreeTier, src/lib/lessons.ts), not
- * the same thing as the daily completion cap below (they happen to share
- * a value, but a change to one shouldn't imply a change to the other).
+ * Daily caps, enforced by daily_lesson_progress's rules (see
+ * firestore.rules) and checked in completeLesson/submitPrayer
+ * (src/lib/db/lessons.ts, src/lib/db/prayers.ts). Event lessons (The
+ * Path) and prayers (the prayer journal) have separate caps — they used
+ * to share one combined number, but an event lesson and a prayer are
+ * different kinds of daily practice, so they're budgeted separately.
+ * Today's Verse/Devotional/Prayer have no completion action and aren't
+ * part of either count.
  */
-export const FREE_DAILY_LESSON_LIMIT = 3;
+export const FREE_DAILY_EVENT_LIMIT = 1;
+export const PREMIUM_DAILY_EVENT_LIMIT = 3;
 
-/**
- * The daily cap on lessons-completed-plus-prayers-submitted, combined,
- * enforced by daily_lesson_progress's rules (see firestore.rules) and
- * checked in completeLesson/submitPrayer (src/lib/db/lessons.ts,
- * src/lib/db/prayers.ts). Applies to The Path's lessons and the prayer
- * journal — Today's Verse/Devotional/Prayer have no completion action and
- * aren't part of this count.
- */
-export const FREE_DAILY_ACTIVITY_LIMIT = 3;
-export const PREMIUM_DAILY_ACTIVITY_LIMIT = 15;
+export function dailyEventLimit(tier: UserTier): number {
+  return tier === "premium" ? PREMIUM_DAILY_EVENT_LIMIT : FREE_DAILY_EVENT_LIMIT;
+}
 
-export function dailyActivityLimit(tier: UserTier): number {
-  return tier === "premium" ? PREMIUM_DAILY_ACTIVITY_LIMIT : FREE_DAILY_ACTIVITY_LIMIT;
+export const FREE_DAILY_PRAYER_LIMIT = 3;
+export const PREMIUM_DAILY_PRAYER_LIMIT = 15;
+
+export function dailyPrayerLimit(tier: UserTier): number {
+  return tier === "premium" ? PREMIUM_DAILY_PRAYER_LIMIT : FREE_DAILY_PRAYER_LIMIT;
 }
 
 export type AccountabilityLinkStatus = "pending" | "active" | "ended";

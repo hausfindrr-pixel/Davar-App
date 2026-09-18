@@ -151,34 +151,41 @@ linked:
 firebase deploy --only firestore:rules,storage
 ```
 
-### The daily activity cap: lessons + prayers, by tier
+### Daily caps: events and prayers, tracked separately
 
-Lesson completions and prayer-journal submissions share one daily cap,
-combined: `FREE_DAILY_ACTIVITY_LIMIT` (3) for free accounts,
-`PREMIUM_DAILY_ACTIVITY_LIMIT` (15) for premium — both in
-`src/types/firestore.ts`, via `dailyActivityLimit(tier)`. Premium used to
-be genuinely unlimited here; it's now a real (much higher) cap, mainly as
-a cost/abuse ceiling rather than a meaningful product restriction.
+Lesson completions (The Path's event cards) and prayer-journal submissions
+each have their own daily cap — they used to share one combined number, but
+an event lesson and a prayer are different kinds of daily practice, so
+they're budgeted separately now:
+
+- **Events:** `FREE_DAILY_EVENT_LIMIT` (1) / `PREMIUM_DAILY_EVENT_LIMIT`
+  (3), via `dailyEventLimit(tier)`.
+- **Prayers:** `FREE_DAILY_PRAYER_LIMIT` (3) / `PREMIUM_DAILY_PRAYER_LIMIT`
+  (15), via `dailyPrayerLimit(tier)`.
+
+Both live in `src/types/firestore.ts`.
 
 This is enforced in `firestore.rules`, not just in the UI:
 `completeLesson()` (`src/lib/db/lessons.ts`) and `submitPrayer()`
-(`src/lib/db/prayers.ts`) both check the limit client-side for a clean
-result, but the actual gate is the `daily_lesson_progress` doc's rules —
-one doc per user per day, holding both `completedLessonIds` (a lesson
-completion grows this by exactly 1) and `prayerCount` (a prayer submission
-grows this by exactly 1, `completedLessonIds` untouched) — either write is
-allowed only if `completedLessonIds.size() + prayerCount` was under the
-tier's limit *before* that write, so bypassing the client checks and
-writing directly to Firestore hits the same wall (the XP award and
-check-in write riding along in the same transaction get rejected with it).
-The `users/{uid}/prayers/{prayerId}` create rule enforces the same
-check independently (reading that same progress doc, or treating it as
-zero via `!exists()` for the very first action of a fresh day) — so a
-prayer can't be created without going through the cap just because the
-paired progress-doc write happens to live on a different document. `tier`
-itself is locked: the `users` rule only lets it be created as `"free"` and
-never lets a client change it afterward — the only way to grant `"premium"`
-is the Admin SDK write in the Plisio webhook (see "Payments" below).
+(`src/lib/db/prayers.ts`) both check their own limit client-side for a
+clean result, but the actual gate is the `daily_lesson_progress` doc's
+rules — one doc per user per day, holding both `completedLessonIds` (a
+lesson completion grows this by exactly 1) and `prayerCount` (a prayer
+submission grows this by exactly 1, `completedLessonIds` untouched) — a
+lesson-completion write is allowed only if `completedLessonIds.size()` was
+under the tier's *event* limit before that write, and a prayer-submission
+write only if `prayerCount` was under the tier's *prayer* limit — so
+bypassing the client checks and writing directly to Firestore hits the
+same wall (the XP award and check-in write riding along in the same
+transaction get rejected with it). The `users/{uid}/prayers/{prayerId}`
+create rule enforces the prayer check independently (reading that same
+progress doc's `prayerCount`, or treating it as zero via `!exists()` for
+the very first action of a fresh day) — so a prayer can't be created
+without going through its own cap just because the paired progress-doc
+write happens to live on a different document. `tier` itself is locked:
+the `users` rule only lets it be created as `"free"` and never lets a
+client change it afterward — the only way to grant `"premium"` is the
+Admin SDK write in the Plisio webhook (see "Payments" below).
 
 Completing a lesson or submitting a prayer also counts as that day's
 streak check-in (same `computeStreakUpdate` the manual "Check in today"
@@ -187,26 +194,40 @@ streak/plant visual tracks them directly instead of requiring a separate,
 unrelated tap.
 
 Today's Verse/Devotional/Prayer (see "Today: daily content" below) have no
-completion action and aren't part of this cap at all — it only covers The
-Path's lessons and the prayer journal.
-
-Free-tier accounts also only ever *see* `FREE_DAILY_LESSON_LIMIT` lessons
-per day of their journey (`visibleLessonsForFreeTier` in `src/lib/lessons.ts`,
-keyed off the user's account-creation date) — rather than the whole
-library with most of it shown as permanently "Locked". As of the book
-restructure below, that reveal is **round-robin across books** (one lesson
-per book, in canonical Bible order, repeating) rather than the flat seed
-order — so a free user's first few days span several books instead of
-working straight through whichever book happens to sort first. Premium
-accounts see the full library immediately, matching the "Full gamified
-lesson library" pricing copy.
+completion action and aren't part of either cap — they only cover The
+Path's event lessons and the prayer journal, respectively.
 
 Run `npm run test:rules` to check `firestore.rules` against a local
 Firestore emulator (`scripts/rules-test.mjs`, using
 `@firebase/rules-unit-testing`) — no network access to the real project or
-a service account needed. It covers the tier lock, the lesson cap itself
-(3rd allowed, 4th denied for free, allowed for premium), and cross-user
-isolation. Re-run it after touching `firestore.rules`.
+a service account needed. It covers the tier lock, both caps independently
+(event cap and prayer cap each checked at the free/premium boundary), and
+cross-user isolation. Re-run it after touching `firestore.rules`.
+
+### All-time completion tracking (`fetchAllCompletedLessonIds`)
+
+`daily_lesson_progress/{uid}_{date}` is per-*day* by design — its
+`completedLessonIds` only ever holds what was completed on that specific
+date, so the day's docId can reset the count cleanly at midnight. The Path's
+gating logic, though, needs to know whether a lesson has *ever* been
+completed, not just today — a lesson finished yesterday should still read
+as done today, not reappear as if new.
+
+That all-time set comes from `fetchAllCompletedLessonIds(uid)`
+(`src/lib/db/lessons.ts`): it queries `daily_lesson_progress` where
+`userId == uid` across every one of that user's day-docs, and unions their
+`completedLessonIds` arrays. It needs no new Firestore rule — the existing
+`daily_lesson_progress` read rule (`resource.data.userId ==
+request.auth.uid`) already covers this as a `list` query the same way it
+covers a single `get`. This also means there's no new writable "all-time
+completed" field for a malicious client to self-populate and fake
+progress — the set is always derived from the same per-day docs the caps
+above already validate. `src/app/page.tsx` fetches this once on mount and
+again after every `completeLesson()` call, storing it as
+`allTimeCompletedLessonIds` and passing it to `PathTab`/`PathEventList`
+and to `nextStoryAcrossBooks`/`nextEventForFreeTier` — everywhere gating
+used to read `lessonProgress.completedLessonIds` (today-only) now reads
+this instead.
 
 ### Seeding lessons and daily content
 
@@ -226,8 +247,8 @@ credential:
 Until those have been run against your actual project, both collections
 have zero documents in them — confirmed directly against production more
 than once in this app's history for `lessons` — so `fetchLessons()`
-(`src/lib/db/lessons.ts`), the free-tier reveal logic
-(`visibleLessonsForFreeTier`, `src/lib/lessons.ts`), and
+(`src/lib/db/lessons.ts`), the free-tier gating that consumes it
+(`nextEventForFreeTier`, `src/lib/roadmap.ts`), and
 `fetchDailyVerses`/`fetchDailyDevotionals`/`fetchDailyPrayers`
 (`src/lib/db/dailyContent.ts`) all work correctly, there's simply nothing
 for them to return yet. **`lessonBook` specifically**: if `lessons` was
@@ -257,7 +278,7 @@ scroll. Each tab is its own component under `src/components/tabs/`:
 | Tab | Component | Access |
 | --- | --- | --- |
 | Today | `TodayTab.tsx` | Everyone — John's mascot greeting, a "Continue Your Story" teaser into The Path, Today's Verse/Devotional/Prayer (see below), streak, XP, level, the apostle companion message, check-in |
-| The Path | `PathTab.tsx` | Free: 3/day combined lesson+prayer cap, lessons revealed round-robin across books. Premium: every book, every lesson, in order, 15/day combined cap — see "The daily activity cap" above |
+| The Path | `PathTab.tsx` | Free: exactly one active event at a time, completion-gated (1/day cap); 3 prayers/day. Premium: the whole library, sequentially gated per book (3 events/day, 15 prayers/day) — see "Daily caps" and "The Path: strict visibility and completion-gated rotation" above/below |
 | The Armory | `ArmoryTab.tsx` | Free: teaser (see below). Premium: full access |
 | Peter's Watch | `WatchTab.tsx` | Free: teaser. Premium: full access |
 | The Word | `WordTab.tsx` | Everyone, never gated |
@@ -267,17 +288,27 @@ scroll. Each tab is its own component under `src/components/tabs/`:
 
 A "Continue Your Story" card (`NextStoryTeaser.tsx`,
 `src/components/NextStoryTeaser.tsx`) points at whatever card is
-"current" for this user right now — `nextStoryAcrossBooks`
-(`src/lib/roadmap.ts`) scans `(book, track)` groups in canonical order and
-returns the first one with a `current` story (see "The Path: an
-event-first card feed" below). This is **not** a fourth daily-rotation
-pool: there's no new collection, no XP awarded here, nothing completable
-from Today itself. It's a pointer into the user's own progress in The
-Path, which is why it changes the moment a story is completed rather than
-once a day — several `(book, track)` groups can each have their own
-"current" card at once (free tier's reveal is round-robin across books),
-so this shows whichever comes first in the feed's own top-to-bottom order,
-matching what a user would see if they opened The Path themselves.
+"current" for this user right now — tier-aware, computed in
+`src/app/page.tsx`:
+
+- **Premium** uses `nextStoryAcrossBooks` (`src/lib/roadmap.ts`), which
+  scans `(book, track)` groups in canonical order and returns the first one
+  with a `current` story — several groups can each have their own current
+  card at once (every book's Lessons/Prayer/Devotion progresses
+  independently), so this shows whichever comes first in the feed's own
+  top-to-bottom order, matching what a user would see if they opened The
+  Path themselves.
+- **Free tier** uses `nextEventForFreeTier` (`src/lib/roadmap.ts`) instead —
+  there's exactly one active event system-wide for free accounts (see
+  "strict visibility and completion-gated rotation" below), so the teaser
+  and The Path's own single visible card always point at the same story.
+
+Both are derived from `allTimeCompletedLessonIds` (see "All-time completion
+tracking" above), not from today's progress doc alone. This is **not** a
+fourth daily-rotation pool: there's no new collection, no XP awarded here,
+nothing completable from Today itself. It's a pointer into the user's own
+progress in The Path, which is why it changes the moment a story is
+completed rather than once a day.
 
 Tapping "Continue" switches to The Path tab and jumps straight to that
 story's detail panel — `Dashboard` (`src/app/page.tsx`) builds a
@@ -357,30 +388,35 @@ container.
   (`"scripture" | "prayer" | "devotional"`) used for the content-type label
   and color — no schema change for any of this, it's a presentation layer
   over fields that already existed.
-- **Ordering:** `flattenPathEvents` (`src/lib/roadmap.ts`) produces the
-  feed's order — canonical book order, then `CONTENT_TYPE_ORDER`
-  (Lessons/Prayer/Devotion) within a book, then each group's own `order` —
-  and computes each card's state via `roadmapNodeStates`, one of:
+- **Ordering (premium):** `flattenPathEvents` (`src/lib/roadmap.ts`)
+  produces the feed's order — canonical book order, then
+  `CONTENT_TYPE_ORDER` (Lessons/Prayer/Devotion) within a book, then each
+  group's own `order` — and computes each card's state via
+  `roadmapNodeStates`, one of:
   - **`completed`** — checkmark badge on the image, green "Completed" chip.
-  - **`current`** — the first not-yet-completed *revealed* story in its
-    `(book, track)` group: a colored "UP NEXT" tag, an accent border/ring,
-    and a "Continue" pill. Several `(book, track)` groups can each have
-    their own current card at once — every book's Lessons, Prayer, and
-    Devotion progress independently.
-  - **`sequenceLocked`** — revealed, but an earlier story in the same
-    `(book, track)` group isn't done yet. Names the specific story
-    blocking it ("Complete 'Noah and the Flood' first") — there's room for
-    that on a full card, unlike the small roadmap nodes this replaced.
-    Applies to both tiers: nobody skips ahead within a group.
-  - **`paywallLocked`** — beyond the free tier's reveal cursor
-    (`visibleLessonsForFreeTier`'s round-robin-across-books reveal, still
-    unchanged) — "Unlock with Premium" on the card; one `UnlockCard`
-    ("Unlock the full Path") appears once at the bottom of the whole feed
-    if any card is paywall-locked, since there's no per-book container to
-    attach it to anymore.
+  - **`current`** — the first not-yet-completed story in its `(book,
+    track)` group: a colored "UP NEXT" tag, an accent border/ring, and a
+    "Continue" pill. Several `(book, track)` groups can each have their own
+    current card at once — every book's Lessons, Prayer, and Devotion
+    progress independently.
+  - **`sequenceLocked`** — an earlier story in the same `(book, track)`
+    group isn't done yet. Names the specific story blocking it ("Complete
+    'Noah and the Flood' first") — there's room for that on a full card,
+    unlike the small roadmap nodes this replaced. Nobody skips ahead within
+    a group.
   - Only `completed`/`current` cards are tappable; tapping swaps the whole
     feed for that story's detail — `LessonCard.tsx`, unchanged, with a
     "back to path" button — rather than expanding in place.
+- **Strict per-tier visibility (free tier):** free accounts never see
+  `flattenPathEvents`'s full list at all — `PathEventList` renders exactly
+  one card, from `nextEventForFreeTier` (see "strict visibility and
+  completion-gated rotation" below). There's no locked/dimmed card for
+  anything else in the library; the rest simply isn't rendered. This
+  replaced an earlier design where free tier saw the whole feed with most
+  of it shown as a `paywallLocked` card ("Unlock with Premium") — that
+  state (and a bottom-of-feed `UnlockCard`) no longer exists;
+  `RoadmapNodeState` is now just `"completed" | "current" |
+  "sequenceLocked"`.
 - **Content-type color identity:** `CONTENT_TYPE_META`
   (`src/lib/contentType.ts`) holds each track's label, icon, and literal
   Tailwind class strings (image gradient, accent border/ring, button,
@@ -396,10 +432,54 @@ container.
   that track (see "event-based stories" below), so every Prayer/Devotion
   card in the feed today is a preview of the color system rather than
   something to complete yet.
-- **`nextStoryAcrossBooks`** (`src/lib/roadmap.ts`, the Today teaser's
-  source — see "Today: story teaser" above) scans the same `(book, track)`
-  groups in the same order `flattenPathEvents` does, so the teaser always
-  points at a card that's genuinely first in the feed.
+
+### The Path: strict visibility and completion-gated rotation
+
+Free and premium tiers now work fundamentally differently, not just at
+different caps:
+
+- **Premium** sees the whole library, unlocked and browsable, from day
+  one — matching the "Full gamified lesson library" pricing copy. Each
+  `(book, track)` group progresses independently via
+  `roadmapNodeStates`/`flattenPathEvents`, so several stories across
+  different books/tracks can each be "current" at once. Only the daily
+  *completions* ceiling applies (`PREMIUM_DAILY_EVENT_LIMIT`, 3/day) — this
+  is a cost/abuse ceiling, not a meaningful product restriction.
+- **Free tier** collapses to exactly **one active event, system-wide** —
+  not per-book, not per-track. `nextEventForFreeTier`
+  (`src/lib/roadmap.ts`) scans the whole library in canonical order (book,
+  then `CONTENT_TYPE_ORDER`, then each group's own `order` — the same
+  ordering `flattenPathEvents` uses) and returns the first lesson not yet
+  in `allTimeCompletedLessonIds`. That's the only card free tier's Path
+  ever renders.
+- **Completion-gated, not date-based.** There's no persisted
+  rotation-position field anywhere — "today's active event" is always
+  derived functionally from the all-time completed set (see "All-time
+  completion tracking" above). The moment the active event is completed,
+  the very next call to `nextEventForFreeTier` returns the next lesson in
+  the library — but `FREE_DAILY_EVENT_LIMIT` (1/day) still blocks
+  completing a second one the same day, so in practice a free user advances
+  exactly one event per day they complete something, and a skipped day
+  just leaves the same event waiting rather than advancing or expiring.
+  This replaced an earlier date-based reveal
+  (`visibleLessonsForFreeTier`/`FREE_DAILY_LESSON_LIMIT`, both removed —
+  `src/lib/lessons.ts` no longer exists) that unlocked lessons on a
+  calendar schedule regardless of whether the user had actually done
+  anything.
+- Once every lesson in the library has been completed, `PathEventList`
+  shows a "You've completed every story in the library" message instead of
+  a card — the library hasn't been designed to cycle back to the start yet.
+
+### Upgrade prompt: hitting the free-tier daily cap
+
+When a free-tier user completes their one event for the day,
+`PathEventList` shows an enticing nudge instead of a plain locked state —
+"You've completed today's story. Want more? Unlock 3 lessons a day with
+Premium," with the same Monthly/Yearly checkout buttons (`handleUpgrade`,
+Plisio) used everywhere else upgrade is offered. Premium sees the
+equivalent state worded as a plain "come back tomorrow," with no upsell
+(they're already subscribed). `suppressUpgradeNag` still hides this right
+after checkout, while the upgrade is confirming on the network.
 
 ### The Path: event-based stories
 
@@ -688,8 +768,9 @@ lives here now instead of the main header.
 - **Your Plan.** A status card (`PlanCard`, inside `ProfilePage.tsx`) driven
   entirely by the existing `users/{uid}` doc — no new Firestore reads.
   - **Free**: a "Free" badge, a one-line summary of what Premium adds
-    (The Armory, Peter's Watch, 15 lessons and prayers a day instead of
-    3 — see "The daily activity cap" above), and the same `UnlockCard`
+    (The Armory, Peter's Watch, the full library with 3 lessons and 15
+    prayers a day instead of 1 and 3 — see "Daily caps" above), and the
+    same `UnlockCard`
     component used on The Armory/Peter's Watch's paywalls — not a
     separate, near-duplicate upgrade button, the literal same component
     and checkout flow.
@@ -1106,8 +1187,10 @@ src/
                   (see "Navigation" above)
   lib/            firebase.ts (client SDK init, incl. Storage), firebase-admin.ts
                   (server-only Admin SDK init), auth-context.tsx, streak.ts,
-                  xp.ts, date.ts (pure logic), lessons.ts (free-tier reveal),
-                  roadmap.ts (per-track node states, nextStoryAcrossBooks),
+                  xp.ts, date.ts (pure logic),
+                  roadmap.ts (per-(book,track) node states, nextStoryAcrossBooks,
+                  nextEventForFreeTier — see "strict visibility and
+                  completion-gated rotation" above),
                   contentType.ts (Lessons/Prayer/Devotion tab metadata —
                   see "content-type tabs and color identity" above),
                   dailyContent.ts (pickForDate rotation — see "Today: daily

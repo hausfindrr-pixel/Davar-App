@@ -4,11 +4,9 @@ import { useState } from "react";
 import { ArrowLeftIcon } from "@/components/icons";
 import { LessonCard } from "@/components/LessonCard";
 import { PathEventCard } from "@/components/PathEventCard";
-import { UnlockCard } from "@/components/PremiumGate";
-import { visibleLessonsForFreeTier } from "@/lib/lessons";
 import type { PlanId } from "@/lib/plisio/plans";
-import { flattenPathEvents } from "@/lib/roadmap";
-import { dailyActivityLimit, type LessonDoc } from "@/types/firestore";
+import { flattenPathEvents, nextEventForFreeTier } from "@/lib/roadmap";
+import { dailyEventLimit, type LessonDoc } from "@/types/firestore";
 
 /** A request from outside (the Today tab's "Continue Your Story" teaser)
  * to jump straight to a specific event's detail. `nonce` only exists so
@@ -18,47 +16,49 @@ export type PathFocusRequest = { lessonId: string; nonce: number };
 
 type PathEventListProps = {
   lessons: LessonDoc[];
-  /** Days since signup — drives how much of the free-tier reveal has
-   * unlocked so far. Ignored for premium, which always sees everything. */
-  dayIndex: number;
+  /** Every lesson `uid` has EVER completed, across all days — see
+   * fetchAllCompletedLessonIds (src/lib/db/lessons.ts). Drives gating for
+   * both tiers; unlike `completedLessonIds` below, this never resets. */
+  allTimeCompletedLessonIds: string[];
+  /** Lessons completed strictly *today* — only used to know whether the
+   * currently open lesson has already been done today for its Complete
+   * button state; gating itself uses allTimeCompletedLessonIds. */
   completedLessonIds: string[];
   isPremium: boolean;
-  /** Lessons completed + prayers submitted today, combined — see
-   * dailyActivityLimit (src/types/firestore.ts). */
-  todayActivityCount: number;
+  /** Event lessons completed today — see dailyEventLimit
+   * (src/types/firestore.ts). Separate from the prayer journal's own cap. */
+  todayEventCount: number;
   /** Hide the "upgrade to unlock more" nag — e.g. right after checkout, while the upgrade is still confirming. */
   suppressUpgradeNag?: boolean;
   focusRequest?: PathFocusRequest | null;
   onComplete: (lesson: LessonDoc) => Promise<void>;
   onUpgrade: (plan: PlanId) => Promise<void>;
-  getIdToken: () => Promise<string>;
 };
 
 /** The Path's story library as a flat, event-first card feed — the event
  * ("The Creation of the World") is each card's heading, with its Bible
- * book as a small subheading, not the other way around. One card per
- * event (today, one lesson each), ordered canonically (book, then
- * CONTENT_TYPE_ORDER, then each group's own `order` — flattenPathEvents,
- * src/lib/roadmap.ts), replacing the earlier nested book-accordion +
- * roadmap layout. Locked/current/completed state per card comes from the
- * same per-(book,track) sequential progression as before
- * (roadmapNodeStates) — this only changes how it's laid out, not the
- * underlying gating: users still can't skip ahead, free tier still can't
- * reveal a whole book at once, and premium still shares the higher daily
- * cap rather than being truly unlimited. Tapping a completed/current card
- * swaps the feed for that story's detail (LessonCard, unchanged) with a
- * "back to path" button. */
+ * book as a small subheading, not the other way around. Visibility is
+ * strict per tier, not just locked states: PREMIUM sees the full flattened
+ * library (flattenPathEvents), sequentially gated per (book, track) group
+ * exactly as before. FREE sees exactly one card — the single system-wide
+ * active event (nextEventForFreeTier) — and nothing else is rendered at
+ * all, not even dimmed/locked. That one event is completion-gated, not
+ * date-based: it advances to the next lesson in the library the moment
+ * it's completed (still capped at dailyEventLimit's 1/day, so an engaged
+ * free user advances exactly one event per day they complete something;
+ * skipping a day just leaves the same event waiting). Tapping a
+ * completed/current card swaps the feed for that story's detail
+ * (LessonCard, unchanged) with a "back to path" button. */
 export function PathEventList({
   lessons,
-  dayIndex,
+  allTimeCompletedLessonIds,
   completedLessonIds,
   isPremium,
-  todayActivityCount,
+  todayEventCount,
   suppressUpgradeNag = false,
   focusRequest = null,
   onComplete,
   onUpgrade,
-  getIdToken,
 }: PathEventListProps) {
   const [openLessonId, setOpenLessonId] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -72,15 +72,16 @@ export function PathEventList({
   // extra, avoidable render.
   const [handledFocusNonce, setHandledFocusNonce] = useState<number | null>(null);
 
-  const limit = dailyActivityLimit(isPremium ? "premium" : "free");
-  const atLimit = todayActivityCount >= limit;
+  const limit = dailyEventLimit(isPremium ? "premium" : "free");
+  const atLimit = todayEventCount >= limit;
 
-  const revealedIds = isPremium
-    ? null
-    : new Set(visibleLessonsForFreeTier(lessons, dayIndex).map((lesson) => lesson.id));
-
-  const events = flattenPathEvents(lessons, completedLessonIds, revealedIds);
-  const hasPaywallLocked = events.some((event) => event.state === "paywallLocked");
+  const events = isPremium
+    ? flattenPathEvents(lessons, allTimeCompletedLessonIds)
+    : (() => {
+        const next = nextEventForFreeTier(lessons, allTimeCompletedLessonIds);
+        return next ? [next] : [];
+      })();
+  const libraryComplete = !isPremium && events.length === 0 && lessons.length > 0;
 
   let effectiveOpenLessonId = openLessonId;
   if (focusRequest && focusRequest.nonce !== handledFocusNonce) {
@@ -145,38 +146,39 @@ export function PathEventList({
       <div className="flex items-center justify-between px-1">
         <h2 className="text-sm font-medium text-ink">The Path</h2>
         <span className="text-xs text-stone">
-          {Math.min(todayActivityCount, limit)} of {limit} today
+          {Math.min(todayEventCount, limit)} of {limit} today
         </span>
       </div>
 
-      <div className="flex flex-col gap-4">
-        {events.map((event) => (
-          <PathEventCard
-            key={event.lesson.id}
-            event={event}
-            onSelect={(selected) => setOpenLessonId(selected.lesson.id)}
-          />
-        ))}
-      </div>
-
-      {hasPaywallLocked && (
-        <UnlockCard
-          title="Unlock the full Path"
-          description="Get every story in every book, in order, from Genesis to Revelation."
-          getIdToken={getIdToken}
-        />
+      {libraryComplete ? (
+        <div className="rounded-2xl bg-sage-50 border border-sage-200 p-5 text-center">
+          <p className="text-sm text-ink">You&apos;ve completed every story in the library.</p>
+          <p className="text-xs text-stone mt-1">More is on the way — check back soon.</p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-4">
+          {events.map((event) => (
+            <PathEventCard
+              key={event.lesson.id}
+              event={event}
+              onSelect={(selected) => setOpenLessonId(selected.lesson.id)}
+            />
+          ))}
+        </div>
       )}
 
       {atLimit && !suppressUpgradeNag && (
         <div className="rounded-2xl bg-clay-50 border border-clay-200 p-4 flex flex-col items-center gap-3 text-center">
           <div>
             <p className="text-sm text-ink">
-              You&apos;ve used all {limit} actions today across lessons and prayers.
+              {isPremium
+                ? `You've completed all ${limit} stories for today.`
+                : "You've completed today's story."}
             </p>
             <p className="text-xs text-stone mt-1">
               {isPremium
-                ? "Come back tomorrow for another 15."
-                : "Come back tomorrow, or upgrade to Premium for 15 a day."}
+                ? "Come back tomorrow for 3 more."
+                : "Want more? Unlock 3 lessons a day with Premium."}
             </p>
           </div>
           {!isPremium && (
