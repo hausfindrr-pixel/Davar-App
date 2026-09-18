@@ -5,11 +5,16 @@ import { ArrowLeftIcon } from "@/components/icons";
 import { LessonCard } from "@/components/LessonCard";
 import { UnlockCard } from "@/components/PremiumGate";
 import { RoadmapPath } from "@/components/RoadmapPath";
-import { BIBLE_BOOKS } from "@/lib/bible";
 import { visibleLessonsForFreeTier } from "@/lib/lessons";
 import type { PlanId } from "@/lib/plisio/plans";
-import { roadmapNodeStates } from "@/lib/roadmap";
+import { groupLessonsByBook, roadmapNodeStates } from "@/lib/roadmap";
 import { dailyActivityLimit, type LessonDoc } from "@/types/firestore";
+
+/** A request from outside (the Today tab's "Continue Your Story" teaser)
+ * to jump straight to a specific book/story. `nonce` only exists so two
+ * requests for the same story in a row still re-trigger the effect below
+ * (object identity, not value equality, drives it). */
+export type PathFocusRequest = { book: string; lessonId: string; nonce: number };
 
 type PathBookSectionsProps = {
   lessons: LessonDoc[];
@@ -23,6 +28,7 @@ type PathBookSectionsProps = {
   todayActivityCount: number;
   /** Hide the "upgrade to unlock more" nag — e.g. right after checkout, while the upgrade is still confirming. */
   suppressUpgradeNag?: boolean;
+  focusRequest?: PathFocusRequest | null;
   onComplete: (lesson: LessonDoc) => Promise<void>;
   onUpgrade: (plan: PlanId) => Promise<void>;
   getIdToken: () => Promise<string>;
@@ -47,6 +53,7 @@ export function PathBookSections({
   isPremium,
   todayActivityCount,
   suppressUpgradeNag = false,
+  focusRequest = null,
   onComplete,
   onUpgrade,
   getIdToken,
@@ -56,6 +63,13 @@ export function PathBookSections({
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [upgradingPlan, setUpgradingPlan] = useState<PlanId | null>(null);
   const [upgradeError, setUpgradeError] = useState<string | null>(null);
+  // Tracks which focusRequest (by nonce) has already been applied, so a
+  // fresh "Continue Your Story" tap from Today can be told apart from a
+  // stale prop on re-render. Adjusted during render (React's documented
+  // pattern for "reset state when a prop changes"), not in an effect —
+  // an effect here would setState after the first paint, causing an
+  // extra, avoidable render.
+  const [handledFocusNonce, setHandledFocusNonce] = useState<number | null>(null);
 
   const limit = dailyActivityLimit(isPremium ? "premium" : "free");
   const atLimit = todayActivityCount >= limit;
@@ -64,17 +78,18 @@ export function PathBookSections({
     ? null
     : new Set(visibleLessonsForFreeTier(lessons, dayIndex).map((lesson) => lesson.id));
 
-  const byBook = new Map<string, LessonDoc[]>();
-  for (const lesson of lessons) {
-    const list = byBook.get(lesson.lessonBook) ?? [];
-    list.push(lesson);
-    byBook.set(lesson.lessonBook, list);
+  const { bookNames, byBook } = groupLessonsByBook(lessons);
+
+  let effectiveOpenBook = openBook;
+  let effectiveOpenLessonId = openLessonId;
+  if (focusRequest && focusRequest.nonce !== handledFocusNonce) {
+    effectiveOpenBook = focusRequest.book;
+    effectiveOpenLessonId = focusRequest.lessonId;
+    setHandledFocusNonce(focusRequest.nonce);
+    setOpenBook(focusRequest.book);
+    setOpenLessonId(focusRequest.lessonId);
   }
-  for (const list of byBook.values()) {
-    list.sort((a, b) => a.order - b.order);
-  }
-  const bookNames = BIBLE_BOOKS.map((book) => book.name).filter((name) => byBook.has(name));
-  const openLesson = lessons.find((lesson) => lesson.id === openLessonId) ?? null;
+  const openLesson = lessons.find((lesson) => lesson.id === effectiveOpenLessonId) ?? null;
 
   function selectBook(name: string) {
     setOpenBook(openBook === name ? null : name);
@@ -124,7 +139,7 @@ export function PathBookSections({
           const hasPaywallLocked = bookLessons.some(
             (lesson) => revealedIds !== null && !revealedIds.has(lesson.id),
           );
-          const isOpen = openBook === name;
+          const isOpen = effectiveOpenBook === name;
           const states = roadmapNodeStates(bookLessons, completedLessonIds, revealedIds);
           const showingDetail = isOpen && openLesson && bookLessons.some((l) => l.id === openLesson.id);
 

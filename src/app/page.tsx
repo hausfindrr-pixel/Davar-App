@@ -19,13 +19,16 @@ import { WordTab } from "@/components/tabs/WordTab";
 import { pickApostleMoment } from "@/lib/apostle-moment";
 import { APOSTLES, pickApostleMessage, type ApostleId } from "@/lib/apostles";
 import { useAuth } from "@/lib/auth-context";
+import type { PathFocusRequest } from "@/components/PathBookSections";
 import { fetchDailyDevotionals, fetchDailyPrayers, fetchDailyVerses } from "@/lib/db/dailyContent";
 import { completeLesson, fetchLessons, subscribeToLessonProgress } from "@/lib/db/lessons";
 import { checkIn, subscribeToStreak } from "@/lib/db/streaks";
 import { subscribeToUser } from "@/lib/db/users";
 import { dateKeyInTimeZone, daysBetweenKeys } from "@/lib/date";
 import { pickForDate } from "@/lib/dailyContent";
+import { visibleLessonsForFreeTier } from "@/lib/lessons";
 import { daysUntilExpiry, shouldShowRenewalReminder } from "@/lib/premium";
+import { nextStoryAcrossBooks, type NextStory } from "@/lib/roadmap";
 import { startCheckout } from "@/lib/plisio/checkout";
 import type { PlanId } from "@/lib/plisio/plans";
 import type {
@@ -344,6 +347,7 @@ function Dashboard({ uid }: { uid: string }) {
   const [dailyPrayers, setDailyPrayers] = useState<DailyPrayerDoc[]>([]);
   const [checkingIn, setCheckingIn] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("today");
+  const [pathFocusRequest, setPathFocusRequest] = useState<PathFocusRequest | null>(null);
   const [showProfile, setShowProfile] = useState(false);
   const [renewing, setRenewing] = useState(false);
   const [renewError, setRenewError] = useState<string | null>(null);
@@ -367,6 +371,21 @@ function Dashboard({ uid }: { uid: string }) {
   // Prayer have no completion action, so they're not part of this count.
   const todayActivityCount =
     (lessonProgress?.completedLessonIds.length ?? 0) + (lessonProgress?.prayerCount ?? 0);
+  const revealedLessonIds = isPremium
+    ? null
+    : new Set(visibleLessonsForFreeTier(lessons, dayIndex).map((lesson) => lesson.id));
+  // A pointer into The Path's own roadmap, not a separate rotation pool —
+  // see NextStoryTeaser and the "Today: story teaser" README section.
+  const nextStory = nextStoryAcrossBooks(
+    lessons,
+    lessonProgress?.completedLessonIds ?? [],
+    revealedLessonIds,
+  );
+
+  function handleContinueStory(story: NextStory) {
+    setActiveTab("path");
+    setPathFocusRequest({ book: story.book, lessonId: story.lesson.id, nonce: Date.now() });
+  }
 
   useEffect(() => {
     const unsubStreak = subscribeToStreak(uid, setStreak);
@@ -518,6 +537,8 @@ function Dashboard({ uid }: { uid: string }) {
                 onCheckIn={handleCheckIn}
                 apostleMoment={apostleMoment}
                 mascotMessage={mascotMessage}
+                nextStory={nextStory}
+                onContinueStory={handleContinueStory}
                 dailyVerse={dailyVerse}
                 dailyDevotional={dailyDevotional}
                 dailyPrayer={dailyPrayer}
@@ -533,6 +554,7 @@ function Dashboard({ uid }: { uid: string }) {
                 isPremium={isPremium}
                 todayActivityCount={todayActivityCount}
                 suppressUpgradeNag={justUpgraded && !isPremium}
+                focusRequest={pathFocusRequest}
                 onComplete={handleCompleteLesson}
                 onUpgrade={handleUpgrade}
                 getIdToken={getIdToken}

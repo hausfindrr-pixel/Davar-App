@@ -256,12 +256,40 @@ scroll. Each tab is its own component under `src/components/tabs/`:
 
 | Tab | Component | Access |
 | --- | --- | --- |
-| Today | `TodayTab.tsx` | Everyone — Today's Verse/Devotional/Prayer (see below), streak, XP, level, the apostle companion message, check-in |
+| Today | `TodayTab.tsx` | Everyone — John's mascot greeting, a "Continue Your Story" teaser into The Path, Today's Verse/Devotional/Prayer (see below), streak, XP, level, the apostle companion message, check-in |
 | The Path | `PathTab.tsx` | Free: 3/day combined lesson+prayer cap, lessons revealed round-robin across books. Premium: every book, every lesson, in order, 15/day combined cap — see "The daily activity cap" above |
 | The Armory | `ArmoryTab.tsx` | Free: teaser (see below). Premium: full access |
 | Peter's Watch | `WatchTab.tsx` | Free: teaser. Premium: full access |
 | The Word | `WordTab.tsx` | Everyone, never gated |
 | Disciples | `DisciplesTab.tsx` | Everyone — a "Coming soon" placeholder, no functionality yet |
+
+### Today: story teaser
+
+A "Continue Your Story" card (`NextStoryTeaser.tsx`,
+`src/components/NextStoryTeaser.tsx`) points at whatever roadmap node is
+"current" for this user right now — `nextStoryAcrossBooks`
+(`src/lib/roadmap.ts`) scans books in canonical order and returns the
+first one with a `current` node (see "The Path: organized by book, as a
+roadmap" below). This is **not** a fourth daily-rotation pool: there's no
+new collection, no XP awarded here, nothing completable from Today itself.
+It's a pointer into the user's own progress in The Path, which is why it
+changes the moment a story is completed rather than once a day — several
+books can each have their own "current" node at once (free tier's reveal
+is round-robin across books), so this shows whichever comes first in the
+roadmap's own top-to-bottom order, matching what a user would see if they
+opened The Path themselves.
+
+Tapping "Continue" switches to The Path tab and jumps straight to that
+story's detail panel — `Dashboard` (`src/app/page.tsx`) builds a
+`PathFocusRequest` (book, lesson ID, and a `nonce` so re-tapping the same
+story still re-triggers it) and passes it down through `PathTab` to
+`PathBookSections`, which opens that book and lesson. This uses React's
+adjust-state-during-render pattern (a guarded `setState` call in the
+render body, not inside a `useEffect`) rather than an effect, specifically
+because this project's lint config (`react-hooks/set-state-in-effect`)
+flags `setState` synchronously inside effects as an avoidable extra
+render — adjusting during render lets the same pass produce the correct
+output immediately.
 
 ### Today: daily content
 
@@ -1056,7 +1084,7 @@ src/
                   api/bible (route handlers — the last proxies bible-api.com)
   components/     UI components (StreakVisual, PlantIcon, PathBookSections,
                   RoadmapPath, LessonCard, MascotHero, DailyContentBackdrop,
-                  PricingSection, AuthForm, ApostleAvatar,
+                  NextStoryTeaser, PricingSection, AuthForm, ApostleAvatar,
                   ApostleMessageCard, BottomTabBar, PremiumGate (UnlockCard
                   + blurredPreviewClass),
                   ProfileButton, ProfilePage, icons.tsx — shared line icons)

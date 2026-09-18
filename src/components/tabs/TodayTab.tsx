@@ -1,8 +1,10 @@
 import { ApostleMessageCard } from "@/components/ApostleMessageCard";
 import { DailyContentBackdrop } from "@/components/DailyContentBackdrop";
 import { MascotHero } from "@/components/MascotHero";
+import { NextStoryTeaser } from "@/components/NextStoryTeaser";
 import { StreakVisual } from "@/components/StreakVisual";
 import type { ApostleMoment } from "@/lib/apostle-moment";
+import type { NextStory } from "@/lib/roadmap";
 import type { DailyDevotionalDoc, DailyPrayerDoc, DailyVerseDoc } from "@/types/firestore";
 
 type TodayTabProps = {
@@ -15,17 +17,22 @@ type TodayTabProps = {
   onCheckIn: () => void;
   apostleMoment: ApostleMoment | null;
   mascotMessage: string;
+  nextStory: NextStory | null;
+  onContinueStory: (story: NextStory) => void;
   dailyVerse: DailyVerseDoc | null;
   dailyDevotional: DailyDevotionalDoc | null;
   dailyPrayer: DailyPrayerDoc | null;
 };
 
-/** Today — John's always-on greeting up top (MascotHero), the app's daily
- * content (verse, devotional, guided prayer, rotating one pick per
- * calendar date — see src/lib/dailyContent.ts), Peter/Matthew/Thomas'
- * situational nudges when one applies (see pickApostleMoment), and streak/
- * XP/level. The Path (a separate tab) holds the structured, book-organized
- * lesson library instead — nothing here repeats there, and vice versa. */
+/** Today — John's always-on greeting up top (MascotHero), a teaser
+ * pointing at whatever story is next in The Path's roadmap
+ * (NextStoryTeaser — not a separate pool, just a pointer into the user's
+ * own progress there), the app's daily content (verse, devotional, guided
+ * prayer, rotating one pick per calendar date — see
+ * src/lib/dailyContent.ts), Peter/Matthew/Thomas' situational nudges when
+ * one applies (see pickApostleMoment), and streak/XP/level. The Path (a
+ * separate tab) holds the structured, book-organized lesson library
+ * instead — nothing here repeats there, and vice versa. */
 export function TodayTab({
   currentCount,
   longestCount,
@@ -36,6 +43,8 @@ export function TodayTab({
   onCheckIn,
   apostleMoment,
   mascotMessage,
+  nextStory,
+  onContinueStory,
   dailyVerse,
   dailyDevotional,
   dailyPrayer,
@@ -43,6 +52,10 @@ export function TodayTab({
   return (
     <div className="flex-1 flex flex-col items-center gap-6 p-6">
       <MascotHero streak={currentCount} message={mascotMessage} />
+
+      {nextStory && (
+        <NextStoryTeaser story={nextStory} onContinue={() => onContinueStory(nextStory)} />
+      )}
 
       {apostleMoment && (
         <ApostleMessageCard apostle={apostleMoment.apostle} message={apostleMoment.message} />

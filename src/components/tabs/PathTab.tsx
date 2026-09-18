@@ -1,4 +1,4 @@
-import { PathBookSections } from "@/components/PathBookSections";
+import { PathBookSections, type PathFocusRequest } from "@/components/PathBookSections";
 import { PrayerJournal } from "@/components/PrayerJournal";
 import type { PlanId } from "@/lib/plisio/plans";
 import type { LessonDoc } from "@/types/firestore";
@@ -15,6 +15,9 @@ type PathTabProps = {
    * lock state and the prayer journal's, since they share one cap. */
   todayActivityCount: number;
   suppressUpgradeNag: boolean;
+  /** Set when the user tapped Today's "Continue Your Story" teaser —
+   * jumps straight to that book/story. */
+  focusRequest?: PathFocusRequest | null;
   onComplete: (lesson: LessonDoc) => Promise<void>;
   onUpgrade: (plan: PlanId) => Promise<void>;
   getIdToken: () => Promise<string>;
