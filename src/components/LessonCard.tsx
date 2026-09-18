@@ -1,5 +1,5 @@
 import { FillBlankCard } from "@/components/FillBlankCard";
-import { isFillBlankLesson, type LessonDoc } from "@/types/firestore";
+import type { LessonDoc } from "@/types/firestore";
 
 const TRACK_LABEL: Record<LessonDoc["track"], string> = {
   scripture: "Scripture",
@@ -15,12 +15,13 @@ type LessonCardProps = {
   onComplete: () => Promise<void>;
 };
 
-/** A single lesson's card — reading summary + Complete button, or the
- * fill-in-the-blank word-bank flow. Reused as the detail view opened by
- * tapping an event card in PathEventList. */
+/** A single lesson's card — the event's narrative summary, followed by its
+ * embedded verse activity (FillBlankCard) built from the passage's own
+ * verses. Completing a lesson means solving that activity, not a separate
+ * "Complete" tap — the two are one piece of content, not a summary plus an
+ * optional quiz. Reused as the detail view opened by tapping an event
+ * card in PathEventList. */
 export function LessonCard({ lesson, isDone, isLocked, isPending, onComplete }: LessonCardProps) {
-  const fillBlank = isFillBlankLesson(lesson);
-
   return (
     <div className="rounded-2xl bg-paper border border-mist p-5 flex flex-col gap-2">
       <span className="text-xs font-medium uppercase tracking-wide text-clay-600">
@@ -31,43 +32,25 @@ export function LessonCard({ lesson, isDone, isLocked, isPending, onComplete }: 
         <span className="text-sm text-stone">{lesson.scriptureReference}</span>
       )}
 
-      {fillBlank ? (
-        // FillBlankCard owns its own check/complete flow (word bank,
-        // correct/incorrect feedback) — it calls onComplete itself once the
-        // answer is right, rather than the plain "Complete" button below,
-        // which doesn't apply here.
+      <p className="text-sm text-ink/80 leading-relaxed">{lesson.summary}</p>
+
+      <div className="mt-1 pt-3 border-t border-mist flex flex-col gap-2">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-stone">
+          Verse challenge
+        </span>
         <FillBlankCard
-          lesson={lesson}
+          activity={lesson.verseActivity}
+          track={lesson.track}
           isDone={isDone}
           isLocked={isLocked}
           isPending={isPending}
           onComplete={onComplete}
         />
-      ) : (
-        <p className="text-sm text-ink/80 leading-relaxed">{lesson.summary}</p>
-      )}
-
-      <div className="flex items-center justify-between mt-1">
-        <span className="text-xs text-stone">
-          {lesson.estimatedMinutes} min · +{lesson.xpReward} XP
-        </span>
-        {!fillBlank && (
-          <button
-            type="button"
-            disabled={isDone || isLocked || isPending}
-            onClick={() => void onComplete()}
-            className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed ${
-              isDone
-                ? "bg-sage-50 text-sage-700"
-                : isLocked
-                  ? "bg-mist text-stone"
-                  : "bg-clay-600 text-paper hover:bg-clay-700 disabled:opacity-70"
-            }`}
-          >
-            {isDone ? "Completed" : isLocked ? "Locked" : isPending ? "Saving…" : "Complete"}
-          </button>
-        )}
       </div>
+
+      <span className="text-xs text-stone mt-1">
+        {lesson.estimatedMinutes} min · +{lesson.xpReward} XP
+      </span>
     </div>
   );
 }

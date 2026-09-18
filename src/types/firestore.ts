@@ -97,40 +97,44 @@ interface LessonDocBase {
 }
 
 /**
- * lessons/{lessonId} — the original read-and-complete type. `lessonType`
- * is optional and defaults to "reading" when absent (every read path —
- * fetchLessons, LessonsSection — treats a missing value that way): the 7
- * lessons seeded before fill-in-the-blank existed don't have this field
- * at all, and don't need a migration to write it in. New reading lessons
- * can set it explicitly or just omit it; both are equivalent.
+ * One of a verse activity's fill-in-the-blank lines — a single verse from
+ * the event's passage, quoted with its own blank(s) marked by the literal
+ * substring `BLANK_TOKEN` ("_____"). `answers` gives the correct word for
+ * each blank in `template`, in order (same length as the number of blanks).
  */
-export interface ReadingLessonDoc extends LessonDocBase {
-  lessonType?: "reading";
-  summary: string;
+export interface VerseBlank {
+  /** The exact verse this line quotes, e.g. "Genesis 1:1". */
+  reference: string;
+  template: string;
+  answers: string[];
 }
 
 /**
- * lessons/{lessonId} — Duolingo-style fill-in-the-blank. `template` is the
- * verse with each blank marked by the literal substring `BLANK_TOKEN`
- * ("_____"); `answers` gives the correct word for each blank, in order
- * (same length as the number of blanks in `template`); `wordBank` is
- * `answers` plus a few decoy words — FillBlankCard shuffles it for
- * display, so storage order doesn't matter.
+ * A lesson's embedded Duolingo-style verse activity — up to 5 of the
+ * event's most important verses (fewer if the passage doesn't have that
+ * many worth quizzing; never padded to 5), each its own `VerseBlank` line.
+ * `wordBank` pools every verse's `answers` plus a roughly matching number
+ * of decoy words — FillBlankCard shuffles it for display and fills blanks
+ * across all verses in order, so storage order doesn't matter.
  */
-export interface FillBlankLessonDoc extends LessonDocBase {
-  lessonType: "fillBlank";
-  template: string;
-  answers: string[];
+export interface VerseActivity {
+  verses: VerseBlank[];
   wordBank: string[];
 }
 
-export type LessonDoc = ReadingLessonDoc | FillBlankLessonDoc;
-
-/** The exact substring `template` uses to mark each blank. */
+/** The exact substring a VerseBlank's `template` uses to mark each blank. */
 export const BLANK_TOKEN = "_____";
 
-export function isFillBlankLesson(lesson: LessonDoc): lesson is FillBlankLessonDoc {
-  return lesson.lessonType === "fillBlank";
+/**
+ * lessons/{lessonId} — a narrative summary of the event, paired with a
+ * verseActivity built from the passage's own verses (see VerseActivity) —
+ * every event has both; they're rendered together in one card
+ * (LessonCard.tsx), and completing a lesson means solving its verse
+ * activity, not just reading the summary.
+ */
+export interface LessonDoc extends LessonDocBase {
+  summary: string;
+  verseActivity: VerseActivity;
 }
 
 /**

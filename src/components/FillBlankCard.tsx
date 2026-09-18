@@ -2,10 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { CONTENT_TYPE_META } from "@/lib/contentType";
-import { BLANK_TOKEN, type FillBlankLessonDoc } from "@/types/firestore";
+import { BLANK_TOKEN, type LessonTrack, type VerseActivity } from "@/types/firestore";
 
 type FillBlankCardProps = {
-  lesson: FillBlankLessonDoc;
+  activity: VerseActivity;
+  track: LessonTrack;
   isDone: boolean;
   isLocked: boolean;
   isPending: boolean;
@@ -24,15 +25,39 @@ function shuffled<T>(items: T[]): T[] {
   return copy;
 }
 
-/** Duolingo-style fill-in-the-blank: tap word-bank words to fill the
- * verse's blanks in order, then check. Wrong isn't final — "not quite,
- * try again" and a reset, never a locked-out failure state, matching this
- * app's never-shaming tone everywhere else. */
-export function FillBlankCard({ lesson, isDone, isLocked, isPending, onComplete }: FillBlankCardProps) {
-  const meta = CONTENT_TYPE_META[lesson.track];
-  const segments = useMemo(() => lesson.template.split(BLANK_TOKEN), [lesson.template]);
-  const blankCount = segments.length - 1;
-  const bankWords = useMemo(() => shuffled(lesson.wordBank), [lesson.wordBank]);
+/** One verse's template split into segments, with a global blank-index
+ * offset so the flattened `blanks` state array below can address a blank
+ * inside any verse by one running index across the whole activity. */
+type VerseRender = {
+  reference: string;
+  segments: string[];
+  blankCount: number;
+  startIndex: number;
+};
+
+function renderVerses(verses: VerseActivity["verses"]): VerseRender[] {
+  let offset = 0;
+  return verses.map((verse) => {
+    const segments = verse.template.split(BLANK_TOKEN);
+    const blankCount = segments.length - 1;
+    const render = { reference: verse.reference, segments, blankCount, startIndex: offset };
+    offset += blankCount;
+    return render;
+  });
+}
+
+/** Duolingo-style fill-in-the-blank, spanning every verse in the event's
+ * verse activity (up to 5 — see VerseActivity, src/types/firestore.ts):
+ * tap word-bank words to fill each verse's blanks in order, then check all
+ * of them at once. Wrong isn't final — "not quite, try again" and a reset,
+ * never a locked-out failure state, matching this app's never-shaming tone
+ * everywhere else. */
+export function FillBlankCard({ activity, track, isDone, isLocked, isPending, onComplete }: FillBlankCardProps) {
+  const meta = CONTENT_TYPE_META[track];
+  const verseRenders = useMemo(() => renderVerses(activity.verses), [activity.verses]);
+  const flatAnswers = useMemo(() => activity.verses.flatMap((v) => v.answers), [activity.verses]);
+  const blankCount = flatAnswers.length;
+  const bankWords = useMemo(() => shuffled(activity.wordBank), [activity.wordBank]);
 
   const [blanks, setBlanks] = useState<(string | null)[]>(() => Array(blankCount).fill(null));
   const [usedIndices, setUsedIndices] = useState<Set<number>>(new Set());
@@ -73,7 +98,7 @@ export function FillBlankCard({ lesson, isDone, isLocked, isPending, onComplete 
   }
 
   async function handleCheck() {
-    const isCorrect = blanks.every((word, i) => word === lesson.answers[i]);
+    const isCorrect = blanks.every((word, i) => word === flatAnswers[i]);
     if (isCorrect) {
       setFeedback("correct");
       setChecking(true);
@@ -93,18 +118,27 @@ export function FillBlankCard({ lesson, isDone, isLocked, isPending, onComplete 
     setFeedback(null);
   }
 
-  // Completed (in a past session, or just now): show the filled verse,
-  // read-only, no word bank.
+  // Completed (in a past session, or just now): show every verse filled
+  // in, read-only, no word bank.
   if (isDone) {
     return (
-      <div className="flex flex-wrap gap-1 text-sm leading-relaxed">
-        {segments.map((segment, i) => (
-          <span key={i}>
-            {segment}
-            {i < blankCount && (
-              <span className="font-semibold text-sage-700">{lesson.answers[i]}</span>
-            )}
-          </span>
+      <div className="flex flex-col gap-2">
+        {verseRenders.map((verse) => (
+          <div key={verse.reference} className="flex flex-wrap gap-1 text-sm leading-relaxed">
+            <span className="w-full text-[11px] font-semibold uppercase tracking-wide text-stone">
+              {verse.reference}
+            </span>
+            {verse.segments.map((segment, i) => (
+              <span key={i}>
+                {segment}
+                {i < verse.blankCount && (
+                  <span className="font-semibold text-sage-700">
+                    {flatAnswers[verse.startIndex + i]}
+                  </span>
+                )}
+              </span>
+            ))}
+          </div>
         ))}
       </div>
     );
@@ -112,29 +146,39 @@ export function FillBlankCard({ lesson, isDone, isLocked, isPending, onComplete 
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-1.5 text-sm leading-relaxed">
-        {segments.map((segment, i) => (
-          <span key={i} className="contents">
-            <span>{segment}</span>
-            {i < blankCount && (
-              <button
-                type="button"
-                disabled={!interactive || blanks[i] === null}
-                onClick={() => clearBlank(i)}
-                className={`inline-flex min-w-[4.5rem] items-center justify-center rounded-lg border-2 px-2.5 py-1 text-sm font-bold transition-colors ${
-                  blanks[i] === null
-                    ? `border-dashed ${meta.currentBorderClass} text-transparent select-none`
-                    : feedback === "correct"
-                      ? "border-sage-600 bg-sage-600 text-paper"
-                      : feedback === "incorrect"
-                        ? `border-transparent ${meta.incorrectBgClass} text-paper`
-                        : `border-transparent ${meta.buttonClass}`
-                }`}
-              >
-                {blanks[i] ?? "___"}
-              </button>
-            )}
-          </span>
+      <div className="flex flex-col gap-2.5">
+        {verseRenders.map((verse) => (
+          <div key={verse.reference} className="flex flex-wrap items-center gap-1.5 text-sm leading-relaxed">
+            <span className="w-full text-[11px] font-semibold uppercase tracking-wide text-stone">
+              {verse.reference}
+            </span>
+            {verse.segments.map((segment, i) => {
+              const blankIndex = verse.startIndex + i;
+              return (
+                <span key={i} className="contents">
+                  <span>{segment}</span>
+                  {i < verse.blankCount && (
+                    <button
+                      type="button"
+                      disabled={!interactive || blanks[blankIndex] === null}
+                      onClick={() => clearBlank(blankIndex)}
+                      className={`inline-flex min-w-[4.5rem] items-center justify-center rounded-lg border-2 px-2.5 py-1 text-sm font-bold transition-colors ${
+                        blanks[blankIndex] === null
+                          ? `border-dashed ${meta.currentBorderClass} text-transparent select-none`
+                          : feedback === "correct"
+                            ? "border-sage-600 bg-sage-600 text-paper"
+                            : feedback === "incorrect"
+                              ? `border-transparent ${meta.incorrectBgClass} text-paper`
+                              : `border-transparent ${meta.buttonClass}`
+                      }`}
+                    >
+                      {blanks[blankIndex] ?? "___"}
+                    </button>
+                  )}
+                </span>
+              );
+            })}
+          </div>
         ))}
       </div>
 
@@ -147,9 +191,7 @@ export function FillBlankCard({ lesson, isDone, isLocked, isPending, onComplete 
               disabled={usedIndices.has(i) || isLocked}
               onClick={() => placeWord(i, word)}
               className={`rounded-full px-3.5 py-1.5 text-sm font-bold transition-colors disabled:cursor-not-allowed ${
-                usedIndices.has(i) || isLocked
-                  ? "bg-mist text-stone/50"
-                  : meta.buttonClass
+                usedIndices.has(i) || isLocked ? "bg-mist text-stone/50" : meta.buttonClass
               }`}
             >
               {word}

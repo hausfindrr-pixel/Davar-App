@@ -43,6 +43,13 @@ try {
 initializeApp({ credential: cert(serviceAccount) });
 const db = getFirestore();
 
+// Fields from lesson shapes this schema no longer has (the old
+// ReadingLessonDoc/FillBlankLessonDoc split, replaced by a single LessonDoc
+// with `summary` + `verseActivity`) — explicitly deleted below so
+// merge:true doesn't leave them stranded on docs seeded under the old
+// shape (the 3 lessons that used to be pure fillBlank entries).
+const OBSOLETE_FIELDS = ["lessonType", "template", "answers", "wordBank"];
+
 for (const lesson of lessons) {
   const { id, ...fields } = lesson;
   const ref = db.collection("lessons").doc(id);
@@ -52,7 +59,11 @@ for (const lesson of lessons) {
   // every re-run either.
   const snap = await ref.get();
   const payload = snap.exists
-    ? { id, ...fields }
+    ? {
+        id,
+        ...fields,
+        ...Object.fromEntries(OBSOLETE_FIELDS.map((field) => [field, FieldValue.delete()])),
+      }
     : { id, ...fields, createdAt: FieldValue.serverTimestamp() };
   await ref.set(payload, { merge: true });
   console.log(`seeded lessons/${id}${snap.exists ? " (updated)" : " (created)"}`);

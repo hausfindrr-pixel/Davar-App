@@ -97,8 +97,9 @@ Types for every collection live in `src/types/firestore.ts`:
 
 - **`users/{uid}`** — profile, XP, level, `tier` (`"free"` | `"premium"`)
 - **`streaks/{uid}`** — current/longest streak count, last check-in date, streak freezes
-- **`lessons/{lessonId}`** — scripture/prayer/devotional content items; two
-  shapes discriminated by `lessonType` (see "The Path: lesson types" below)
+- **`lessons/{lessonId}`** — scripture/prayer/devotional content items; a
+  narrative `summary` paired with an embedded `verseActivity` (see "The
+  Path: lesson content and verse activity" below)
 - **`users/{uid}/prayers/{prayerId}`** — a user's own free-text prayers (see
   "The Path: prayer journal" below)
 - **`check_ins/{checkInId}`** — a completed lesson, prayer, reading, etc. for a given day
@@ -487,64 +488,79 @@ Lesson content is narrative Bible events (Creation, the Red Sea, David and
 Goliath, the Resurrection, ...) tied to a chapter-range reference, not
 isolated verses — a content choice, not a schema change: `title`,
 `scriptureReference` (now a range like `"Exodus 14:1-31"`), `summary` (the
-narrative — what happens and why it matters), `lessonType`, and
-`lessonBook` are the same fields `LessonDoc` already had. The 10 stories
-in `scripts/lessons-data.mjs` span both testaments across 7 books
-(Genesis, Exodus, 1 Samuel, Daniel, Luke, Mark, John).
+narrative — what happens and why it matters), and `lessonBook` are the
+same fields `LessonDoc` already had. The 10 stories in
+`scripts/lessons-data.mjs` span both testaments across 7 books (Genesis,
+Exodus, 1 Samuel, Daniel, Luke, Mark, John).
 
 **Migration note:** these reuse the original 10 lesson IDs
 (`day-01-creation` etc.) rather than retiring them for new ones — a
 deliberate choice so re-seeding stays a plain content update with no
 orphaned docs, at the cost of a user who'd completed the old single-verse
 version of an ID showing as having completed the new story version too
-(harmless over-credit, not under-credit). Each ID kept its original
-`lessonType` across the rewrite (reading stayed reading, fillBlank stayed
-fillBlank) specifically so `npm run seed:lessons`' `merge: true` write
-never leaves stale type-only fields (`template`/`answers`/`wordBank`)
-behind on a doc that changed shape — merge only adds/overwrites the fields
-it's given, it doesn't delete fields the new payload omits.
+(harmless over-credit, not under-credit).
 
-### The Path: lesson types
+### The Path: lesson content and verse activity
 
-`LessonDoc` (`src/types/firestore.ts`) is a discriminated union on a new
-`lessonType` field:
+`LessonDoc` (`src/types/firestore.ts`) is a single shape — no discriminated
+union — every lesson always has both:
 
-- **`ReadingLessonDoc`** (`lessonType?: "reading"`, optional) — the
-  original read-and-complete shape (`summary`, a "Complete" button).
-- **`FillBlankLessonDoc`** (`lessonType: "fillBlank"`) — Duolingo-style:
-  `template` is the verse with each blank marked by the literal substring
-  `BLANK_TOKEN` (`"_____"`); `answers` gives the correct word per blank,
-  in order; `wordBank` is `answers` plus a few decoy words. `FillBlankCard`
-  (`src/components/FillBlankCard.tsx`) shuffles the bank for display (not
-  relying on storage order), lets the user tap words to fill blanks in
-  order or tap a filled blank to clear it back, and on a wrong attempt
-  shows a gentle "Not quite — take another look and try again" with a
-  reset — never a locked-out failure state. `LessonCard.tsx` branches
-  on `isFillBlankLesson(lesson)` to render `FillBlankCard` instead of the
-  plain summary + Complete button; the completion/XP backend
-  (`completeLesson`, `src/lib/db/lessons.ts`) needed **zero changes** —
-  it only ever touched `lesson.id`/`lesson.xpReward`, which exist on both
-  shapes.
+- **`summary`** — the narrative reading, unchanged from before.
+- **`verseActivity`** — a Duolingo-style fill-in-the-blank activity built
+  from the passage's own verses, embedded in the same card
+  (`LessonCard.tsx`) right below the summary, not a separate lesson entry.
+  **Completing a lesson means solving this activity** — there's no
+  standalone "Complete" button anymore; the summary and the verse
+  challenge are one piece of content.
 
-`lessonType` is optional on `ReadingLessonDoc` specifically so a document
-written before this field existed is still valid — every read path
-(`isFillBlankLesson`, `LessonCard`) treats a missing `lessonType` as
-`"reading"`. This is a deliberately additive schema change: nothing had to
-be backfilled, and nothing will break if it never is.
+`verseActivity` is `{ verses: VerseBlank[], wordBank: string[] }`:
 
-`scripts/lessons-data.mjs` seeds 3 fill-in-the-blank stories (`day-08`
-David and Goliath, `day-09` Jesus Calms the Storm, `day-10` The
-Resurrection) via `npm run seed:lessons` — no seed-script changes needed,
-since it already spreads whatever fields are present on each lesson
-object onto the Firestore doc. **Verified** (beyond the emulator, since
-`lessons` itself needs the same Admin SDK credential the original seeding
-did): each lesson's blank count matches its `answers.length`, every answer
-appears in its own `wordBank`, and `wordBank` has no accidental
-duplicates — checked directly against the seed data, not just eyeballed.
-The interactive flow itself (tap words, wrong-answer feedback, correct-
-answer completion firing exactly once) was verified with Playwright
-driving the actual rendered component through both a wrong and a correct
-attempt.
+- **`verses`** — up to 5 of the passage's most important verses (fewer if
+  the passage doesn't have that many worth quizzing — never padded to 5).
+  Each `VerseBlank` is `{ reference, template, answers }`: `template` is
+  that one verse with each blank marked by the literal substring
+  `BLANK_TOKEN` (`"_____"`, `src/types/firestore.ts`); `answers` gives the
+  correct word per blank, in order.
+- **`wordBank`** — every verse's answers pooled together, plus a roughly
+  matching number of decoy words (so a 5-verse activity's bank has ~10
+  words, not the single verse's old 5) — deliberately a bigger, richer
+  bank than the original one-verse-per-lesson version, per the "more word
+  bank" request that prompted this.
+
+**Verse selection:** the verse(s) chosen for each lesson are the passage's
+most quotable line(s) or its theological/narrative turning point — not
+necessarily the first verse of the range. For a short passage (John 8:1-11,
+Mark 4:35-41) this is naturally fewer than 5; a long passage (Genesis
+9:5-9:17, four chapters covering the flood *and* the rainbow covenant) is
+a real judgment call, resolved case by case rather than defaulting to
+whichever verse comes first — e.g. Noah and the Flood picks the
+rainbow-covenant verse (9:13) as the passage's climax over its opening or
+the flood's mechanics.
+
+`FillBlankCard` (`src/components/FillBlankCard.tsx`) renders every verse
+in the activity on its own line (with a small reference label), flattens
+their blanks into one running sequence so the word bank fills them in
+document order regardless of which verse a tap targets, shuffles the bank
+for display (not relying on storage order), and checks all blanks across
+every verse at once — not one verse at a time. On a wrong attempt: a
+gentle "Not quite — take another look and try again" with a reset, never
+a locked-out failure state. Word-bank pills and filled blanks are bold,
+solid-color chips in the lesson's track color (`CONTENT_TYPE_META`,
+`src/lib/contentType.ts`) — correct turns solid sage, incorrect turns a
+deeper solid shade of the track's own color (no red, matching the app's
+never-shaming tone) — replacing an earlier pale-outline style that read as
+low-contrast. The completion/XP backend (`completeLesson`,
+`src/lib/db/lessons.ts`) needed **zero changes** — it only ever touched
+`lesson.id`/`lesson.xpReward`, unaffected by this.
+
+**Migration note:** the 3 lessons that used to be pure fill-blank entries
+under the old `lessonType`-discriminated schema (`day-08` David and
+Goliath, `day-09` Jesus Calms the Storm, `day-10` The Resurrection) gained
+a `summary` for the first time here, and `npm run seed:lessons`
+(`scripts/seed-lessons.mjs`) explicitly `FieldValue.delete()`s the old
+flat `lessonType`/`template`/`answers`/`wordBank` fields on existing docs
+— otherwise `merge: true` would leave them stranded alongside the new
+`verseActivity` shape rather than replacing them.
 
 ### The Path: prayer journal
 
