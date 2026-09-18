@@ -235,8 +235,10 @@ seeded before the book-restructure work below, those existing docs won't
 have a `lessonBook` field until `npm run seed:lessons` is re-run — until
 then they won't appear in any book section.
 
-`scripts/seed-lessons.mjs` writes `scripts/lessons-data.mjs` (scripture,
-prayer, and devotional tracks, now tagged with `lessonBook`);
+`scripts/seed-lessons.mjs` writes `scripts/lessons-data.mjs` — 10
+narrative Bible events/stories (Creation, the Red Sea, David and Goliath,
+...), each tagged with `lessonBook` and a chapter-range `scriptureReference`
+rather than an isolated verse (see "The Path: event-based stories" below);
 `scripts/seed-daily-content.mjs` writes `scripts/daily-content-data.mjs`
 (the Today tab's three pools — see "Today: daily content" below). Edit
 either data file and re-run its script to add more — each entry's `id` is
@@ -349,6 +351,29 @@ actually have seeded lessons — there's no separate books collection.
   `lessonBook`, so they won't appear in any book section — see "Seeding
   lessons" above.
 
+### The Path: event-based stories
+
+Lesson content is narrative Bible events (Creation, the Red Sea, David and
+Goliath, the Resurrection, ...) tied to a chapter-range reference, not
+isolated verses — a content choice, not a schema change: `title`,
+`scriptureReference` (now a range like `"Exodus 14:1-31"`), `summary` (the
+narrative — what happens and why it matters), `lessonType`, and
+`lessonBook` are the same fields `LessonDoc` already had. The 10 stories
+in `scripts/lessons-data.mjs` span both testaments across 7 books
+(Genesis, Exodus, 1 Samuel, Daniel, Luke, Mark, John).
+
+**Migration note:** these reuse the original 10 lesson IDs
+(`day-01-creation` etc.) rather than retiring them for new ones — a
+deliberate choice so re-seeding stays a plain content update with no
+orphaned docs, at the cost of a user who'd completed the old single-verse
+version of an ID showing as having completed the new story version too
+(harmless over-credit, not under-credit). Each ID kept its original
+`lessonType` across the rewrite (reading stayed reading, fillBlank stayed
+fillBlank) specifically so `npm run seed:lessons`' `merge: true` write
+never leaves stale type-only fields (`template`/`answers`/`wordBank`)
+behind on a doc that changed shape — merge only adds/overwrites the fields
+it's given, it doesn't delete fields the new payload omits.
+
 ### The Path: lesson types
 
 `LessonDoc` (`src/types/firestore.ts`) is a discriminated union on a new
@@ -371,21 +396,20 @@ actually have seeded lessons — there's no separate books collection.
   it only ever touched `lesson.id`/`lesson.xpReward`, which exist on both
   shapes.
 
-**No migration needed for the 7 existing seeded lessons.** `lessonType` is
-optional on `ReadingLessonDoc` specifically so a document written before
-this field existed (all 7 of them) is still valid — every read path
+`lessonType` is optional on `ReadingLessonDoc` specifically so a document
+written before this field existed is still valid — every read path
 (`isFillBlankLesson`, `LessonCard`) treats a missing `lessonType` as
 `"reading"`. This is a deliberately additive schema change: nothing had to
 be backfilled, and nothing will break if it never is.
 
-`scripts/lessons-data.mjs` now also seeds 3 sample fill-in-the-blank
-lessons (`day-08`–`day-10`: John 3:16, Philippians 4:13, Psalm 23:1) via
-the same `npm run seed:lessons` — no seed-script changes needed either,
+`scripts/lessons-data.mjs` seeds 3 fill-in-the-blank stories (`day-08`
+David and Goliath, `day-09` Jesus Calms the Storm, `day-10` The
+Resurrection) via `npm run seed:lessons` — no seed-script changes needed,
 since it already spreads whatever fields are present on each lesson
 object onto the Firestore doc. **Verified** (beyond the emulator, since
 `lessons` itself needs the same Admin SDK credential the original seeding
-did): each new lesson's blank count matches its `answers.length`, every
-answer appears in its own `wordBank`, and `wordBank` has no accidental
+did): each lesson's blank count matches its `answers.length`, every answer
+appears in its own `wordBank`, and `wordBank` has no accidental
 duplicates — checked directly against the seed data, not just eyeballed.
 The interactive flow itself (tap words, wrong-answer feedback, correct-
 answer completion firing exactly once) was verified with Playwright
