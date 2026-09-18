@@ -19,7 +19,7 @@ import { WordTab } from "@/components/tabs/WordTab";
 import { pickApostleMoment } from "@/lib/apostle-moment";
 import { APOSTLES, pickApostleMessage, type ApostleId } from "@/lib/apostles";
 import { useAuth } from "@/lib/auth-context";
-import type { PathFocusRequest } from "@/components/PathBookSections";
+import type { PathFocusRequest } from "@/components/PathEventList";
 import { fetchDailyDevotionals, fetchDailyPrayers, fetchDailyVerses } from "@/lib/db/dailyContent";
 import { completeLesson, fetchLessons, subscribeToLessonProgress } from "@/lib/db/lessons";
 import { checkIn, subscribeToStreak } from "@/lib/db/streaks";
@@ -384,7 +384,7 @@ function Dashboard({ uid }: { uid: string }) {
 
   function handleContinueStory(story: NextStory) {
     setActiveTab("path");
-    setPathFocusRequest({ book: story.book, lessonId: story.lesson.id, nonce: Date.now() });
+    setPathFocusRequest({ lessonId: story.lesson.id, nonce: Date.now() });
   }
 
   useEffect(() => {

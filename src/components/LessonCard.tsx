@@ -16,8 +16,8 @@ type LessonCardProps = {
 };
 
 /** A single lesson's card — reading summary + Complete button, or the
- * fill-in-the-blank word-bank flow. Shared between the revealed and
- * locked-preview states in PathBookSections. */
+ * fill-in-the-blank word-bank flow. Reused as the detail view opened by
+ * tapping an event card in PathEventList. */
 export function LessonCard({ lesson, isDone, isLocked, isPending, onComplete }: LessonCardProps) {
   const fillBlank = isFillBlankLesson(lesson);
 

@@ -266,30 +266,30 @@ scroll. Each tab is its own component under `src/components/tabs/`:
 ### Today: story teaser
 
 A "Continue Your Story" card (`NextStoryTeaser.tsx`,
-`src/components/NextStoryTeaser.tsx`) points at whatever roadmap node is
+`src/components/NextStoryTeaser.tsx`) points at whatever card is
 "current" for this user right now — `nextStoryAcrossBooks`
-(`src/lib/roadmap.ts`) scans books in canonical order and returns the
-first one with a `current` node (see "The Path: organized by book, as a
-roadmap" below). This is **not** a fourth daily-rotation pool: there's no
-new collection, no XP awarded here, nothing completable from Today itself.
-It's a pointer into the user's own progress in The Path, which is why it
-changes the moment a story is completed rather than once a day — several
-books can each have their own "current" node at once (free tier's reveal
-is round-robin across books), so this shows whichever comes first in the
-roadmap's own top-to-bottom order, matching what a user would see if they
-opened The Path themselves.
+(`src/lib/roadmap.ts`) scans `(book, track)` groups in canonical order and
+returns the first one with a `current` story (see "The Path: an
+event-first card feed" below). This is **not** a fourth daily-rotation
+pool: there's no new collection, no XP awarded here, nothing completable
+from Today itself. It's a pointer into the user's own progress in The
+Path, which is why it changes the moment a story is completed rather than
+once a day — several `(book, track)` groups can each have their own
+"current" card at once (free tier's reveal is round-robin across books),
+so this shows whichever comes first in the feed's own top-to-bottom order,
+matching what a user would see if they opened The Path themselves.
 
 Tapping "Continue" switches to The Path tab and jumps straight to that
 story's detail panel — `Dashboard` (`src/app/page.tsx`) builds a
-`PathFocusRequest` (book, lesson ID, and a `nonce` so re-tapping the same
-story still re-triggers it) and passes it down through `PathTab` to
-`PathBookSections`, which opens that book and lesson. This uses React's
-adjust-state-during-render pattern (a guarded `setState` call in the
-render body, not inside a `useEffect`) rather than an effect, specifically
-because this project's lint config (`react-hooks/set-state-in-effect`)
-flags `setState` synchronously inside effects as an avoidable extra
-render — adjusting during render lets the same pass produce the correct
-output immediately.
+`PathFocusRequest` (lesson ID and a `nonce` so re-tapping the same story
+still re-triggers it) and passes it down through `PathTab` to
+`PathEventList`, which opens that lesson's detail directly. This uses
+React's adjust-state-during-render pattern (a guarded `setState` call in
+the render body, not inside a `useEffect`) rather than an effect,
+specifically because this project's lint config
+(`react-hooks/set-state-in-effect`) flags `setState` synchronously inside
+effects as an avoidable extra render — adjusting during render lets the
+same pass produce the correct output immediately.
 
 ### Today: daily content
 
@@ -338,103 +338,68 @@ inside the illustrated band.
 - **No XP, no completion state, read-only for v1** — these are things to
   read, not tasks to complete, unlike lessons.
 
-### The Path: organized by book, as a roadmap
+### The Path: an event-first card feed
 
-The lesson library is grouped into book sections (Genesis, John,
-Philippians, ...) rather than a flat feed — `PathBookSections.tsx`
-(`src/components/PathBookSections.tsx`, mounted by `PathTab.tsx`), a
-single-open accordion using the same interaction pattern as
-`ArmoryTab.tsx`. Section order follows `BIBLE_BOOKS`'
-(`src/lib/bible.ts`) canonical order, filtered to only the books that
-actually have seeded lessons — there's no separate books collection.
+The Path is a flat, scrollable feed of event cards — `PathEventList.tsx`
+(`src/components/PathEventList.tsx`, mounted by `PathTab.tsx`), one card
+per story (`PathEventCard.tsx`). Each card's main heading is the
+event/story title ("The Creation of the World"), with its Bible book and
+content type as a small "GENESIS · LESSONS" subheading underneath, and a
+prominent image-placeholder area on top (today a tinted gradient with the
+content type's icon; swap-ready for real illustrations later) — the book
+is identifying context, not the primary unit, which is the reverse of an
+earlier version of this screen that led with the book as a collapsible
+container.
 
 - **Schema:** every `LessonDoc` (`src/types/firestore.ts`) has a required
-  `lessonBook: string`, an exact `BIBLE_BOOKS` entry name (e.g. `"Psalms"`,
-  not `"Psalm"`). `scripts/lessons-data.mjs` sets it per lesson.
-- **Inside an open book**, stories render as a winding roadmap
-  (`RoadmapPath.tsx`, `src/components/RoadmapPath.tsx`) — alternating
-  left/right nodes down the accordion body, connected by a curved SVG
-  line, instead of a flat card list. Node state comes from
-  `roadmapNodeStates` (`src/lib/roadmap.ts`), a pure function returning
-  one of four states per lesson:
-  - **`completed`** — filled, checkmark.
-  - **`current`** — the first not-yet-completed *revealed* story: emphasized
-    (larger, ringed) so it's obvious what to do next.
-  - **`sequenceLocked`** — revealed, but an earlier story in the same book
-    isn't done yet. Users progress in order within a book; there's no
-    skipping ahead, for either tier.
-  - **`paywallLocked`** — beyond the free tier's reveal cursor entirely.
-  
-  `sequenceLocked` and `paywallLocked` intentionally render identically
-  (a plain gray locked circle) — the per-book `UnlockCard` below already
-  explains the paywall case in words, so nodes only need to communicate
-  *that* they're locked, not *why*. Only `completed`/`current` nodes are
-  tappable; tapping swaps the roadmap for that story's detail (the same
-  `LessonCard` used everywhere else) with a "back to path" button, rather
-  than trying to fit full narrative text inside a small node.
-- **Revealed lessons in a book are always a prefix** of that book's
-  ordered list (`visibleLessonsForFreeTier`'s round-robin picks each
-  book's own lessons in order, one per round), so `roadmapNodeStates`
-  never has to reconcile "revealed but out of order" — it's a simple
-  linear scan once the revealed subset is known.
-- **Premium** sees every book fully revealed — no `paywallLocked` nodes —
-  but still walks each book's roadmap in order (`sequenceLocked` still
-  applies) and still shares the daily activity cap with free tier, just
-  much higher (15/day vs. 3/day — see "The daily activity cap" above).
-- **`LessonCard.tsx`** (`src/components/LessonCard.tsx`) holds the actual
-  per-lesson card markup (reading summary + Complete button, or
-  `FillBlankCard`) — reused unchanged as the roadmap's detail-panel
-  content, so a tapped story renders identically to how lessons always
-  have.
-
-### The Path: content-type tabs and color identity
-
-Inside an open book, content splits into three collapsible tabs by
-`LessonDoc.track` (`"scripture" | "prayer" | "devotional"` — a field that
-already existed, previously just a small badge; this is a new grouping
-over the same data, not a schema change) — `CONTENT_TYPE_ORDER` and
-`CONTENT_TYPE_META` in `src/lib/contentType.ts`:
-
-| Track | Tab label | Icon | Accent |
-| --- | --- | --- | --- |
-| `scripture` | Lessons | `ScrollIcon` | `clay` (existing) |
-| `prayer` | Prayer | `HeartIcon` | `dusk` (new) |
-| `devotional` | Devotion | `SunIcon` | `gold` (new) |
-
-- **Two new accent color families** in `globals.css` (`--color-dusk-*`,
-  `--color-gold-*`), built to the same 50/200/400/600/700 ramp shape and
-  muted, dusty character as the existing `clay`/`sage` tokens — richer
-  variety without stepping outside the "Dawn Light" palette's saturation
-  level. `RoadmapPath.tsx` takes an `accent: ContentTypeMeta` prop now
-  (previously hardcoded to clay) so each tab's roadmap — node fill, ring,
-  and connector color — reads as its own color identity. Locked
-  nodes/connectors stay neutral `mist` regardless of accent on purpose:
-  richness belongs to what's active, not to what's out of reach.
-- **Tailwind class strings are all literal**, defined once in
-  `CONTENT_TYPE_META` rather than assembled at runtime (`` `bg-${accent}-600` ``
-  never works — Tailwind's build-time scanner can't see it) — every
-  consumer just indexes into the shared object. The SVG connector color is
-  the one exception: it's a `var(--color-x-400)` CSS custom property
-  reference resolved by the browser at paint time, so that one *is* built
-  dynamically from `accent.connectorVar` safely.
+  `lessonBook: string`, an exact `BIBLE_BOOKS` (`src/lib/bible.ts`) entry
+  name (e.g. `"Psalms"`, not `"Psalm"`), plus the pre-existing `track`
+  (`"scripture" | "prayer" | "devotional"`) used for the content-type label
+  and color — no schema change for any of this, it's a presentation layer
+  over fields that already existed.
+- **Ordering:** `flattenPathEvents` (`src/lib/roadmap.ts`) produces the
+  feed's order — canonical book order, then `CONTENT_TYPE_ORDER`
+  (Lessons/Prayer/Devotion) within a book, then each group's own `order` —
+  and computes each card's state via `roadmapNodeStates`, one of:
+  - **`completed`** — checkmark badge on the image, green "Completed" chip.
+  - **`current`** — the first not-yet-completed *revealed* story in its
+    `(book, track)` group: a colored "UP NEXT" tag, an accent border/ring,
+    and a "Continue" pill. Several `(book, track)` groups can each have
+    their own current card at once — every book's Lessons, Prayer, and
+    Devotion progress independently.
+  - **`sequenceLocked`** — revealed, but an earlier story in the same
+    `(book, track)` group isn't done yet. Names the specific story
+    blocking it ("Complete 'Noah and the Flood' first") — there's room for
+    that on a full card, unlike the small roadmap nodes this replaced.
+    Applies to both tiers: nobody skips ahead within a group.
+  - **`paywallLocked`** — beyond the free tier's reveal cursor
+    (`visibleLessonsForFreeTier`'s round-robin-across-books reveal, still
+    unchanged) — "Unlock with Premium" on the card; one `UnlockCard`
+    ("Unlock the full Path") appears once at the bottom of the whole feed
+    if any card is paywall-locked, since there's no per-book container to
+    attach it to anymore.
+  - Only `completed`/`current` cards are tappable; tapping swaps the whole
+    feed for that story's detail — `LessonCard.tsx`, unchanged, with a
+    "back to path" button — rather than expanding in place.
+- **Content-type color identity:** `CONTENT_TYPE_META`
+  (`src/lib/contentType.ts`) holds each track's label, icon, and literal
+  Tailwind class strings (image gradient, accent border/ring, button,
+  badge) — Lessons stays `clay` (existing), Prayer is new `dusk`, Devotion
+  is new `gold`, both built to the same 50/200/400/600/700 ramp and muted
+  character as `clay`/`sage` in `globals.css`. Classes are all literal,
+  defined once in this object — Tailwind's build-time scanner can't see a
+  class assembled at runtime (`` `bg-${accent}-600` `` never works), so
+  every consumer just indexes into the shared object instead. Locked cards
+  stay neutral (`mist`) regardless of accent on purpose: richness belongs
+  to what's active, not to what's out of reach.
 - **Only `scripture` has real content today** — all 10 seeded stories are
-  that track (see "event-based stories" below). A track with zero lessons
-  in a given book renders as a muted, non-interactive "Coming soon" row
-  (icon badge + label, no chevron, not collapsible) rather than being
-  hidden — every book shows all three tabs consistently, and the new
-  accent colors are visible (even if inactive) well before any Prayer/
-  Devotion content exists to populate them.
-- **Book headers gained a small progress bar** (`bg-clay-600` fill over
-  `bg-mist`, plus an "N/M" count) in place of plain "N lessons" text —
-  ties the one new bit of book-header color to something meaningful
-  (completion), rather than being pure decoration. This stays `clay`
-  regardless of a book's tracks, since it reflects the whole book's
-  progress across all three, not one track's identity.
+  that track (see "event-based stories" below), so every Prayer/Devotion
+  card in the feed today is a preview of the color system rather than
+  something to complete yet.
 - **`nextStoryAcrossBooks`** (`src/lib/roadmap.ts`, the Today teaser's
-  source — see "Today: story teaser" above) scans `(book, track)` pairs in
-  `CONTENT_TYPE_ORDER` now, matching exactly what `PathBookSections`
-  renders as independent per-track roadmaps, rather than treating a whole
-  book's lessons (mixed tracks) as one combined sequence.
+  source — see "Today: story teaser" above) scans the same `(book, track)`
+  groups in the same order `flattenPathEvents` does, so the teaser always
+  points at a card that's genuinely first in the feed.
 
 ### The Path: event-based stories
 
@@ -1131,8 +1096,8 @@ src/
                   premium/success, premium/failed (post-checkout pages)
                   api/plisio/create-invoice, api/plisio/webhook,
                   api/bible (route handlers — the last proxies bible-api.com)
-  components/     UI components (StreakVisual, PlantIcon, PathBookSections,
-                  RoadmapPath, LessonCard, MascotHero, DailyContentBackdrop,
+  components/     UI components (StreakVisual, PlantIcon, PathEventList,
+                  PathEventCard, LessonCard, MascotHero, DailyContentBackdrop,
                   NextStoryTeaser, PricingSection, AuthForm, ApostleAvatar,
                   ApostleMessageCard, BottomTabBar, PremiumGate (UnlockCard
                   + blurredPreviewClass),
