@@ -562,7 +562,25 @@ flat `lessonType`/`template`/`answers`/`wordBank` fields on existing docs
 — otherwise `merge: true` would leave them stranded alongside the new
 `verseActivity` shape rather than replacing them.
 
-### The Path: prayer journal
+**A schema change alone doesn't update already-written documents** —
+`npm run seed:lessons` has to actually be re-run against a project for its
+existing `lessons` docs to gain `verseActivity`. Until that happens,
+`fetchLessons()` (`src/lib/db/lessons.ts`) runs every doc through
+`isValidLessonDoc` (checks `summary` is a string and `verseActivity.verses`
+is a non-empty array of well-formed `VerseBlank`s) and **drops any doc that
+fails it**, logging `console.error` with the doc ID rather than returning
+it — this is the fix for a real incident where a still-unmigrated doc's
+missing `verseActivity` crashed `FillBlankCard` (`activity.verses` on
+`undefined`) and took down the whole lesson-detail page with a generic
+Next.js error screen. A user on free tier, whose one visible lesson is
+whichever unmigrated doc sorts first, would see this on every open; a
+premium user browsing the rest of the library might not hit an affected
+doc at all — same root cause, tier-shaped only by which lesson each tier
+happens to load. A filtered-out lesson simply doesn't appear (same
+"nothing to show yet" experience as an empty collection) until it's
+re-seeded correctly, and `src/app/error.tsx` is a last-resort boundary so
+any other unexpected render error shows a friendly retry card instead of a
+blank page.
 
 Below the lesson feed, `PathTab.tsx` renders `PrayerJournal.tsx` — a place
 to write a free-text prayer instead of only reading guided ones. Submitting
