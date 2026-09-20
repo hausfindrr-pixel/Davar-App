@@ -544,12 +544,27 @@ document order regardless of which verse a tap targets, shuffles the bank
 for display (not relying on storage order), and checks all blanks across
 every verse at once — not one verse at a time. On a wrong attempt: a
 gentle "Not quite — take another look and try again" with a reset, never
-a locked-out failure state. Word-bank pills and filled blanks are bold,
-solid-color chips in the lesson's track color (`CONTENT_TYPE_META`,
-`src/lib/contentType.ts`) — correct turns solid sage, incorrect turns a
-deeper solid shade of the track's own color (no red, matching the app's
-never-shaming tone) — replacing an earlier pale-outline style that read as
-low-contrast. The completion/XP backend (`completeLesson`,
+a locked-out failure state.
+
+**Contrast:** word-bank pills and a filled-but-unchecked blank use
+`CONTENT_TYPE_META.activeBgClass` (`src/lib/contentType.ts`) — each
+track's own color at its ramp's darkest (`-700`) shade, not the `-600`
+`solidBgClass`/`buttonClass` used elsewhere (the "current" card badge,
+the Continue pill). This is deliberate, not cosmetic: at the small pill
+size these sit at, `-600` against the paper background measures under
+WCAG's 4.5:1 text-contrast floor for clay and gold (~3.4-3.5:1) and reads
+as washed out; `-700` clears it comfortably (~4.9-6.6:1 across all three
+tracks) — a real production complaint, not a hypothetical one. Correct
+turns solid sage-700; incorrect turns solid `ink` (the app's core near-
+black text color, repurposed as a background here) rather than a deeper
+shade of the track's own color, specifically so it's never the same color
+as the pending/active state it's transitioning from — sage and ink also
+mean "correct"/"incorrect" read the same regardless of which track's
+color the activity happens to be in. No red anywhere, matching the app's
+never-shaming tone. The empty-blank placeholder is a light tint fill
+(`-50`) plus a bold `-700` dashed border (`emptyBlankClass`) — a real box
+shape at a glance, not the previous unfilled `-400` dashed outline that
+was nearly invisible. The completion/XP backend (`completeLesson`,
 `src/lib/db/lessons.ts`) needed **zero changes** — it only ever touched
 `lesson.id`/`lesson.xpReward`, unaffected by this.
 

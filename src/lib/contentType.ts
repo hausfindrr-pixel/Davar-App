@@ -33,11 +33,25 @@ export interface ContentTypeMeta {
   solidBgClass: string;
   /** The card's "Continue" pill/button — solidBgClass plus text + hover. */
   buttonClass: string;
-  /** A deeper solid shade of the same family, used for the verse-activity
-   * word bank's "incorrect" state (FillBlankCard) — bold enough to read
-   * clearly against paper, but still the track's own color rather than an
-   * alarming red, matching this app's never-shaming tone. */
-  incorrectBgClass: string;
+  /**
+   * The verse activity's word-bank tiles, a filled-but-unchecked blank,
+   * and its "Check answer" button (FillBlankCard) — deliberately the
+   * ramp's darkest (-700) shade, not solidBgClass/buttonClass's -600: at
+   * the small pill size these sit at, -600 against paper measures under
+   * WCAG's 4.5:1 text-contrast floor for clay and gold (~3.4-3.5:1) and
+   * reads as washed out, where -700 clears it comfortably (~4.9-6.6:1
+   * across all three tracks). Scoped to this one activity rather than
+   * changed on solidBgClass/buttonClass, which stay -600 for the "current"
+   * card badges and Continue pill elsewhere (PathEventCard) — that UI
+   * wasn't reported as low-contrast, so it's untouched.
+   */
+  activeBgClass: string;
+  /** The verse activity's empty-blank placeholder (FillBlankCard) — a
+   * light tinted fill plus the ramp's darkest border shade, so an
+   * unfilled blank reads as a clear box at a glance rather than a
+   * near-invisible dashed line (the previous -400 border with no fill at
+   * all). */
+  emptyBlankClass: string;
 }
 
 export const CONTENT_TYPE_META: Record<LessonTrack, ContentTypeMeta> = {
@@ -51,7 +65,8 @@ export const CONTENT_TYPE_META: Record<LessonTrack, ContentTypeMeta> = {
     currentRingClass: "ring-clay-100",
     solidBgClass: "bg-clay-600",
     buttonClass: "bg-clay-600 text-paper hover:bg-clay-700",
-    incorrectBgClass: "bg-clay-700",
+    activeBgClass: "bg-clay-700 text-paper hover:opacity-90",
+    emptyBlankClass: "border-clay-700 bg-clay-50",
   },
   prayer: {
     label: "Prayer",
@@ -63,7 +78,8 @@ export const CONTENT_TYPE_META: Record<LessonTrack, ContentTypeMeta> = {
     currentRingClass: "ring-dusk-100",
     solidBgClass: "bg-dusk-600",
     buttonClass: "bg-dusk-600 text-paper hover:bg-dusk-700",
-    incorrectBgClass: "bg-dusk-700",
+    activeBgClass: "bg-dusk-700 text-paper hover:opacity-90",
+    emptyBlankClass: "border-dusk-700 bg-dusk-50",
   },
   devotional: {
     label: "Devotion",
@@ -75,7 +91,8 @@ export const CONTENT_TYPE_META: Record<LessonTrack, ContentTypeMeta> = {
     currentRingClass: "ring-gold-100",
     solidBgClass: "bg-gold-600",
     buttonClass: "bg-gold-600 text-paper hover:bg-gold-700",
-    incorrectBgClass: "bg-gold-700",
+    activeBgClass: "bg-gold-700 text-paper hover:opacity-90",
+    emptyBlankClass: "border-gold-700 bg-gold-50",
   },
 };
 

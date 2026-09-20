@@ -164,12 +164,12 @@ export function FillBlankCard({ activity, track, isDone, isLocked, isPending, on
                       onClick={() => clearBlank(blankIndex)}
                       className={`inline-flex min-w-[4.5rem] items-center justify-center rounded-lg border-2 px-2.5 py-1 text-sm font-bold transition-colors ${
                         blanks[blankIndex] === null
-                          ? `border-dashed ${meta.currentBorderClass} text-transparent select-none`
+                          ? `border-dashed ${meta.emptyBlankClass} text-transparent select-none`
                           : feedback === "correct"
-                            ? "border-sage-600 bg-sage-600 text-paper"
+                            ? "border-transparent bg-sage-700 text-paper"
                             : feedback === "incorrect"
-                              ? `border-transparent ${meta.incorrectBgClass} text-paper`
-                              : `border-transparent ${meta.buttonClass}`
+                              ? "border-transparent bg-ink text-paper"
+                              : `border-transparent ${meta.activeBgClass}`
                       }`}
                     >
                       {blanks[blankIndex] ?? "___"}
@@ -191,7 +191,7 @@ export function FillBlankCard({ activity, track, isDone, isLocked, isPending, on
               disabled={usedIndices.has(i) || isLocked}
               onClick={() => placeWord(i, word)}
               className={`rounded-full px-3.5 py-1.5 text-sm font-bold transition-colors disabled:cursor-not-allowed ${
-                usedIndices.has(i) || isLocked ? "bg-mist text-stone/50" : meta.buttonClass
+                usedIndices.has(i) || isLocked ? "bg-mist text-stone/50" : meta.activeBgClass
               }`}
             >
               {word}
@@ -226,7 +226,7 @@ export function FillBlankCard({ activity, track, isDone, isLocked, isPending, on
           type="button"
           disabled={!interactive || isPending}
           onClick={() => void handleCheck()}
-          className={`self-start rounded-full px-4 py-1.5 text-xs font-bold transition-colors disabled:opacity-70 disabled:cursor-not-allowed ${meta.buttonClass}`}
+          className={`self-start rounded-full px-4 py-1.5 text-xs font-bold transition-colors disabled:opacity-70 disabled:cursor-not-allowed ${meta.activeBgClass}`}
         >
           Check answer
         </button>
