@@ -491,7 +491,11 @@ function Dashboard({ uid }: { uid: string }) {
               </span>
             )}
           </div>
-          <ProfileButton photoURL={profile?.photoURL ?? null} onClick={() => setShowProfile(true)} />
+          <ProfileButton
+            avatarId={profile?.avatarId ?? null}
+            displayName={profile?.displayName ?? null}
+            onClick={() => setShowProfile(true)}
+          />
         </div>
       </header>
 

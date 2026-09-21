@@ -17,7 +17,7 @@ export async function ensureUserDoc(user: User): Promise<void> {
     uid: user.uid,
     email: user.email,
     displayName: user.displayName,
-    photoURL: user.photoURL,
+    avatarId: null,
     xp: 0,
     level: 1,
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -39,14 +39,14 @@ export function subscribeToUser(
   });
 }
 
-/** Updates a user's own display name and/or photo URL. Every other field
- * on users/{uid} is either set at creation or (tier/premiumSince/
- * premiumUntil/planId) locked to Admin SDK writes only — see the `users`
- * rule in firestore.rules — these two are the only ones a client can
- * freely change. */
+/** Updates a user's own display name and/or chosen avatar preset. Every
+ * other field on users/{uid} is either set at creation or (tier/
+ * premiumSince/premiumUntil/planId) locked to Admin SDK writes only — see
+ * the `users` rule in firestore.rules — these are the only ones a client
+ * can freely change. */
 export async function updateUserProfile(
   uid: string,
-  fields: { displayName?: string; photoURL?: string },
+  fields: { displayName?: string; avatarId?: string | null },
 ): Promise<void> {
   await updateDoc(doc(db!, COLLECTIONS.users, uid), fields);
 }

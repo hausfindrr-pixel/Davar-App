@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeftIcon } from "@/components/icons";
 import { LessonFlow } from "@/components/LessonFlow";
 import { PathEventCard } from "@/components/PathEventCard";
@@ -30,6 +30,14 @@ type PathEventListProps = {
   /** Hide the "upgrade to unlock more" nag — e.g. right after checkout, while the upgrade is still confirming. */
   suppressUpgradeNag?: boolean;
   focusRequest?: PathFocusRequest | null;
+  /** Fires whenever a lesson opens/closes here — lets the parent (PathTab)
+   * hide the prayer journal while a lesson's guided flow is on screen, so
+   * "Your Own Words" never reads as part of the lesson itself. */
+  onLessonOpenChange?: (isOpen: boolean) => void;
+  /** The resolution screen's optional "Pray about this" button — reports
+   * the lesson's title up so PathTab can hand it to the prayer journal as
+   * context. Closes the open lesson itself; the caller doesn't need to. */
+  onPrayAboutThis?: (lessonTitle: string) => void;
   onComplete: (lesson: LessonDoc) => Promise<void>;
   onUpgrade: (plan: PlanId) => Promise<void>;
 };
@@ -57,6 +65,8 @@ export function PathEventList({
   todayEventCount,
   suppressUpgradeNag = false,
   focusRequest = null,
+  onLessonOpenChange,
+  onPrayAboutThis,
   onComplete,
   onUpgrade,
 }: PathEventListProps) {
@@ -91,6 +101,15 @@ export function PathEventList({
     setOpenLessonId(focusRequest.lessonId);
   }
   const openLesson = lessons.find((lesson) => lesson.id === effectiveOpenLessonId) ?? null;
+
+  useEffect(() => {
+    onLessonOpenChange?.(openLesson !== null);
+  }, [openLesson, onLessonOpenChange]);
+
+  function handlePrayAboutThis(lesson: LessonDoc) {
+    setOpenLessonId(null);
+    onPrayAboutThis?.(lesson.title);
+  }
 
   async function handleComplete(lesson: LessonDoc) {
     setPendingId(lesson.id);
@@ -138,6 +157,7 @@ export function PathEventList({
           isLocked={atLimit && !allTimeCompletedLessonIds.includes(openLesson.id)}
           isPending={pendingId === openLesson.id}
           onComplete={() => handleComplete(openLesson)}
+          onPrayAboutThis={onPrayAboutThis ? () => handlePrayAboutThis(openLesson) : undefined}
         />
       </section>
     );

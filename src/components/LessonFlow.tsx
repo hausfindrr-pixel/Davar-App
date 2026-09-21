@@ -22,6 +22,10 @@ type LessonFlowProps = {
   isLocked: boolean;
   isPending: boolean;
   onComplete: () => Promise<void>;
+  /** Optional — the resolution screen's "Pray about this" button, wired
+   * up only when the caller wants it (PathEventList does, to hand off to
+   * the prayer journal). Never required to finish the lesson. */
+  onPrayAboutThis?: () => void;
 };
 
 function ContextDropdown({ context }: { context: string }) {
@@ -278,11 +282,13 @@ function ResolutionScreen({
   isLocked,
   isPending,
   onComplete,
+  onPrayAboutThis,
 }: {
   lesson: LessonDoc;
   isLocked: boolean;
   isPending: boolean;
   onComplete: () => Promise<void>;
+  onPrayAboutThis?: () => void;
 }) {
   const [completing, setCompleting] = useState(false);
 
@@ -303,14 +309,25 @@ function ResolutionScreen({
         <p className="text-xs font-semibold uppercase tracking-wide text-dusk-700 mb-1">Next up</p>
         <p className="text-sm text-ink/80 leading-relaxed">{lesson.nextHook}</p>
       </div>
-      <button
-        type="button"
-        disabled={isLocked || isPending || completing}
-        onClick={() => void handleComplete()}
-        className="self-start rounded-full bg-sage-700 text-paper px-5 py-2 text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {completing || isPending ? "Saving…" : `Complete +${lesson.xpReward} XP`}
-      </button>
+      <div className="flex items-center gap-3 flex-wrap">
+        <button
+          type="button"
+          disabled={isLocked || isPending || completing}
+          onClick={() => void handleComplete()}
+          className="self-start rounded-full bg-sage-700 text-paper px-5 py-2 text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {completing || isPending ? "Saving…" : `Complete +${lesson.xpReward} XP`}
+        </button>
+        {onPrayAboutThis && (
+          <button
+            type="button"
+            onClick={onPrayAboutThis}
+            className="self-start rounded-full border border-dusk-300 text-dusk-700 px-5 py-2 text-sm font-medium hover:bg-dusk-50 transition-colors"
+          >
+            Pray about this
+          </button>
+        )}
+      </div>
       {isLocked && <p className="text-xs text-stone">You&apos;ve reached today&apos;s limit — come back tomorrow to finish this one.</p>}
     </div>
   );
@@ -324,7 +341,15 @@ function ResolutionScreen({
  * lessons ever reach this component (PathEventList gates that); a
  * `completed` lesson gets a compact read-only recap instead of the full
  * interactive replay, since re-running onComplete would double-count it. */
-export function LessonFlow({ lesson, uid, isDone, isLocked, isPending, onComplete }: LessonFlowProps) {
+export function LessonFlow({
+  lesson,
+  uid,
+  isDone,
+  isLocked,
+  isPending,
+  onComplete,
+  onPrayAboutThis,
+}: LessonFlowProps) {
   const [step, setStep] = useState(0);
   const meta = CONTENT_TYPE_META[lesson.track];
   const totalSteps = lesson.screens.length + 2; // intro + questions + resolution
@@ -415,7 +440,13 @@ export function LessonFlow({ lesson, uid, isDone, isLocked, isPending, onComplet
       {step === 0 && <IntroScreen lesson={lesson} onNext={goNext} />}
       {step >= 1 && step <= lesson.screens.length && renderScreen(lesson.screens[step - 1])}
       {step === totalSteps - 1 && (
-        <ResolutionScreen lesson={lesson} isLocked={isLocked} isPending={isPending} onComplete={onComplete} />
+        <ResolutionScreen
+          lesson={lesson}
+          isLocked={isLocked}
+          isPending={isPending}
+          onComplete={onComplete}
+          onPrayAboutThis={onPrayAboutThis}
+        />
       )}
     </div>
   );

@@ -1,13 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeftIcon, CameraIcon, UserIcon } from "@/components/icons";
+import { Avatar } from "@/components/Avatar";
+import { ArrowLeftIcon, CameraIcon } from "@/components/icons";
 import { UnlockCard } from "@/components/PremiumGate";
 import { updateHighlightNote, subscribeToHighlights } from "@/lib/db/highlights";
 import { updateUserProfile } from "@/lib/db/users";
+import { AVATAR_PRESETS } from "@/lib/avatars";
 import type { PlanId } from "@/lib/plisio/plans";
-import { uploadProfilePhoto } from "@/lib/storage";
-import type { HighlightColor, UserDoc, UserHighlightDoc } from "@/types/firestore";
+import {
+  FREE_DAILY_EVENT_LIMIT,
+  PREMIUM_DAILY_EVENT_LIMIT,
+  type HighlightColor,
+  type UserDoc,
+  type UserHighlightDoc,
+} from "@/types/firestore";
 
 type ProfilePageProps = {
   uid: string;
@@ -47,13 +54,14 @@ function PlanCard({ profile, getIdToken }: { profile: UserDoc | null; getIdToken
             Free
           </span>
           <p className="text-xs text-stone leading-relaxed">
-            You&apos;re missing The Armory, Peter&apos;s Watch, and full access to
-            15 lessons and prayers a day — Premium unlocks the full walk.
+            You&apos;re missing The Armory, Peter&apos;s Watch, and{" "}
+            {PREMIUM_DAILY_EVENT_LIMIT} lessons a day (you get {FREE_DAILY_EVENT_LIMIT} on
+            Free) — Premium unlocks the full walk.
           </p>
         </div>
         <UnlockCard
           title="Upgrade to Premium"
-          description="Unlock The Armory, Peter's Watch, and 15 lessons and prayers a day."
+          description={`Unlock The Armory, Peter's Watch, and ${PREMIUM_DAILY_EVENT_LIMIT} lessons a day.`}
           getIdToken={getIdToken}
         />
       </div>
@@ -146,10 +154,10 @@ export function ProfilePage({ uid, profile, getIdToken, onBack, onSignOut }: Pro
   const [nameSaving, setNameSaving] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
   const [nameSavedFlash, setNameSavedFlash] = useState(false);
-  const [photoUploading, setPhotoUploading] = useState(false);
-  const [photoError, setPhotoError] = useState<string | null>(null);
+  const [avatarPickerOpen, setAvatarPickerOpen] = useState(false);
+  const [avatarSaving, setAvatarSaving] = useState<string | null>(null);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
   const [highlights, setHighlights] = useState<UserHighlightDoc[]>([]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     return subscribeToHighlights(uid, setHighlights);
@@ -186,17 +194,16 @@ export function ProfilePage({ uid, profile, getIdToken, onBack, onSignOut }: Pro
     }
   }
 
-  async function handlePhotoChange(file: File | undefined) {
-    if (!file) return;
-    setPhotoUploading(true);
-    setPhotoError(null);
+  async function handleSelectAvatar(avatarId: string) {
+    setAvatarSaving(avatarId);
+    setAvatarError(null);
     try {
-      const url = await uploadProfilePhoto(uid, file);
-      await updateUserProfile(uid, { photoURL: url });
+      await updateUserProfile(uid, { avatarId });
+      setAvatarPickerOpen(false);
     } catch (err) {
-      setPhotoError(err instanceof Error ? err.message : "Could not upload that photo.");
+      setAvatarError(err instanceof Error ? err.message : "Could not save that avatar.");
     } finally {
-      setPhotoUploading(false);
+      setAvatarSaving(null);
     }
   }
 
@@ -216,33 +223,50 @@ export function ProfilePage({ uid, profile, getIdToken, onBack, onSignOut }: Pro
 
       <div className="flex flex-col items-center gap-2">
         <div className="relative">
-          <div className="h-20 w-20 rounded-full overflow-hidden bg-clay-50 text-clay-600 flex items-center justify-center border border-clay-200">
-            {profile?.photoURL ? (
-              // eslint-disable-next-line @next/next/no-img-element -- external Firebase Storage URL
-              <img src={profile.photoURL} alt="" className="h-full w-full object-cover" />
-            ) : (
-              <UserIcon className="h-9 w-9" />
-            )}
-          </div>
+          <Avatar
+            avatarId={profile?.avatarId}
+            displayName={profile?.displayName}
+            sizeClass="h-20 w-20"
+            textSizeClass="text-xl"
+            iconClass="h-9 w-9"
+          />
           <button
             type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={photoUploading}
-            aria-label="Change photo"
-            className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-clay-600 text-paper border-2 border-ivory disabled:opacity-60"
+            onClick={() => setAvatarPickerOpen((open) => !open)}
+            aria-label="Choose avatar"
+            className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-clay-600 text-paper border-2 border-ivory"
           >
             <CameraIcon className="h-3.5 w-3.5" />
           </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => void handlePhotoChange(e.target.files?.[0])}
-          />
         </div>
-        {photoUploading && <p className="text-xs text-stone">Uploading…</p>}
-        {photoError && <p className="text-xs text-clay-700">{photoError}</p>}
+        {avatarError && <p className="text-xs text-clay-700">{avatarError}</p>}
+
+        {avatarPickerOpen && (
+          <div className="w-full max-w-sm rounded-2xl bg-paper border border-mist p-4 grid grid-cols-5 gap-3">
+            {AVATAR_PRESETS.map((preset) => {
+              const Icon = preset.Icon;
+              const selected = profile?.avatarId === preset.id;
+              return (
+                <button
+                  key={preset.id}
+                  type="button"
+                  aria-label={preset.label}
+                  disabled={avatarSaving !== null}
+                  onClick={() => void handleSelectAvatar(preset.id)}
+                  className={`h-11 w-11 rounded-full overflow-hidden border-2 flex items-center justify-center ${preset.bgClass} ${preset.iconClass} disabled:opacity-60 ${
+                    selected ? "border-clay-600" : preset.borderClass
+                  }`}
+                >
+                  {avatarSaving === preset.id ? (
+                    <span className="text-[10px]">…</span>
+                  ) : (
+                    <Icon className="h-5 w-5" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className="w-full max-w-sm rounded-2xl bg-paper border border-mist p-5 flex flex-col gap-3">

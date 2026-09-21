@@ -63,10 +63,6 @@ anything until you create your own Firebase project and add your keys to
    `firestore.rules` (see below) before going to production. Pick a region
    close to your users.
 
-4b. **Enable Storage** (needed for profile photos — see "Profile" below).
-   **Build → Storage → Get started**, same region as Firestore. Deploy
-   `storage.rules` the same way as the Firestore rules — see below.
-
 5. **Copy the config into `.env.local`.** From **Project settings** (gear
    icon) **→ General → Your apps**, copy each value from the `firebaseConfig`
    object into the matching variable:
@@ -76,7 +72,6 @@ anything until you create your own Firebase project and add your keys to
    | `apiKey`               | `NEXT_PUBLIC_FIREBASE_API_KEY`              |
    | `authDomain`           | `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`          |
    | `projectId`            | `NEXT_PUBLIC_FIREBASE_PROJECT_ID`           |
-   | `storageBucket`        | `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`       |
    | `messagingSenderId`    | `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`  |
    | `appId`                | `NEXT_PUBLIC_FIREBASE_APP_ID`               |
 
@@ -85,7 +80,11 @@ anything until you create your own Firebase project and add your keys to
    Firestore/Auth access is enforced by security rules, not by hiding this
    config. Still, don't commit `.env.local` (it's gitignored).
 
-6. **When deploying to Vercel**, add the same six variables under
+   No Storage bucket to enable or configure: profile avatars are a fixed
+   set of presets, not uploads (see "Profile" below) — Firebase Storage
+   isn't available on the Spark/free plan for new projects anyway.
+
+6. **When deploying to Vercel**, add the same five variables under
    **Project Settings → Environment Variables**.
 
 The client SDK is initialized in `src/lib/firebase.ts`, exporting `auth` and
@@ -143,22 +142,26 @@ the Admin SDK (via `/api/watch-chat`) writes to it, so the crisis-detection
 and apostle-routing logic in that route can't be bypassed by writing
 straight to Firestore. `daily_verses`, `daily_devotionals`, and
 `daily_prayers` are read-only for any signed-in user, the same rule shape
-as `lessons`. `storage.rules` covers profile photos the same way (see
-"Profile" below).
+as `lessons`. There's no `storage.rules` — profile avatars are presets, not
+uploads (see "Profile" below), so Firebase Storage isn't used at all.
 
-**Whenever you change either rules file, you have to deploy it yourself** —
+**Whenever you change `firestore.rules`, you have to deploy it yourself** —
 editing it here only changes what's in the repo, not what's enforced on
-your live project. This has bitten this app before: `user_highlights` had
-rules written and tested (`npm run test:rules`) but never actually deployed,
-so every highlight attempt was silently rejected — confirmed directly
-against production by writing to it with a real ID token and getting
-`PERMISSION_DENIED`, while the same token could write to `streaks` (rules
-deployed long ago) with no issue. Deploy both rules files together once you
-have the [Firebase CLI](https://firebase.google.com/docs/cli) installed and
-linked:
+your live project. This has bitten this app before, more than once:
+`user_highlights` had rules written and tested (`npm run test:rules`) but
+never actually deployed, so every highlight attempt was silently rejected —
+confirmed directly against production by writing to it with a real ID
+token and getting `PERMISSION_DENIED`, while the same token could write to
+`streaks` (rules deployed long ago) with no issue. The exact same thing
+happened again with `lessonAnswers` (added alongside the guided lesson
+screens below) — the rule was correct and tested, just never pushed live,
+which is why "Continue" on a scenario/free-text screen threw "Missing or
+insufficient permissions" in production until it was deployed. Deploy the
+rules file once you have the [Firebase CLI](https://firebase.google.com/docs/cli)
+installed and linked:
 
 ```bash
-firebase deploy --only firestore:rules,storage
+firebase deploy --only firestore:rules
 ```
 
 ### Daily caps: events and prayers, tracked separately
@@ -829,15 +832,16 @@ one of the 5 in the bottom bar — and opens a dedicated Profile page
 (`ProfilePage.tsx`) in its place, with its own back button; "Sign out"
 lives here now instead of the main header.
 
-- **Photo.** Tapping the small camera badge on the avatar opens a file
-  picker; `uploadProfilePhoto` (`src/lib/storage.ts`) uploads to Firebase
-  Storage at `avatars/{uid}` (one file per user — re-uploading overwrites
-  it, no orphaned old files) and the resulting download URL is saved to
-  `users/{uid}.photoURL` (`updateUserProfile`, `src/lib/db/users.ts`) — the
-  same field Google sign-in already populates, so both paths feed the one
-  field the rest of the app reads. `storage.rules` caps uploads at 5MB and
-  requires an image content type; `uploadProfilePhoto` checks the same
-  limits client-side first for a fast, clear error.
+- **Avatar.** No photo upload — Firebase Storage isn't available on the
+  Spark (free) plan for new projects, and paying for Blaze just to host
+  small profile pictures isn't worth it. Tapping the small camera badge on
+  the avatar instead opens a picker of 10 preset symbol+color combinations
+  (`AVATAR_PRESETS`, `src/lib/avatars.ts`); picking one saves its id to
+  `users/{uid}.avatarId` (`updateUserProfile`, `src/lib/db/users.ts`). The
+  shared `Avatar` component (`src/components/Avatar.tsx`) renders the
+  chosen preset everywhere an avatar appears, falling back to the user's
+  initials (derived from `displayName`), or a generic person glyph if
+  neither is set yet.
 - **Display name.** An editable field over the same `users/{uid}.displayName`
   already in the schema, saved explicitly (a "Save name" button, disabled
   until the value actually changes) rather than auto-saving on every
@@ -1266,10 +1270,13 @@ src/
                   DailyContentBackdrop, NextStoryTeaser, PricingSection,
                   AuthForm, ApostleAvatar, ApostleMessageCard, BottomTabBar,
                   PremiumGate (UnlockCard + blurredPreviewClass),
-                  ProfileButton, ProfilePage, icons.tsx — shared line icons)
+                  ProfileButton, ProfilePage, Avatar (avatarId → preset or
+                  initials, everywhere an avatar renders), icons.tsx —
+                  shared line icons)
                   tabs/ — TodayTab, PathTab, ArmoryTab, WatchTab, WordTab
                   (see "Navigation" above)
-  lib/            firebase.ts (client SDK init, incl. Storage), firebase-admin.ts
+  lib/            firebase.ts (client SDK init — Auth + Firestore, no
+                  Storage), firebase-admin.ts
                   (server-only Admin SDK init), auth-context.tsx, streak.ts,
                   xp.ts, date.ts (pure logic),
                   roadmap.ts (the single chronological sequence, flattenPathEvents,
@@ -1282,9 +1289,9 @@ src/
                   (see "Apostle Companion" above), armory.ts (Armory content),
                   bible.ts (book list + /api/bible client — BIBLE_BOOKS is
                   now display-only for lessons, chronologicalOrder drives
-                  ordering), storage.ts
-                  (profile photo upload), db/ (Firestore reads/writes,
-                  including highlights.ts, accountability.ts, lessonAnswers.ts
+                  ordering), avatars.ts (AVATAR_PRESETS — see "Profile"
+                  above), db/ (Firestore reads/writes, including
+                  highlights.ts, accountability.ts, lessonAnswers.ts
                   (scenario-screen answers), and dailyContent.ts),
                   plisio/ (plans.ts, checkout.ts, verify.ts — see "Payments" below)
   types/          firestore.ts (Firestore document types)
@@ -1297,7 +1304,6 @@ public/
                   portraits for the landing page (see "Apostle Companion"
                   above); falls back to an icon avatar if one's ever missing
 firestore.rules   Security rules matching the schema above
-storage.rules     Security rules for profile photo uploads (see "Profile" above)
 scripts/          seed-lessons.mjs + lessons-data.mjs (Admin SDK lesson seeding),
                   seed-daily-content.mjs + daily-content-data.mjs (Admin SDK
                   Today-tab daily-content seeding),

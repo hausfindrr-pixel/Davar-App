@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { submitPrayer, subscribeToPrayers } from "@/lib/db/prayers";
 import { dailyPrayerLimit, type PrayerDoc } from "@/types/firestore";
 
@@ -11,6 +11,16 @@ type PrayerJournalProps = {
   /** Prayers submitted today — its own cap, separate from The Path's event
    * completions (see dailyPrayerLimit). */
   todayPrayerCount: number;
+  /** Visually hidden (not unmounted, so an in-progress draft survives)
+   * while a lesson's guided flow is open — see PathTab. */
+  hidden?: boolean;
+  /** Set when a lesson's "Pray about this" button was tapped — pre-fills
+   * the draft with that lesson as context and focuses here. `nonce` lets
+   * the same lesson be requested twice in a row and still re-trigger
+   * (object/value identity, not just the title). Consumed once via
+   * onPrefillConsumed. */
+  prefillRequest?: { title: string; nonce: number } | null;
+  onPrefillConsumed?: () => void;
 };
 
 function formatPrayerDate(timestamp: PrayerDoc["createdAt"]): string {
@@ -24,13 +34,28 @@ function formatPrayerDate(timestamp: PrayerDoc["createdAt"]): string {
  * lesson does (see submitPrayer, src/lib/db/prayers.ts) — same streak/
  * check-in mechanics, but its own daily cap (dailyPrayerLimit): 3/day
  * free, 15/day premium, separate from The Path's event-completion cap. */
-export function PrayerJournal({ uid, timeZone, isPremium, todayPrayerCount }: PrayerJournalProps) {
+export function PrayerJournal({
+  uid,
+  timeZone,
+  isPremium,
+  todayPrayerCount,
+  hidden = false,
+  prefillRequest = null,
+  onPrefillConsumed,
+}: PrayerJournalProps) {
   const [draft, setDraft] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [xpFlash, setXpFlash] = useState<number | null>(null);
   const [prayers, setPrayers] = useState<PrayerDoc[]>([]);
   const [showPast, setShowPast] = useState(false);
+  // Which prefillRequest (by nonce) has already been applied — same
+  // "adjust state during render" pattern as PathEventList's focusRequest
+  // handling, so a repeat "Pray about this" tap on the same lesson still
+  // re-fills/re-focuses rather than being a no-op on an unchanged prop.
+  const [handledNonce, setHandledNonce] = useState<number | null>(null);
+  const sectionRef = useRef<HTMLElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const limit = dailyPrayerLimit(isPremium ? "premium" : "free");
   const atLimit = todayPrayerCount >= limit;
@@ -38,6 +63,21 @@ export function PrayerJournal({ uid, timeZone, isPremium, todayPrayerCount }: Pr
   useEffect(() => {
     return subscribeToPrayers(uid, setPrayers);
   }, [uid]);
+
+  if (prefillRequest && prefillRequest.nonce !== handledNonce) {
+    setHandledNonce(prefillRequest.nonce);
+    setDraft((prev) => prev || `Lord, about "${prefillRequest.title}" — `);
+  }
+
+  // Scroll/focus are DOM side effects, not state — kept in an effect
+  // (keyed on the now-handled nonce) rather than the render body above.
+  useEffect(() => {
+    if (handledNonce === null) return;
+    sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    textareaRef.current?.focus();
+    onPrefillConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [handledNonce]);
 
   async function handleSubmit() {
     const text = draft.trim();
@@ -62,7 +102,10 @@ export function PrayerJournal({ uid, timeZone, isPremium, todayPrayerCount }: Pr
   }
 
   return (
-    <section className="w-full max-w-sm flex flex-col gap-3">
+    <section
+      ref={sectionRef}
+      className={`w-full max-w-sm flex-col gap-3 ${hidden ? "hidden" : "flex"}`}
+    >
       <h2 className="text-sm font-medium text-ink px-1">Your Own Words</h2>
 
       <div className="rounded-2xl bg-paper border border-mist p-5 flex flex-col gap-3">
@@ -71,6 +114,7 @@ export function PrayerJournal({ uid, timeZone, isPremium, todayPrayerCount }: Pr
           your heart today.
         </p>
         <textarea
+          ref={textareaRef}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           placeholder="Lord, today I..."

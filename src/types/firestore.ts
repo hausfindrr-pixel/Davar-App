@@ -28,7 +28,13 @@ export interface UserDoc {
   uid: string;
   email: string | null;
   displayName: string | null;
-  photoURL: string | null;
+  /**
+   * A chosen preset avatar's id (see src/lib/avatars.ts), or null if the
+   * user hasn't picked one — the Avatar component then falls back to
+   * their initials, or a generic person glyph. There's no photo upload:
+   * Firebase Storage isn't available on the Spark (free) plan.
+   */
+  avatarId: string | null;
   createdAt: Timestamp;
   xp: number;
   level: number;
