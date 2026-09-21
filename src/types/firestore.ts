@@ -36,8 +36,6 @@ export interface UserDoc {
    */
   avatarId: string | null;
   createdAt: Timestamp;
-  xp: number;
-  level: number;
   timezone: string | null;
   /**
    * Set to "free" on creation and never changed by the client — see the
@@ -111,7 +109,6 @@ interface LessonDocBase {
    * placeholder gradient+icon. Deliberately one per lesson, not one per
    * screen. */
   imageUrl: string | null;
-  xpReward: number;
   estimatedMinutes: number;
   createdAt: Timestamp;
 }
@@ -210,7 +207,7 @@ export function isMultipleChoiceScreen(screen: LessonScreen): screen is Multiple
  *    Scripture) plus `nextHook` (a cliffhanger pointing at the next
  *    lesson in chronological order). This is where completing the lesson
  *    actually fires (completeLesson, src/lib/db/lessons.ts) — unchanged
- *    XP/streak/daily-cap mechanics, still keyed on `id`/`xpReward`.
+ *    streak/daily-cap mechanics, still keyed on `id`.
  */
 export interface LessonDoc extends LessonDocBase {
   summary: string;
@@ -281,11 +278,8 @@ export interface CheckInDoc {
   type: CheckInType;
   date: string; // "YYYY-MM-DD", in the user's timezone
   completedAt: Timestamp;
-  xpEarned: number;
   notes: string | null;
 }
-
-export const PRAYER_XP_REWARD = 10;
 
 /**
  * users/{uid}/prayers/{prayerId} — a user's own free-text prayers, newest

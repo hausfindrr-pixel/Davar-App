@@ -59,8 +59,6 @@ async function seedUser(uid, tier) {
       email: `${uid}@example.com`,
       displayName: null,
       avatarId: null,
-      xp: 0,
-      level: 1,
       timezone: "UTC",
       tier,
       premiumSince: null,
@@ -86,8 +84,6 @@ await check("a brand-new user cannot self-create with tier=premium", async () =>
       email: null,
       displayName: null,
       avatarId: null,
-      xp: 0,
-      level: 1,
       timezone: null,
       tier: "premium",
       premiumUntil: null,
@@ -102,8 +98,6 @@ await check("a brand-new user cannot self-create with a non-null premiumUntil", 
       email: null,
       displayName: null,
       avatarId: null,
-      xp: 0,
-      level: 1,
       timezone: null,
       tier: "free",
       premiumUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
@@ -118,8 +112,6 @@ await check("a brand-new user cannot self-create with a non-null planId", async 
       email: null,
       displayName: null,
       avatarId: null,
-      xp: 0,
-      level: 1,
       timezone: null,
       tier: "free",
       premiumUntil: null,
@@ -135,8 +127,6 @@ await check("a brand-new user cannot self-create with a non-null premiumSince", 
       email: null,
       displayName: null,
       avatarId: null,
-      xp: 0,
-      level: 1,
       timezone: null,
       tier: "free",
       premiumSince: new Date(),
@@ -155,8 +145,6 @@ await check(
         email: null,
         displayName: null,
         avatarId: null,
-        xp: 0,
-        level: 1,
         timezone: null,
         tier: "free",
         premiumSince: null,
@@ -450,7 +438,6 @@ await testEnv.withSecurityRulesDisabled(async (ctx) => {
     lessonId: null,
     type: "custom",
     date: TODAY,
-    xpEarned: 10,
     notes: null,
   });
   await setDoc(doc(ctx.firestore(), "accountability_links", "link-1"), {
@@ -594,8 +581,12 @@ await check("alice cannot edit an existing prayer (immutable journal)", async ()
   await assertFails(updateDoc(doc(aliceDb, "users", ALICE, "prayers", "prayer-1"), { text: "edited" }));
 });
 
-await check("alice cannot delete her own prayer", async () => {
-  await assertFails(deleteDoc(doc(aliceDb, "users", ALICE, "prayers", "prayer-1")));
+await check("bob cannot delete alice's prayer", async () => {
+  await assertFails(deleteDoc(doc(bobDb, "users", ALICE, "prayers", "prayer-1")));
+});
+
+await check("alice can delete her own prayer (Matthew's Ledger)", async () => {
+  await assertSucceeds(deleteDoc(doc(aliceDb, "users", ALICE, "prayers", "prayer-1")));
 });
 
 // --- users/{uid}/lessonAnswers: a lesson's scenario-screen answers ---
@@ -664,8 +655,12 @@ await check("alice can read her own lesson answer", async () => {
   await assertSucceeds(getDoc(doc(aliceDb, "users", ALICE, "lessonAnswers", aliceAnswerId)));
 });
 
-await check("alice cannot delete her own lesson answer", async () => {
-  await assertFails(deleteDoc(doc(aliceDb, "users", ALICE, "lessonAnswers", aliceAnswerId)));
+await check("bob cannot delete alice's lesson answer", async () => {
+  await assertFails(deleteDoc(doc(bobDb, "users", ALICE, "lessonAnswers", aliceAnswerId)));
+});
+
+await check("alice can delete her own lesson answer (Matthew's Ledger)", async () => {
+  await assertSucceeds(deleteDoc(doc(aliceDb, "users", ALICE, "lessonAnswers", aliceAnswerId)));
 });
 
 // --- prayers have their own daily cap, separate from event completions ---

@@ -24,3 +24,19 @@ export function daysBetweenKeys(fromKey: string, toKey: string): number {
   const to = Date.UTC(ty, tm - 1, td);
   return Math.round((to - from) / 86_400_000);
 }
+
+/** "Monday, 21 September" for a "YYYY-MM-DD" key — Matthew's Ledger's day
+ * headings. The key is already a calendar date computed in the user's own
+ * timezone (dateKeyInTimeZone), so this formats it in UTC rather than
+ * shifting it again by the browser's local zone. Built from separately
+ * formatted weekday/day/month parts (rather than one combined
+ * Intl.DateTimeFormat call) since combined day-before-month formats are
+ * locale-specific (e.g. en-GB drops the comma) and this exact
+ * "Weekday, D Month" shape is the app's own copy, not a locale's. */
+export function formatDayLabel(key: string): string {
+  const [year, month, day] = key.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  const weekday = new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" }).format(date);
+  const monthName = new Intl.DateTimeFormat("en-US", { month: "long", timeZone: "UTC" }).format(date);
+  return `${weekday}, ${day} ${monthName}`;
+}

@@ -90,7 +90,6 @@ export const lessons = [
       "In six days, God speaks a formless world into shape — light, sky, land, every living thing — and calls it good. On the seventh, He rests, setting a rhythm of work and rest that runs through the whole of Scripture.",
     nextHook:
       "Not long after, that same 'very good' world breaks — and God's response isn't to walk away from it. Next: one family, a flood, and a promise that outlasts the water.",
-    xpReward: 15,
     estimatedMinutes: 8,
   },
   {
@@ -155,7 +154,6 @@ export const lessons = [
       "Noah builds, waits, and finally steps onto washed ground under a rainbow — God's promise never to flood the earth again. Judgment and mercy, holding together rather than canceling each other out.",
     nextHook:
       "Generations later, that same family's descendants will find themselves trapped between an army and the sea — and discover the same God still makes a way through what looks like the end. Next: the Red Sea.",
-    xpReward: 15,
     estimatedMinutes: 8,
   },
   {
@@ -220,7 +218,6 @@ export const lessons = [
       "Moses stretched out his hand, and the LORD drove the sea back with a strong east wind, turning it into dry ground. Israel crossed with a wall of water on both sides, and everyone who saw it \"feared the LORD and put their trust in him.\"",
     nextHook:
       "Free on the far shore, Israel will spend generations in the land God promised them — kings rise and fall, and eventually a shepherd boy with a sling will face a giant no soldier would touch. Next: David and Goliath.",
-    xpReward: 15,
     estimatedMinutes: 7,
   },
   {
@@ -285,7 +282,6 @@ export const lessons = [
       "A giant no one else would face, and a shepherd boy who shows up with a sling and a reason bigger than fear. 'The battle is the LORD's' — and David triumphs with nothing but that sling and a stone.",
     nextHook:
       "David's own story doesn't stay this simple — a king's life gets complicated in ways a shepherd's never does. Centuries later, another young man faces his own impossible test, not with a sling but with prayer, in a den of lions. Next: Daniel.",
-    xpReward: 15,
     estimatedMinutes: 8,
   },
   {
@@ -350,7 +346,6 @@ export const lessons = [
       "Daniel keeps praying three times a day even after a law is passed to trap him for it. Thrown to the lions overnight, he's found alive at dawn: \"my God sent his angel and shut the lions' mouths.\"",
     nextHook:
       "Centuries of waiting for God to make good on His promises come to a point no one expects — not in a palace, but in a feeding trough, in an unremarkable town, to parents nobody would have picked. Next: the birth of Jesus.",
-    xpReward: 15,
     estimatedMinutes: 7,
   },
   {
@@ -415,7 +410,6 @@ export const lessons = [
       "God enters the world as a baby in a feeding trough, and the first people told are shepherds working the night shift — not anyone important. The overlooked get the news first; that's the shape the whole story keeps taking.",
     nextHook:
       "That baby grows up — and the grown man will do something that terrifies even His closest friends: fall asleep in a boat, in the middle of a storm that has them convinced they're about to die. Next: Jesus calms the storm.",
-    xpReward: 15,
     estimatedMinutes: 6,
   },
   {
@@ -478,7 +472,6 @@ export const lessons = [
       "The storm is real, the disciples are convinced they're about to die — and Jesus says three words to the wind and waves, and it's over. The real question isn't about the storm: \"why are you so afraid? Do you still have no faith?\"",
     nextHook:
       "Not every storm Jesus calms is made of wind and water — some of His hardest stories are about a father waiting for a son who ran, and whether we'd actually want him to come home. Next: the Prodigal Son.",
-    xpReward: 15,
     estimatedMinutes: 6,
   },
   {
@@ -543,7 +536,6 @@ export const lessons = [
       "A son wastes everything and comes home rehearsing an apology he never gets to finish — his father is already running toward him. Grace that isn't earned back, offered to a son who thought he'd disqualified himself.",
     nextHook:
       "Not everyone around Jesus is as ready to extend that grace — some people are far more interested in catching someone in the act than in seeing them get free of it. Next: the woman caught in sin.",
-    xpReward: 15,
     estimatedMinutes: 8,
   },
   {
@@ -607,7 +599,6 @@ export const lessons = [
       "A woman is dragged in front of Jesus as a trap — until He tells her accusers that whoever is without sin can throw the first stone, and they walk away one by one. \"Neither do I condemn you,\" He tells her, \"go now and leave your life of sin.\"",
     nextHook:
       "Grace this real costs something — and not long after, the people who wanted Jesus gone will finally get their way. But the story doesn't end at a cross. Next: the resurrection.",
-    xpReward: 15,
     estimatedMinutes: 7,
   },
   {
@@ -671,7 +662,6 @@ export const lessons = [
       "Mary comes to grieve at an empty tomb — then a familiar voice says her name, and everything turns. She runs to tell the others the only sentence that matters: \"I have seen the Lord!\"",
     nextHook:
       "This is where the seeded library stands today — more stories, spanning both testaments, are on their way. Come back for what's next.",
-    xpReward: 15,
     estimatedMinutes: 6,
   },
 ];

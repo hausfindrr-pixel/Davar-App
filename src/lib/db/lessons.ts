@@ -12,7 +12,6 @@ import {
 import { db } from "@/lib/firebase";
 import { dateKeyInTimeZone } from "@/lib/date";
 import { computeStreakUpdate } from "@/lib/streak";
-import { CHECK_IN_XP, levelFromXp } from "@/lib/xp";
 import {
   COLLECTIONS,
   dailyEventLimit,
@@ -160,21 +159,18 @@ export function subscribeToLessonProgress(
 export interface CompleteLessonResult {
   limitReached: boolean;
   completedLessonIds: string[];
-  xpEarned: number;
-  newXp: number;
-  newLevel: number;
 }
 
 /**
- * Records a lesson completion for `uid` "today" (in `timeZone`) and awards
- * its XP. Users are capped at dailyEventLimit(tier) lesson completions per
- * day — a separate cap from the prayer journal's submissions (see
- * submitPrayer, src/lib/db/prayers.ts) — enforced here as a quick
- * client-side check for a clean result, but the real gate is the
- * daily_lesson_progress update rule in firestore.rules: if a client
- * bypassed this check and tried anyway, that rule rejects the whole
- * transaction (including the XP award and check-in), so the limit holds
- * even against a client that isn't using this function honestly.
+ * Records a lesson completion for `uid` "today" (in `timeZone`). Users are
+ * capped at dailyEventLimit(tier) lesson completions per day — a separate
+ * cap from the prayer journal's submissions (see submitPrayer,
+ * src/lib/db/prayers.ts) — enforced here as a quick client-side check for a
+ * clean result, but the real gate is the daily_lesson_progress update rule
+ * in firestore.rules: if a client bypassed this check and tried anyway,
+ * that rule rejects the whole transaction (including the check-in), so the
+ * limit holds even against a client that isn't using this function
+ * honestly.
  *
  * A lesson is the app's daily practice, so completing one also counts as
  * today's streak check-in (via the same computeStreakUpdate the manual
@@ -203,17 +199,9 @@ export async function completeLesson(
     const completedLessonIds = prevProgress?.completedLessonIds ?? [];
     const user = userSnap.exists() ? (userSnap.data() as UserDoc) : undefined;
     const tier = user?.tier ?? "free";
-    const prevXp = user?.xp ?? 0;
-    const prevLevel = user?.level ?? 1;
 
     if (completedLessonIds.length >= dailyEventLimit(tier)) {
-      return {
-        limitReached: true,
-        completedLessonIds,
-        xpEarned: 0,
-        newXp: prevXp,
-        newLevel: prevLevel,
-      };
+      return { limitReached: true, completedLessonIds };
     }
 
     const nextCompletedLessonIds = [...completedLessonIds, lesson.id];
@@ -255,21 +243,9 @@ export async function completeLesson(
       type: "lesson",
       date: today,
       completedAt: serverTimestamp(),
-      xpEarned: lesson.xpReward,
       notes: null,
     });
 
-    const streakXp = streakUpdate.alreadyCheckedInToday ? 0 : CHECK_IN_XP;
-    const newXp = prevXp + lesson.xpReward + streakXp;
-    const newLevel = levelFromXp(newXp);
-    tx.update(userRef, { xp: newXp, level: newLevel });
-
-    return {
-      limitReached: false,
-      completedLessonIds: nextCompletedLessonIds,
-      xpEarned: lesson.xpReward + streakXp,
-      newXp,
-      newLevel,
-    };
+    return { limitReached: false, completedLessonIds: nextCompletedLessonIds };
   });
 }

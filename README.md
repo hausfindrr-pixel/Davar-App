@@ -1,7 +1,7 @@
 # Davar
 
 A daily discipleship app: Duolingo-style gamified scripture engagement
-(streaks, XP, levels) combined with lightweight accountability tracking.
+(streaks) combined with lightweight accountability tracking.
 
 **Stack:** Next.js (App Router) · TypeScript · Tailwind CSS · Firebase
 (Firestore + Auth) · PWA (`@ducanh2912/next-pwa`) · Vercel
@@ -94,7 +94,7 @@ The client SDK is initialized in `src/lib/firebase.ts`, exporting `auth` and
 
 Types for every collection live in `src/types/firestore.ts`:
 
-- **`users/{uid}`** — profile, XP, level, `tier` (`"free"` | `"premium"`)
+- **`users/{uid}`** — profile, `tier` (`"free"` | `"premium"`)
 - **`streaks/{uid}`** — current/longest streak count, last check-in date, streak freezes
 - **`lessons/{lessonId}`** — a guided, one-screen-at-a-time sequence, not a
   single scrolling card: intro (`summary`) → question `screens` → a
@@ -189,8 +189,8 @@ lesson-completion write is allowed only if `completedLessonIds.size()` was
 under the tier's *event* limit before that write, and a prayer-submission
 write only if `prayerCount` was under the tier's *prayer* limit — so
 bypassing the client checks and writing directly to Firestore hits the
-same wall (the XP award and check-in write riding along in the same
-transaction get rejected with it). The `users/{uid}/prayers/{prayerId}`
+same wall (the check-in write riding along in the same transaction gets
+rejected with it). The `users/{uid}/prayers/{prayerId}`
 create rule enforces the prayer check independently (reading that same
 progress doc's `prayerCount`, or treating it as zero via `!exists()` for
 the very first action of a fresh day) — so a prayer can't be created
@@ -290,7 +290,7 @@ scroll. Each tab is its own component under `src/components/tabs/`:
 
 | Tab | Component | Access |
 | --- | --- | --- |
-| Today | `TodayTab.tsx` | Everyone — John's mascot greeting, a "Continue Your Story" teaser into The Path, Today's Verse/Devotional/Prayer (see below), streak, XP, level, the apostle companion message, check-in |
+| Today | `TodayTab.tsx` | Everyone — John's mascot greeting, a "Continue Your Story" teaser into The Path, Today's Verse/Devotional/Prayer (see below), streak, the apostle companion message, check-in |
 | The Path | `PathTab.tsx` | Free: exactly one lesson at a time, completion-gated (1/day cap); 3 prayers/day. Premium: the whole library, all in one chronological sequence (3 lessons/day, 15 prayers/day) — see "Daily caps" and "The Path: strict visibility and completion-gated rotation" above/below |
 | The Armory | `ArmoryTab.tsx` | Free: teaser (see below). Premium: full access |
 | Peter's Watch | `WatchTab.tsx` | Free: teaser. Premium: full access |
@@ -309,8 +309,8 @@ always point at the same lesson.
 
 Derived from `allTimeCompletedLessonIds` (see "All-time completion
 tracking" above), not from today's progress doc alone. This is **not** a
-fourth daily-rotation pool: there's no new collection, no XP awarded here,
-nothing completable from Today itself. It's a pointer into the user's own
+fourth daily-rotation pool: there's no new collection, nothing completable
+from Today itself. It's a pointer into the user's own
 progress in The Path, which is why it changes the moment a lesson is
 completed rather than once a day.
 
@@ -366,12 +366,12 @@ inside the illustrated band.
   own independent rotation. Nothing else in the daily-content data model
   tracks a per-user "seen" history the way it would need to for a
   personalized rotation, and building one just for this would add a new
-  per-user subcollection and write path for content that isn't XP-bearing
-  or otherwise personalized — the standard "Verse of the Day" shape this
-  mirrors is global for the same reason. Revisit this if the content ever
-  needs to be personalized.
-- **No XP, no completion state, read-only for v1** — these are things to
-  read, not tasks to complete, unlike lessons.
+  per-user subcollection and write path for content that isn't otherwise
+  personalized — the standard "Verse of the Day" shape this mirrors is
+  global for the same reason. Revisit this if the content ever needs to
+  be personalized.
+- **No completion state, read-only for v1** — these are things to read,
+  not tasks to complete, unlike lessons.
 
 ### The Path: journey progress and stages
 
@@ -532,7 +532,7 @@ A lesson is a guided, one-screen-at-a-time sequence — `LessonFlow.tsx`
    chronological order) in a separate callout. **This is where completing
    a lesson actually fires** — `completeLesson()` (`src/lib/db/lessons.ts`)
    needed **zero changes** for any of this restructure, since it only ever
-   touched `lesson.id`/`lesson.xpReward`.
+   touched `lesson.id`.
 
 `LessonScreen` is a union of four types, each its own component inside
 `LessonFlow.tsx`:
@@ -593,9 +593,9 @@ color the activity happens to be in. No red anywhere, matching the app's
 never-shaming tone. The empty-blank placeholder is a light tint fill
 (`-50`) plus a bold `-700` dashed border (`emptyBlankClass`) — a real box
 shape at a glance, not the previous unfilled `-400` dashed outline that
-was nearly invisible. The completion/XP backend (`completeLesson`,
+was nearly invisible. The completion backend (`completeLesson`,
 `src/lib/db/lessons.ts`) needed **zero changes** — it only ever touched
-`lesson.id`/`lesson.xpReward`, unaffected by this.
+`lesson.id`, unaffected by this.
 
 **Migration note:** all 10 seeded lessons moved from the old single-card
 shape (`summary` + one embedded `verseActivity`) to this screen-flow shape
@@ -635,8 +635,8 @@ render error shows a friendly retry card instead of a blank page.
 
 Below the lesson feed, `PathTab.tsx` renders `PrayerJournal.tsx` — a place
 to write a free-text prayer instead of only reading guided ones. Submitting
-awards XP the same way completing a lesson does: `submitPrayer`
-(`src/lib/db/prayers.ts`) runs the same shape of transaction as
+counts as today's streak check-in the same way completing a lesson does:
+`submitPrayer` (`src/lib/db/prayers.ts`) runs the same shape of transaction as
 `completeLesson` (`src/lib/db/lessons.ts`) — a write, a streak check-in
 (only once per day; a second prayer the same day still saves, it just
 doesn't re-award the streak bonus), and a `check_ins` record (using the
@@ -657,8 +657,8 @@ feature asked for one, so none was added.
 - **Verified**: 8 new emulator rules tests (own-uid write, id-must-match-
   docId, empty-text rejected, cross-user write denied, immutable), plus a
   full transactional test against the emulator (not just rules in
-  isolation) confirming the prayer, streak, and XP all commit together
-  correctly in one atomic write.
+  isolation) confirming the prayer, streak, and check-in all commit
+  together correctly in one atomic write.
 
 ### The Armory
 
@@ -867,6 +867,80 @@ lives here now instead of the main header.
     so implying a renewal date would be a false claim. If neither field is
     set (a grant made before `planId` existed, or any other gap), it falls
     back to a plain "Premium member" — no invented date.
+
+## Matthew's Ledger (Archives)
+
+A private, personal record of the user's walk — completed lessons (title,
+date completed, the scenario/short-answer text they wrote) and prayers
+(full text, date) — opened from a "Matthew's Ledger" entry card on the
+Profile page (subtitled "(Archives)"). `MatthewsLedger.tsx` swaps in over
+`ProfilePage.tsx` the same way Profile itself swaps in over the dashboard
+— own header, own back button.
+
+**Nothing new is stored.** The Ledger is a read-composed view joined
+client-side from data that already exists for other reasons:
+
+- `check_ins` (`type == "lesson"`) gives each completed lesson's real
+  completion date — `fetchLessonCheckIns`, `src/lib/db/checkIns.ts`. This
+  is the date shown, not a lesson answer's own `createdAt`, which gets
+  overwritten if the answer is later revised (back-navigation).
+- `users/{uid}/lessonAnswers` supplies the written scenario/short-answer
+  text, joined by `lessonId` — `fetchLessonAnswers`,
+  `src/lib/db/lessonAnswers.ts`.
+- The already-loaded `lessons` list supplies each screen's own `prompt`,
+  so an expanded entry shows the question next to the answer.
+- `users/{uid}/prayers` (`subscribeToPrayers`) is used as-is.
+
+`src/lib/ledger.ts` does the joining, in one place, independent of
+Firestore: `buildLedgerEntries` merges lesson completions and prayers into
+one reverse-chronological list; `groupLedgerEntriesByDay` buckets them for
+the day-grouped timeline (headed "Monday, 21 September" —
+`formatDayLabel`, `src/lib/date.ts`); `findOnThisDay` and
+`searchLedgerEntries` back the two Premium features below. All four are
+pure functions over plain arrays, so they're testable without a browser or
+Firestore.
+
+- **Short-answer text wasn't being saved at all before this.**
+  `ScenarioScreenView` in `LessonFlow.tsx` always called
+  `saveLessonAnswer`; `ShortAnswerScreenView` didn't — the text was typed,
+  self-marked, then discarded the moment the user tapped Continue. Fixed
+  by wiring it to the same `saveLessonAnswer` call (on "Check my
+  thinking", its own lock-in moment), no schema change needed since the
+  doc shape was always generic on `screenId`.
+- **Filter and layout.** All/Lessons/Prayers pills filter the merged list
+  before grouping. Each entry is a compact "ledger line" (kind + time,
+  title or a truncated preview, `font-serif` for the actual written text
+  to read differently from the app's UI chrome) that expands on tap to
+  show the full answer(s) or prayer text.
+- **Delete.** Deleting a lesson entry removes only its saved answer
+  text — the lesson's `check_ins` completion record (and any streak
+  credit it earned) is untouched, so deleting a written reflection never
+  un-completes the lesson. Deleting a prayer removes it entirely, same as
+  it always meant. Two small rules changes were needed for this —
+  `lessonAnswers`' `allow delete` went from `false` to `isOwner(uid)`, and
+  `prayers`' combined `allow update, delete: if false` split into
+  `update: if false` (still immutable once written) + `delete:
+  if isOwner(uid)` — both covered by new `rules-test.mjs` cases. **This
+  needs `firebase deploy --only firestore:rules` to take effect in
+  production** — reading the Ledger doesn't (all the reads above were
+  already owner-only), only deleting an entry does.
+- **Matthew, at the top.** Same speech-bubble layout as John's
+  `MascotHero` on Today (portrait + tail-pointed bubble), but a separate
+  message lane from his dashboard progress recaps: `MATTHEW_LEDGER_MESSAGES`
+  (`src/lib/apostles.ts`), picked the same deterministic per-day way via a
+  new generalized `pickFromList` (which `pickApostleMessage` now also
+  calls internally, instead of duplicating the hash-and-index logic).
+- **"On this day" (Premium).** `findOnThisDay` looks for entries whose
+  day-of-month matches today's, from the closest strictly-earlier month,
+  and surfaces all of that date's entries under "N month(s) ago today."
+  Only rendered when a match exists, for both tiers — Free sees it as a
+  blurred teaser (the same `blurredPreviewClass`/`UnlockCard` pattern as
+  The Armory/Peter's Watch) rather than nothing, Premium sees it for real.
+- **Search (Premium).** Plain client-side substring search
+  (`searchLedgerEntries`) over the already-loaded entries' text — no
+  search index, this app's per-user ledger is small enough not to need
+  one. Free sees a locked, non-interactive search row instead of the real
+  input.
 
 ## Payments (Plisio)
 
@@ -1186,8 +1260,7 @@ from their own story:
   `${uid}-${date}-${type}` seed rather than `Math.random()`, so it's stable
   across re-renders/navigation within a day (no flicker) but still varies
   day to day and user to user. `formatApostleMessage` fills
-  `{streak}`/`{longest}`/`{xp}`/`{level}` placeholders (used by Matthew's
-  recap templates).
+  `{streak}`/`{longest}` placeholders (used by Matthew's recap templates).
 - `src/lib/apostle-moment.ts` — `pickApostleMoment(ctx)` decides which
   *type* applies right now from simple dashboard state, in priority order:
   not checked in today → Peter; checked in but the streak just reset after
@@ -1244,13 +1317,12 @@ from their own story:
   consecutive day, bridges a single missed day with a streak freeze if one's
   available, otherwise resets to 1.
 - `src/lib/db/streaks.ts` — `checkIn(uid, timeZone)` runs a Firestore
-  transaction that applies `computeStreakUpdate`, writes a `check_ins` doc,
-  and awards XP (`src/lib/xp.ts`) on the `users` doc, so a double-tap or two
-  devices checking in at once can't double-count.
+  transaction that applies `computeStreakUpdate` and writes a `check_ins`
+  doc, so a double-tap or two devices checking in at once can't double-count.
 - "Today" is computed per-user via `dateKeyInTimeZone` (`src/lib/date.ts`)
   using the `timezone` stored on their `users` doc (captured from the
   browser at sign-in).
-- `isFirebaseConfigured` (`src/lib/firebase.ts`) is `false` until all six env
+- `isFirebaseConfigured` (`src/lib/firebase.ts`) is `false` until all five env
   vars are set. The SDK throws synchronously on a missing/placeholder API
   key, so `auth`/`db` are only initialized once it's `true` — `AuthForm`
   checks it and shows a setup notice instead of crashing.
@@ -1271,14 +1343,15 @@ src/
                   AuthForm, ApostleAvatar, ApostleMessageCard, BottomTabBar,
                   PremiumGate (UnlockCard + blurredPreviewClass),
                   ProfileButton, ProfilePage, Avatar (avatarId → preset or
-                  initials, everywhere an avatar renders), icons.tsx —
-                  shared line icons)
+                  initials, everywhere an avatar renders), MatthewsLedger
+                  (see "Matthew's Ledger" above), icons.tsx — shared line
+                  icons)
                   tabs/ — TodayTab, PathTab, ArmoryTab, WatchTab, WordTab
                   (see "Navigation" above)
   lib/            firebase.ts (client SDK init — Auth + Firestore, no
                   Storage), firebase-admin.ts
                   (server-only Admin SDK init), auth-context.tsx, streak.ts,
-                  xp.ts, date.ts (pure logic),
+                  date.ts (pure logic),
                   roadmap.ts (the single chronological sequence, flattenPathEvents,
                   nextLesson — see "strict visibility and
                   completion-gated rotation" above),
@@ -1290,9 +1363,12 @@ src/
                   bible.ts (book list + /api/bible client — BIBLE_BOOKS is
                   now display-only for lessons, chronologicalOrder drives
                   ordering), avatars.ts (AVATAR_PRESETS — see "Profile"
-                  above), db/ (Firestore reads/writes, including
-                  highlights.ts, accountability.ts, lessonAnswers.ts
-                  (scenario-screen answers), and dailyContent.ts),
+                  above), ledger.ts (LedgerEntry, buildLedgerEntries,
+                  findOnThisDay, searchLedgerEntries — pure logic behind
+                  "Matthew's Ledger" above), db/ (Firestore reads/writes,
+                  including highlights.ts, accountability.ts,
+                  lessonAnswers.ts (scenario/short-answer text),
+                  checkIns.ts (fetchLessonCheckIns), and dailyContent.ts),
                   plisio/ (plans.ts, checkout.ts, verify.ts — see "Payments" below)
   types/          firestore.ts (Firestore document types)
 public/

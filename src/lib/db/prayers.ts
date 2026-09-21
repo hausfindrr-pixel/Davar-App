@@ -1,5 +1,6 @@
 import {
   collection,
+  deleteDoc,
   doc,
   onSnapshot,
   orderBy,
@@ -10,10 +11,8 @@ import {
 import { db } from "@/lib/firebase";
 import { dateKeyInTimeZone } from "@/lib/date";
 import { computeStreakUpdate } from "@/lib/streak";
-import { CHECK_IN_XP, levelFromXp } from "@/lib/xp";
 import {
   COLLECTIONS,
-  PRAYER_XP_REWARD,
   dailyPrayerLimit,
   type DailyLessonProgressDoc,
   type PrayerDoc,
@@ -35,23 +34,26 @@ export function subscribeToPrayers(uid: string, callback: (prayers: PrayerDoc[])
   });
 }
 
+/** Deletes a prayer entirely — Matthew's Ledger's per-entry delete. Unlike
+ * a lesson answer, a prayer has no separate completion record riding on
+ * it, so this just removes the doc (see firestore.rules). */
+export async function deletePrayer(uid: string, prayerId: string): Promise<void> {
+  await deleteDoc(doc(db!, COLLECTIONS.users, uid, "prayers", prayerId));
+}
+
 export interface SubmitPrayerResult {
   limitReached: boolean;
-  xpEarned: number;
-  newXp: number;
-  newLevel: number;
 }
 
 /**
- * Saves a free-text prayer and awards XP the same way completing a lesson
- * does — same transaction shape as completeLesson in src/lib/db/lessons.ts:
- * the prayer write, a streak check-in (only once per day — a second
- * prayer the same day still saves, just doesn't re-award the streak XP),
- * and a check_ins record, all in one transaction. Prayers have their own
- * daily cap (dailyPrayerLimit, src/types/firestore.ts), tracked in the same
- * daily_lesson_progress doc as lessons but counted separately — counted,
- * not ID-tracked, since a prayer doesn't need an "already done" check the
- * way a lesson does.
+ * Saves a free-text prayer — same transaction shape as completeLesson in
+ * src/lib/db/lessons.ts: the prayer write, a streak check-in (only once
+ * per day — a second prayer the same day still saves, it just doesn't
+ * re-fire the streak update), and a check_ins record, all in one
+ * transaction. Prayers have their own daily cap (dailyPrayerLimit,
+ * src/types/firestore.ts), tracked in the same daily_lesson_progress doc
+ * as lessons but counted separately — counted, not ID-tracked, since a
+ * prayer doesn't need an "already done" check the way a lesson does.
  */
 export async function submitPrayer(uid: string, timeZone: string, text: string): Promise<SubmitPrayerResult> {
   const trimmed = text.trim();
@@ -76,11 +78,9 @@ export async function submitPrayer(uid: string, timeZone: string, text: string):
     const prayerCount = prevProgress?.prayerCount ?? 0;
     const user = userSnap.exists() ? (userSnap.data() as UserDoc) : undefined;
     const tier = user?.tier ?? "free";
-    const prevXp = user?.xp ?? 0;
-    const prevLevel = user?.level ?? 1;
 
     if (prayerCount >= dailyPrayerLimit(tier)) {
-      return { limitReached: true, xpEarned: 0, newXp: prevXp, newLevel: prevLevel };
+      return { limitReached: true };
     }
 
     tx.set(prayerRef, { id: prayerRef.id, text: trimmed, date: today, createdAt: serverTimestamp() });
@@ -123,15 +123,9 @@ export async function submitPrayer(uid: string, timeZone: string, text: string):
       type: "prayer",
       date: today,
       completedAt: serverTimestamp(),
-      xpEarned: PRAYER_XP_REWARD,
       notes: null,
     });
 
-    const streakXp = streakUpdate.alreadyCheckedInToday ? 0 : CHECK_IN_XP;
-    const newXp = prevXp + PRAYER_XP_REWARD + streakXp;
-    const newLevel = levelFromXp(newXp);
-    tx.update(userRef, { xp: newXp, level: newLevel });
-
-    return { limitReached: false, xpEarned: PRAYER_XP_REWARD + streakXp, newXp, newLevel };
+    return { limitReached: false };
   });
 }

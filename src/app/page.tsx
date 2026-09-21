@@ -426,8 +426,6 @@ function Dashboard({ uid }: { uid: string }) {
         checkedInToday,
         currentStreak: streak?.currentCount ?? 0,
         longestStreak: streak?.longestCount ?? 0,
-        xp: profile.xp,
-        level: profile.level,
       })
     : null;
   // John's permanent Today greeting — deterministic per user per day (same
@@ -536,6 +534,9 @@ function Dashboard({ uid }: { uid: string }) {
           <ProfilePage
             uid={uid}
             profile={profile}
+            lessons={lessons}
+            timeZone={timeZone}
+            isPremium={isPremium}
             getIdToken={getIdToken}
             onBack={() => setShowProfile(false)}
             onSignOut={() => void signOut()}
@@ -546,8 +547,6 @@ function Dashboard({ uid }: { uid: string }) {
               <TodayTab
                 currentCount={streak?.currentCount ?? 0}
                 longestCount={streak?.longestCount ?? 0}
-                level={profile?.level ?? 1}
-                xp={profile?.xp ?? 0}
                 checkedInToday={checkedInToday}
                 checkingIn={checkingIn}
                 onCheckIn={handleCheckIn}

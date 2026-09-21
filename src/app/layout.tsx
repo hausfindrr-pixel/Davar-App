@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Davar — Daily Discipleship",
   description:
-    "A daily discipleship app: gamified scripture engagement with streaks, XP, and lightweight accountability.",
+    "A daily discipleship app: gamified scripture engagement with streaks and lightweight accountability.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,

@@ -10,8 +10,6 @@ import type { DailyDevotionalDoc, DailyPrayerDoc, DailyVerseDoc } from "@/types/
 type TodayTabProps = {
   currentCount: number;
   longestCount: number;
-  level: number;
-  xp: number;
   checkedInToday: boolean;
   checkingIn: boolean;
   onCheckIn: () => void;
@@ -30,14 +28,12 @@ type TodayTabProps = {
  * own progress there), the app's daily content (verse, devotional, guided
  * prayer, rotating one pick per calendar date — see
  * src/lib/dailyContent.ts), Peter/Matthew/Thomas' situational nudges when
- * one applies (see pickApostleMoment), and streak/XP/level. The Path (a
+ * one applies (see pickApostleMoment), and the streak. The Path (a
  * separate tab) holds the structured, book-organized lesson library
  * instead — nothing here repeats there, and vice versa. */
 export function TodayTab({
   currentCount,
   longestCount,
-  level,
-  xp,
   checkedInToday,
   checkingIn,
   onCheckIn,
@@ -103,8 +99,6 @@ export function TodayTab({
       <StreakVisual
         currentCount={currentCount}
         longestCount={longestCount}
-        level={level}
-        xp={xp}
         checkedInToday={checkedInToday}
         checkingIn={checkingIn}
         onCheckIn={onCheckIn}

@@ -8,12 +8,10 @@ import {
 import { db } from "@/lib/firebase";
 import { dateKeyInTimeZone } from "@/lib/date";
 import { computeStreakUpdate } from "@/lib/streak";
-import { CHECK_IN_XP, levelFromXp } from "@/lib/xp";
 import {
   COLLECTIONS,
   type CheckInType,
   type StreakDoc,
-  type UserDoc,
 } from "@/types/firestore";
 
 export function subscribeToStreak(
@@ -30,10 +28,6 @@ export interface CheckInResult {
   alreadyCheckedInToday: boolean;
   currentCount: number;
   longestCount: number;
-  xpEarned: number;
-  newXp: number;
-  newLevel: number;
-  leveledUp: boolean;
 }
 
 export interface CheckInOptions {
@@ -43,11 +37,11 @@ export interface CheckInOptions {
 }
 
 /**
- * Records a check-in for `uid` "today" (in `timeZone`), updating the streak,
- * writing a check_ins doc, and awarding XP — all in one transaction so a
- * double-tap or two devices checking in at once can't double-count. Only
- * called for a real signed-in user, which implies Firebase was configured
- * when auth initialized — so `db` is guaranteed to be set here.
+ * Records a check-in for `uid` "today" (in `timeZone`), updating the streak
+ * and writing a check_ins doc in one transaction so a double-tap or two
+ * devices checking in at once can't double-count. Only called for a real
+ * signed-in user, which implies Firebase was configured when auth
+ * initialized — so `db` is guaranteed to be set here.
  */
 export async function checkIn(
   uid: string,
@@ -56,17 +50,14 @@ export async function checkIn(
 ): Promise<CheckInResult> {
   const today = dateKeyInTimeZone(new Date(), timeZone);
   const streakRef = doc(db!, COLLECTIONS.streaks, uid);
-  const userRef = doc(db!, COLLECTIONS.users, uid);
   const checkInRef = doc(collection(db!, COLLECTIONS.checkIns));
 
   return runTransaction(db!, async (tx) => {
     const streakSnap = await tx.get(streakRef);
-    const userSnap = await tx.get(userRef);
 
     const prevStreak = streakSnap.exists()
       ? (streakSnap.data() as StreakDoc)
       : null;
-    const prevUser = userSnap.exists() ? (userSnap.data() as UserDoc) : null;
     const update = computeStreakUpdate(prevStreak, today);
 
     if (update.alreadyCheckedInToday) {
@@ -74,10 +65,6 @@ export async function checkIn(
         alreadyCheckedInToday: true,
         currentCount: prevStreak?.currentCount ?? 0,
         longestCount: prevStreak?.longestCount ?? 0,
-        xpEarned: 0,
-        newXp: prevUser?.xp ?? 0,
-        newLevel: prevUser?.level ?? 1,
-        leveledUp: false,
       };
     }
 
@@ -98,24 +85,13 @@ export async function checkIn(
       type: options.type,
       date: today,
       completedAt: serverTimestamp(),
-      xpEarned: CHECK_IN_XP,
       notes: options.notes ?? null,
     });
-
-    const prevXp = prevUser?.xp ?? 0;
-    const prevLevel = prevUser?.level ?? 1;
-    const newXp = prevXp + CHECK_IN_XP;
-    const newLevel = levelFromXp(newXp);
-    tx.update(userRef, { xp: newXp, level: newLevel });
 
     return {
       alreadyCheckedInToday: false,
       currentCount: update.currentCount,
       longestCount: update.longestCount,
-      xpEarned: CHECK_IN_XP,
-      newXp,
-      newLevel,
-      leveledUp: newLevel > prevLevel,
     };
   });
 }

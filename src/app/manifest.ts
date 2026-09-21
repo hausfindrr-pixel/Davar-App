@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Davar — Daily Discipleship",
     short_name: "Davar",
     description:
-      "A daily discipleship app: gamified scripture engagement with streaks, XP, and lightweight accountability.",
+      "A daily discipleship app: gamified scripture engagement with streaks and lightweight accountability.",
     start_url: "/",
     display: "standalone",
     background_color: "#faf7f2",

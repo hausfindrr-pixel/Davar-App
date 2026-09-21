@@ -8,8 +8,8 @@ type NextStoryTeaserProps = {
 /** A pointer into The Path from Today — not a separate rotation pool.
  * Shows whatever lesson is "current" in the single chronological sequence
  * right now (see nextLesson, src/lib/roadmap.ts) and jumps straight to it
- * on tap. Nothing here is completable or XP-bearing on its own; the
- * actual story only exists in The Path, same as always. */
+ * on tap. Nothing here is completable on its own; the actual story only
+ * exists in The Path, same as always. */
 export function NextStoryTeaser({ story, onContinue }: NextStoryTeaserProps) {
   return (
     <section className="w-full max-w-sm rounded-2xl bg-paper border border-mist p-5 flex flex-col gap-2">

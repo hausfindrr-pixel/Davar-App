@@ -60,7 +60,11 @@ service cloud.firestore {
             (get(/databases/$(database)/documents/users/$(uid)).data.tier == "premium" ? 15 : 3)
           )
         );
-      allow update, delete: if false;
+      allow update: if false;
+      // Deleting a prayer removes it entirely — unlike a lesson answer
+      // (below), there's no separate completion record riding on it, so
+      // a straight owner-only delete is safe (see "Matthew's Ledger").
+      allow delete: if isOwner(uid);
     }
 
     // A user's own free-text answer to a lesson's scenario screen(s) — no
@@ -79,7 +83,11 @@ service cloud.firestore {
         request.resource.data.text is string &&
         request.resource.data.text.size() > 0 &&
         request.resource.data.text.size() <= 2000;
-      allow delete: if false;
+      // Deleting removes the saved answer text only — the lesson's
+      // completion record (check_ins) and any streak credit it earned
+      // live on separate documents and are untouched by this (see
+      // "Matthew's Ledger").
+      allow delete: if isOwner(uid);
     }
 
     match /streaks/{uid} {

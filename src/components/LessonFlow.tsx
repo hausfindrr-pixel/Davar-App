@@ -196,15 +196,32 @@ function ShortAnswerScreenView({
   screen,
   meta,
   isLocked,
+  onSave,
   onNext,
 }: {
   screen: ShortAnswerScreen;
   meta: (typeof CONTENT_TYPE_META)[keyof typeof CONTENT_TYPE_META];
   isLocked: boolean;
+  onSave: (text: string) => Promise<void>;
   onNext: () => void;
 }) {
   const [text, setText] = useState("");
   const [selfMarked, setSelfMarked] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleCheck() {
+    setSaving(true);
+    setError(null);
+    try {
+      await onSave(text);
+      setSelfMarked(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't save that — try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <div className="flex flex-col gap-3">
@@ -214,18 +231,19 @@ function ShortAnswerScreenView({
         onChange={(e) => setText(e.target.value)}
         placeholder="Your answer…"
         rows={3}
-        disabled={isLocked}
+        disabled={isLocked || selfMarked}
         className="w-full rounded-xl border border-mist bg-ivory px-3 py-2 text-sm text-ink placeholder:text-stone/70 resize-none disabled:opacity-70"
       />
       {screen.context && <ContextDropdown context={screen.context} />}
+      {error && <p className="text-xs text-clay-700">{error}</p>}
       {!selfMarked ? (
         <button
           type="button"
-          disabled={!text.trim() || isLocked}
-          onClick={() => setSelfMarked(true)}
+          disabled={!text.trim() || isLocked || saving}
+          onClick={() => void handleCheck()}
           className={`self-start rounded-full px-5 py-2 text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed ${meta.activeBgClass}`}
         >
-          Check my thinking
+          {saving ? "Saving…" : "Check my thinking"}
         </button>
       ) : (
         <button
@@ -316,7 +334,7 @@ function ResolutionScreen({
           onClick={() => void handleComplete()}
           className="self-start rounded-full bg-sage-700 text-paper px-5 py-2 text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {completing || isPending ? "Saving…" : `Complete +${lesson.xpReward} XP`}
+          {completing || isPending ? "Saving…" : "Complete"}
         </button>
         {onPrayAboutThis && (
           <button
@@ -376,7 +394,7 @@ export function LessonFlow({
     setStep((s) => Math.min(totalSteps - 1, s + 1));
   }
 
-  async function handleSaveScenario(screen: ScenarioScreen, text: string) {
+  async function handleSaveAnswer(screen: ScenarioScreen | ShortAnswerScreen, text: string) {
     await saveLessonAnswer(uid, lesson.id, screen.id, text);
   }
 
@@ -389,7 +407,7 @@ export function LessonFlow({
             screen={screen}
             meta={meta}
             isLocked={isLocked}
-            onSave={(text) => handleSaveScenario(screen, text)}
+            onSave={(text) => handleSaveAnswer(screen, text)}
             onNext={goNext}
           />
         );
@@ -399,7 +417,14 @@ export function LessonFlow({
         );
       case "shortAnswer":
         return (
-          <ShortAnswerScreenView key={screen.id} screen={screen} meta={meta} isLocked={isLocked} onNext={goNext} />
+          <ShortAnswerScreenView
+            key={screen.id}
+            screen={screen}
+            meta={meta}
+            isLocked={isLocked}
+            onSave={(text) => handleSaveAnswer(screen, text)}
+            onNext={goNext}
+          />
         );
       case "verseBlank":
         return (

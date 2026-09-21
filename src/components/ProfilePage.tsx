@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ApostleAvatar } from "@/components/ApostleAvatar";
 import { Avatar } from "@/components/Avatar";
 import { ArrowLeftIcon, CameraIcon } from "@/components/icons";
+import { MatthewsLedger } from "@/components/MatthewsLedger";
 import { UnlockCard } from "@/components/PremiumGate";
 import { updateHighlightNote, subscribeToHighlights } from "@/lib/db/highlights";
 import { updateUserProfile } from "@/lib/db/users";
@@ -12,6 +14,7 @@ import {
   FREE_DAILY_EVENT_LIMIT,
   PREMIUM_DAILY_EVENT_LIMIT,
   type HighlightColor,
+  type LessonDoc,
   type UserDoc,
   type UserHighlightDoc,
 } from "@/types/firestore";
@@ -19,6 +22,9 @@ import {
 type ProfilePageProps = {
   uid: string;
   profile: UserDoc | null;
+  lessons: LessonDoc[];
+  timeZone: string;
+  isPremium: boolean;
   getIdToken: () => Promise<string>;
   onBack: () => void;
   onSignOut: () => void;
@@ -149,7 +155,16 @@ function HighlightNoteCard({ uid, highlight }: { uid: string; highlight: UserHig
   );
 }
 
-export function ProfilePage({ uid, profile, getIdToken, onBack, onSignOut }: ProfilePageProps) {
+export function ProfilePage({
+  uid,
+  profile,
+  lessons,
+  timeZone,
+  isPremium,
+  getIdToken,
+  onBack,
+  onSignOut,
+}: ProfilePageProps) {
   const [displayName, setDisplayName] = useState(profile?.displayName ?? "");
   const [nameSaving, setNameSaving] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
@@ -158,6 +173,7 @@ export function ProfilePage({ uid, profile, getIdToken, onBack, onSignOut }: Pro
   const [avatarSaving, setAvatarSaving] = useState<string | null>(null);
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const [highlights, setHighlights] = useState<UserHighlightDoc[]>([]);
+  const [showLedger, setShowLedger] = useState(false);
 
   useEffect(() => {
     return subscribeToHighlights(uid, setHighlights);
@@ -205,6 +221,19 @@ export function ProfilePage({ uid, profile, getIdToken, onBack, onSignOut }: Pro
     } finally {
       setAvatarSaving(null);
     }
+  }
+
+  if (showLedger) {
+    return (
+      <MatthewsLedger
+        uid={uid}
+        timeZone={timeZone}
+        isPremium={isPremium}
+        lessons={lessons}
+        getIdToken={getIdToken}
+        onBack={() => setShowLedger(false)}
+      />
+    );
   }
 
   return (
@@ -295,6 +324,18 @@ export function ProfilePage({ uid, profile, getIdToken, onBack, onSignOut }: Pro
       </div>
 
       <PlanCard profile={profile} getIdToken={getIdToken} />
+
+      <button
+        type="button"
+        onClick={() => setShowLedger(true)}
+        className="w-full max-w-sm rounded-2xl bg-paper border border-mist p-4 flex items-center gap-3 text-left hover:bg-mist/20 transition-colors"
+      >
+        <ApostleAvatar apostleId="matthew" />
+        <div className="min-w-0">
+          <h2 className="text-sm font-semibold text-ink">Matthew&apos;s Ledger</h2>
+          <p className="text-xs text-stone">(Archives) — your lessons and prayers, kept</p>
+        </div>
+      </button>
 
       <div className="w-full max-w-sm flex flex-col gap-3">
         <h2 className="text-sm font-medium text-ink px-1">Highlighted Verses</h2>

@@ -18,8 +18,6 @@ export async function ensureUserDoc(user: User): Promise<void> {
     email: user.email,
     displayName: user.displayName,
     avatarId: null,
-    xp: 0,
-    level: 1,
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     tier: "free",
     premiumSince: null,

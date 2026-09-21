@@ -26,8 +26,8 @@ export interface Apostle {
   /** Short landing-page tagline — "who they are to you," not who they were. */
   role: string;
   notificationType: NotificationType;
-  /** Message templates for this apostle's lane. May contain {streak},
-   * {longest}, {xp}, or {level} placeholders — see formatApostleMessage. */
+  /** Message templates for this apostle's lane. May contain {streak} or
+   * {longest} placeholders — see formatApostleMessage. */
   messages: string[];
 }
 
@@ -55,9 +55,9 @@ export const APOSTLES: Record<ApostleId, Apostle> = {
     role: "A gentle record of your progress",
     notificationType: "progress",
     messages: [
-      "{streak}-day streak, {xp} XP earned, Level {level}. Every number here is a day you showed up.",
+      "{streak}-day streak. Every number here is a day you showed up.",
       "This week you logged {streak} days in a row. That's not nothing — that's a pattern.",
-      "Level {level}, {xp} XP. I keep the records so you can see how far you've come.",
+      "I keep the records so you can see how far you've come — {streak} days and counting.",
       "{streak} days and counting. Small, faithful, countable — exactly how growth works.",
       "Longest streak so far: {longest} days. You've already proven you can do this.",
     ],
@@ -108,6 +108,22 @@ export function apostleForType(type: NotificationType): Apostle {
   return APOSTLES[APOSTLE_FOR_TYPE[type]];
 }
 
+/**
+ * Matthew's line at the top of his Ledger (src/components/MatthewsLedger.tsx)
+ * — a different lane from his dashboard progress recaps above (`matthew.
+ * messages`), since this one speaks to the record itself, not a streak/XP
+ * stat. Picked the same deterministic way (pickApostleMessage), so it's
+ * stable through a session but changes day to day.
+ */
+export const MATTHEW_LEDGER_MESSAGES: string[] = [
+  "I used to count coins. This is a better ledger.",
+  "Every day you show up, I write it down. Nothing here is wasted.",
+  "Forty-two days, and I've kept every one of them.",
+  "You wrote this a month ago. Read it again — you may need it today.",
+  "I kept careful books once, for the wrong reasons. This time, it's worth counting.",
+  "Nothing you've written here is forgotten. I keep the record so you don't have to.",
+];
+
 /** A small, deterministic string hash — used to pick a message per
  * (user, day, type) so the "random" pick is stable across re-renders and
  * across a single day (no flicker), but still varies day to day and
@@ -120,24 +136,30 @@ function hashString(input: string): number {
   return Math.abs(hash);
 }
 
+/** Deterministically picks one item from `list` for a given `seed` — the
+ * same no-flicker-but-varies-daily approach pickApostleMessage uses for an
+ * apostle's own message lane, generalized for other message lists (e.g.
+ * MATTHEW_LEDGER_MESSAGES). */
+export function pickFromList<T>(list: T[], seed: string): T {
+  const index = hashString(seed) % list.length;
+  return list[index];
+}
+
 /** Picks one of `apostle`'s message templates, deterministically for a
  * given `seed` (e.g. `${uid}-${today}`) so it doesn't change on every
  * render but does change day to day. */
 export function pickApostleMessage(apostle: Apostle, seed: string): string {
-  const index = hashString(`${apostle.id}:${seed}`) % apostle.messages.length;
-  return apostle.messages[index];
+  return pickFromList(apostle.messages, `${apostle.id}:${seed}`);
 }
 
 export type ApostleMessageVars = {
   streak?: number;
   longest?: number;
-  xp?: number;
-  level?: number;
 };
 
-/** Fills {streak}/{longest}/{xp}/{level} placeholders in a message template. */
+/** Fills {streak}/{longest} placeholders in a message template. */
 export function formatApostleMessage(template: string, vars: ApostleMessageVars): string {
-  return template.replace(/\{(streak|longest|xp|level)\}/g, (_match, key: keyof ApostleMessageVars) =>
+  return template.replace(/\{(streak|longest)\}/g, (_match, key: keyof ApostleMessageVars) =>
     String(vars[key] ?? 0),
   );
 }

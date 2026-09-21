@@ -30,9 +30,9 @@ function formatPrayerDate(timestamp: PrayerDoc["createdAt"]): string {
 }
 
 /** A place to write a free-text prayer, alongside the guided ones in The
- * Path's lesson tracks. Submitting awards XP the same way completing a
- * lesson does (see submitPrayer, src/lib/db/prayers.ts) — same streak/
- * check-in mechanics, but its own daily cap (dailyPrayerLimit): 3/day
+ * Path's lesson tracks. Submitting counts as today's streak check-in the
+ * same way completing a lesson does (see submitPrayer,
+ * src/lib/db/prayers.ts), but its own daily cap (dailyPrayerLimit): 3/day
  * free, 15/day premium, separate from The Path's event-completion cap. */
 export function PrayerJournal({
   uid,
@@ -46,7 +46,7 @@ export function PrayerJournal({
   const [draft, setDraft] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [xpFlash, setXpFlash] = useState<number | null>(null);
+  const [savedFlash, setSavedFlash] = useState(false);
   const [prayers, setPrayers] = useState<PrayerDoc[]>([]);
   const [showPast, setShowPast] = useState(false);
   // Which prefillRequest (by nonce) has already been applied — same
@@ -84,7 +84,7 @@ export function PrayerJournal({
     if (!text || submitting || atLimit) return;
     setSubmitting(true);
     setError(null);
-    setXpFlash(null);
+    setSavedFlash(false);
     try {
       const result = await submitPrayer(uid, timeZone, text);
       if (result.limitReached) {
@@ -92,8 +92,8 @@ export function PrayerJournal({
         return;
       }
       setDraft("");
-      setXpFlash(result.xpEarned);
-      setTimeout(() => setXpFlash(null), 2500);
+      setSavedFlash(true);
+      setTimeout(() => setSavedFlash(false), 2500);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save that prayer.");
     } finally {
@@ -137,7 +137,7 @@ export function PrayerJournal({
             >
               {submitting ? "Saving…" : "Submit prayer"}
             </button>
-            {xpFlash !== null && <span className="text-xs text-sage-700">+{xpFlash} XP</span>}
+            {savedFlash && <span className="text-xs text-sage-700">Saved</span>}
             {error && <span className="text-xs text-clay-700">{error}</span>}
           </div>
         )}

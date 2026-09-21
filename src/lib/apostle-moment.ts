@@ -12,8 +12,6 @@ export interface ApostleMomentContext {
   checkedInToday: boolean;
   currentStreak: number;
   longestStreak: number;
-  xp: number;
-  level: number;
 }
 
 export interface ApostleMoment {
@@ -62,8 +60,6 @@ export function pickApostleMoment(ctx: ApostleMomentContext): ApostleMoment | nu
   const message = formatApostleMessage(template, {
     streak: ctx.currentStreak,
     longest: ctx.longestStreak,
-    xp: ctx.xp,
-    level: ctx.level,
   });
 
   return { type, apostle, message };

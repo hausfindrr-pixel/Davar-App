@@ -90,7 +90,6 @@ export function PathEventCard({ event, onSelect }: PathEventCardProps) {
         {lesson.scriptureReference && (
           <p className="text-xs text-stone">
             {lesson.scriptureReference} · {lesson.estimatedMinutes} min
-            {!isLocked ? ` · +${lesson.xpReward} XP` : ""}
           </p>
         )}
 
