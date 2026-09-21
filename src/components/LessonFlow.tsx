@@ -325,6 +325,7 @@ function ResolutionScreen({
   onPremiumNudgeTap?: () => void;
 }) {
   const [completing, setCompleting] = useState(false);
+  const [completeError, setCompleteError] = useState<string | null>(null);
 
   // Fires once when this screen mounts with the nudge visible — records
   // it as shown so the interval-based cadence advances regardless of
@@ -338,8 +339,18 @@ function ResolutionScreen({
 
   async function handleComplete() {
     setCompleting(true);
+    setCompleteError(null);
     try {
       await onComplete();
+    } catch (err) {
+      // A failed save used to be silent — the button just quietly reverted
+      // to "Complete" with nothing else on screen, which read as "nothing
+      // happened" rather than "this failed." Surface it instead, and log
+      // it so a real recurrence is visible without needing devtools open.
+      console.error("LessonFlow: completing lesson failed", err);
+      setCompleteError(
+        err instanceof Error ? err.message : "Couldn't save that — check your connection and try again.",
+      );
     } finally {
       setCompleting(false);
     }
@@ -372,6 +383,14 @@ function ResolutionScreen({
           </button>
         )}
       </div>
+      {completeError && (
+        <p className="text-xs text-clay-700">
+          {completeError} —{" "}
+          <button type="button" onClick={() => void handleComplete()} className="underline">
+            try again
+          </button>
+        </p>
+      )}
       {isLocked && <p className="text-xs text-stone">You&apos;ve reached today&apos;s limit — come back tomorrow to finish this one.</p>}
       {showPremiumNudge && (
         <p className="text-xs text-stone">

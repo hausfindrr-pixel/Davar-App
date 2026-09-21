@@ -16,6 +16,8 @@ import {
   getDoc,
   getDocs,
   query,
+  runTransaction,
+  serverTimestamp,
   setDoc,
   updateDoc,
   where,
@@ -178,6 +180,69 @@ await check("alice cannot grant herself a premiumSince date via update", async (
 await check("alice CAN update other fields on her own user doc (e.g. displayName)", async () => {
   await assertSucceeds(
     updateDoc(doc(aliceDb, "users", ALICE), { displayName: "Alice" }),
+  );
+});
+
+// --- completeLesson()'s REAL transaction shape, not just setDoc/updateDoc
+// on daily_lesson_progress in isolation. Regression test for a bug found in
+// production (Sept 2026): completeLesson's first read is `tx.get()` on the
+// day's progress doc, which doesn't exist yet on a user's first lesson/
+// prayer of the day — and the daily_lesson_progress read rule used to
+// dereference `resource.data` unconditionally, which throws a rule-
+// evaluation error (not just "false") when the doc doesn't exist, failing
+// the WHOLE transaction (including the streak and check-in writes) every
+// time, for every user's very first action of the day. Every other test in
+// this file drives the collection with direct setDoc/updateDoc, which
+// never exercises this exact read-inside-a-transaction-on-a-missing-doc
+// path — that's exactly how this slipped past this suite for months.
+await check("alice's first-ever lesson completion succeeds via the real multi-collection transaction (regression: used to throw permission-denied on the doc's own read rule)", async () => {
+  const uid = "transaction-regression-uid";
+  const date = "2026-01-01";
+
+  // A fresh uid, not alice's — impersonate it directly so the doc IDs line
+  // up with request.auth.uid the same way completeLesson expects.
+  const txnDb = testEnv.authenticatedContext(uid).firestore();
+  const txnProgressRef = doc(txnDb, "daily_lesson_progress", `${uid}_${date}`);
+  const txnUserRef = doc(txnDb, "users", uid);
+  const txnStreakRef = doc(txnDb, "streaks", uid);
+  const txnCheckInRef = doc(collection(txnDb, "check_ins"));
+
+  await assertSucceeds(
+    runTransaction(txnDb, async (tx) => {
+      const progressSnap = await tx.get(txnProgressRef);
+      await tx.get(txnUserRef);
+      const streakSnap = await tx.get(txnStreakRef);
+
+      if (!progressSnap.exists()) {
+        tx.set(txnProgressRef, {
+          userId: uid,
+          date,
+          completedLessonIds: ["lesson-1"],
+          prayerCount: 0,
+          updatedAt: serverTimestamp(),
+        });
+      }
+      if (!streakSnap.exists()) {
+        tx.set(txnStreakRef, {
+          userId: uid,
+          currentCount: 1,
+          longestCount: 1,
+          lastCheckInDate: date,
+          freezesAvailable: 0,
+          freezesUsedDates: [],
+          updatedAt: serverTimestamp(),
+        });
+      }
+      tx.set(txnCheckInRef, {
+        id: txnCheckInRef.id,
+        userId: uid,
+        lessonId: "lesson-1",
+        type: "lesson",
+        date,
+        completedAt: serverTimestamp(),
+        notes: null,
+      });
+    }),
   );
 });
 

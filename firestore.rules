@@ -128,7 +128,17 @@ service cloud.firestore {
     // clearing local state) but not a client deliberately forging writes;
     // closing that fully needs server-trusted time (e.g. a Cloud Function).
     match /daily_lesson_progress/{docId} {
-      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      // `resource == null` first is load-bearing, not stylistic:
+      // completeLesson()/submitPrayer() read this doc inside a transaction
+      // before deciding whether to create or update it, and on a user's
+      // first activity of the day the doc doesn't exist yet. Without this
+      // guard, `resource` is null and `resource.data.userId` throws a
+      // rule-evaluation error instead of just failing the condition — which
+      // fails the *entire* transaction (including the streak/check-in
+      // writes riding along with it), every single time, for every user's
+      // first lesson or prayer of the day. Same idiom the prayers rule
+      // above already uses (`!exists(...) || ...`) for the same reason.
+      allow read: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid);
 
       allow create: if isSignedIn() &&
         request.resource.data.userId == request.auth.uid &&
