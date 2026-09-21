@@ -355,7 +355,7 @@ export const lessons = [
     chronologicalOrder: 600,
     scriptureReference: "Luke 2:1-20",
     lessonBook: "Luke",
-    imageUrl: null,
+    imageUrl: "/events/birth-of-jesus.webp",
     summary:
       "No room, no fanfare — God enters the world as a baby in a feeding trough, and the first people told are shepherds working the night shift, not anyone important.",
     screens: [
@@ -419,7 +419,7 @@ export const lessons = [
     chronologicalOrder: 700,
     scriptureReference: "Mark 4:35-41",
     lessonBook: "Mark",
-    imageUrl: null,
+    imageUrl: "/events/calms-the-storm.webp",
     summary:
       "The storm is real, the boat is actually taking on water, and the disciples actually think they're going to die — Jesus is just asleep through all of it.",
     screens: [
@@ -481,7 +481,7 @@ export const lessons = [
     chronologicalOrder: 800,
     scriptureReference: "Luke 15:11-32",
     lessonBook: "Luke",
-    imageUrl: null,
+    imageUrl: "/events/prodigal-son.webp",
     summary:
       "A son takes his inheritance early, wastes it, and finally turns back toward home — rehearsing an apology he's not sure will be enough. Notice which character you actually read yourself as today: the son who left, or the older brother still keeping score at the door.",
     screens: [
@@ -545,7 +545,7 @@ export const lessons = [
     chronologicalOrder: 900,
     scriptureReference: "John 8:1-11",
     lessonBook: "John",
-    imageUrl: null,
+    imageUrl: "/events/woman-caught-in-sin.webp",
     summary:
       "Dragged in front of Jesus to be stoned, a woman is used as a trap. Jesus bends down, writes in the dust, and says something that changes who's holding the stones.",
     screens: [
@@ -608,7 +608,7 @@ export const lessons = [
     chronologicalOrder: 1000,
     scriptureReference: "John 20:1-18",
     lessonBook: "John",
-    imageUrl: null,
+    imageUrl: "/events/resurrection.webp",
     summary:
       "Mary comes to grieve at a tomb and finds it empty — her first thought is that someone has taken the body.",
     screens: [
