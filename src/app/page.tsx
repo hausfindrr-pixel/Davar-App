@@ -15,7 +15,7 @@ import { DisciplesTab } from "@/components/tabs/DisciplesTab";
 import { PathTab } from "@/components/tabs/PathTab";
 import { TodayTab } from "@/components/tabs/TodayTab";
 import { WatchTab } from "@/components/tabs/WatchTab";
-import { WordTab } from "@/components/tabs/WordTab";
+import { WordTab, type WordFocusRequest } from "@/components/tabs/WordTab";
 import { pickApostleMoment } from "@/lib/apostle-moment";
 import { APOSTLES, pickApostleMessage, type ApostleId } from "@/lib/apostles";
 import { useAuth } from "@/lib/auth-context";
@@ -28,10 +28,11 @@ import {
   subscribeToLessonProgress,
 } from "@/lib/db/lessons";
 import { checkIn, subscribeToStreak } from "@/lib/db/streaks";
-import { subscribeToUser } from "@/lib/db/users";
+import { recordPremiumNudgeShown, recordPremiumNudgeTapped, subscribeToUser } from "@/lib/db/users";
 import { dateKeyInTimeZone } from "@/lib/date";
 import { pickForDate } from "@/lib/dailyContent";
 import { daysUntilExpiry, shouldShowRenewalReminder } from "@/lib/premium";
+import type { PremiumNudgeState } from "@/lib/premiumNudge";
 import { nextLesson } from "@/lib/roadmap";
 import type { PathEvent } from "@/lib/roadmap";
 import { startCheckout } from "@/lib/plisio/checkout";
@@ -354,7 +355,9 @@ function Dashboard({ uid }: { uid: string }) {
   const [checkingIn, setCheckingIn] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("today");
   const [pathFocusRequest, setPathFocusRequest] = useState<PathFocusRequest | null>(null);
+  const [wordFocusRequest, setWordFocusRequest] = useState<WordFocusRequest | null>(null);
   const [showProfile, setShowProfile] = useState(false);
+  const [openLedgerRequest, setOpenLedgerRequest] = useState<number | null>(null);
   const [renewing, setRenewing] = useState(false);
   const [renewError, setRenewError] = useState<string | null>(null);
   const { user, signOut } = useAuth();
@@ -385,6 +388,40 @@ function Dashboard({ uid }: { uid: string }) {
   function handleContinueStory(story: PathEvent) {
     setActiveTab("path");
     setPathFocusRequest({ lessonId: story.lesson.id, nonce: Date.now() });
+  }
+
+  /** Bubbled up from Matthew's Ledger — a highlighted verse's "Go to
+   * passage" action. Closes Profile (the Ledger lives inside it) and
+   * switches straight to The Word, open to that chapter. */
+  function handleNavigateToVerse(book: string, chapter: number) {
+    setShowProfile(false);
+    setActiveTab("word");
+    setWordFocusRequest({ book, chapter, nonce: Date.now() });
+  }
+
+  /** Today's LedgerShortcut — opens Profile with the Ledger already showing,
+   * skipping the plain Profile screen. */
+  function handleOpenLedger() {
+    setShowProfile(true);
+    setOpenLedgerRequest(Date.now());
+  }
+
+  const premiumNudgeState: PremiumNudgeState = {
+    lastShownDate: profile?.premiumNudgeLastShownDate ?? null,
+    lastShownCompletedCount: profile?.premiumNudgeLastShownCompletedCount ?? null,
+    lastTappedDate: profile?.premiumNudgeLastTappedDate ?? null,
+  };
+
+  function handlePremiumNudgeShown(completedCount: number) {
+    void recordPremiumNudgeShown(uid, today, completedCount);
+  }
+
+  /** The nudge's own link — records the tap (the longer cooldown) and
+   * opens Profile's existing "Your Plan" card, same as any other upgrade
+   * entry point in the app. */
+  function handlePremiumNudgeTap() {
+    void recordPremiumNudgeTapped(uid, today);
+    setShowProfile(true);
   }
 
   useEffect(() => {
@@ -540,11 +577,16 @@ function Dashboard({ uid }: { uid: string }) {
             getIdToken={getIdToken}
             onBack={() => setShowProfile(false)}
             onSignOut={() => void signOut()}
+            openLedgerRequest={openLedgerRequest}
+            onNavigateToVerse={handleNavigateToVerse}
           />
         ) : (
           <>
             {activeTab === "today" && (
               <TodayTab
+                uid={uid}
+                timeZone={timeZone}
+                lessons={lessons}
                 currentCount={streak?.currentCount ?? 0}
                 longestCount={streak?.longestCount ?? 0}
                 checkedInToday={checkedInToday}
@@ -557,6 +599,7 @@ function Dashboard({ uid }: { uid: string }) {
                 dailyVerse={dailyVerse}
                 dailyDevotional={dailyDevotional}
                 dailyPrayer={dailyPrayer}
+                onOpenLedger={handleOpenLedger}
               />
             )}
             {activeTab === "path" && (
@@ -570,6 +613,10 @@ function Dashboard({ uid }: { uid: string }) {
                 todayPrayerCount={todayPrayerCount}
                 suppressUpgradeNag={justUpgraded && !isPremium}
                 focusRequest={pathFocusRequest}
+                today={today}
+                premiumNudgeState={premiumNudgeState}
+                onPremiumNudgeShown={handlePremiumNudgeShown}
+                onPremiumNudgeTap={handlePremiumNudgeTap}
                 onComplete={handleCompleteLesson}
                 onUpgrade={handleUpgrade}
               />
@@ -584,7 +631,7 @@ function Dashboard({ uid }: { uid: string }) {
                 getIdToken={getIdToken}
               />
             )}
-            {activeTab === "word" && <WordTab uid={uid} />}
+            {activeTab === "word" && <WordTab uid={uid} focusRequest={wordFocusRequest} />}
             {activeTab === "disciples" && <DisciplesTab />}
           </>
         )}

@@ -67,6 +67,20 @@ export interface UserDoc {
    * member" label rather than guessing when this is null.
    */
   planId: PlanId | null;
+  /**
+   * State for the passive premium nudge on a lesson's resolution screen
+   * (see shouldShowPremiumNudge, src/lib/premiumNudge.ts) — unrestricted
+   * by the `users` update rule (only tier/premiumSince/premiumUntil/planId
+   * are locked), so the client updates these directly, same as
+   * displayName/avatarId. `lastShownDate`/`lastShownCompletedCount` throttle
+   * how often the nudge re-appears (at most once every 3-4 completed
+   * lessons); `lastTappedDate` is the separate, longer cooldown after the
+   * user actually taps it and doesn't upgrade. All null until the nudge
+   * has ever been shown.
+   */
+  premiumNudgeLastShownDate: string | null; // "YYYY-MM-DD"
+  premiumNudgeLastShownCompletedCount: number | null;
+  premiumNudgeLastTappedDate: string | null; // "YYYY-MM-DD"
 }
 
 /** streaks/{uid} — one streak-state document per user. */

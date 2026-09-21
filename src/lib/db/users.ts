@@ -23,6 +23,9 @@ export async function ensureUserDoc(user: User): Promise<void> {
     premiumSince: null,
     premiumUntil: null,
     planId: null,
+    premiumNudgeLastShownDate: null,
+    premiumNudgeLastShownCompletedCount: null,
+    premiumNudgeLastTappedDate: null,
     createdAt: serverTimestamp(),
   });
 }
@@ -47,4 +50,25 @@ export async function updateUserProfile(
   fields: { displayName?: string; avatarId?: string | null },
 ): Promise<void> {
   await updateDoc(doc(db!, COLLECTIONS.users, uid), fields);
+}
+
+/** Records that the passive premium nudge (LessonFlow's resolution
+ * screen — see shouldShowPremiumNudge, src/lib/premiumNudge.ts) was just
+ * shown, so it doesn't re-appear until the next eligible lesson. */
+export async function recordPremiumNudgeShown(
+  uid: string,
+  date: string,
+  completedCount: number,
+): Promise<void> {
+  await updateDoc(doc(db!, COLLECTIONS.users, uid), {
+    premiumNudgeLastShownDate: date,
+    premiumNudgeLastShownCompletedCount: completedCount,
+  });
+}
+
+/** Records that the user tapped the nudge (and, implicitly, didn't
+ * upgrade — if they had, `tier` would already be "premium" and the nudge
+ * would stop showing regardless) — the stronger week-long cooldown. */
+export async function recordPremiumNudgeTapped(uid: string, date: string): Promise<void> {
+  await updateDoc(doc(db!, COLLECTIONS.users, uid), { premiumNudgeLastTappedDate: date });
 }

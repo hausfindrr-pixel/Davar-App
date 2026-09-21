@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { PathEventList, type PathFocusRequest } from "@/components/PathEventList";
 import { PrayerJournal } from "@/components/PrayerJournal";
 import type { PlanId } from "@/lib/plisio/plans";
+import type { PremiumNudgeState } from "@/lib/premiumNudge";
 import type { LessonDoc } from "@/types/firestore";
 
 type PathTabProps = {
@@ -22,6 +23,11 @@ type PathTabProps = {
   /** Set when the user tapped Today's "Continue Your Story" teaser —
    * jumps straight to that story's detail. */
   focusRequest?: PathFocusRequest | null;
+  /** "YYYY-MM-DD" — see PathEventList's premium nudge props below. */
+  today: string;
+  premiumNudgeState: PremiumNudgeState;
+  onPremiumNudgeShown?: (completedCount: number) => void;
+  onPremiumNudgeTap?: () => void;
   onComplete: (lesson: LessonDoc) => Promise<void>;
   onUpgrade: (plan: PlanId) => Promise<void>;
 };

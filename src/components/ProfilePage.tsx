@@ -28,6 +28,13 @@ type ProfilePageProps = {
   getIdToken: () => Promise<string>;
   onBack: () => void;
   onSignOut: () => void;
+  /** Set (with a fresh nonce) to open Matthew's Ledger immediately, e.g.
+   * from Today's LedgerShortcut — skips landing on the plain Profile
+   * screen first. Same nonce-request pattern as PathFocusRequest. */
+  openLedgerRequest?: number | null;
+  /** Jumps to The Word tab, open to this book/chapter — bubbled up from
+   * the Ledger's "Go to passage" action on a highlighted verse. */
+  onNavigateToVerse: (book: string, chapter: number) => void;
 };
 
 const HIGHLIGHT_ACCENT: Record<HighlightColor, string> = {
@@ -164,6 +171,8 @@ export function ProfilePage({
   getIdToken,
   onBack,
   onSignOut,
+  openLedgerRequest = null,
+  onNavigateToVerse,
 }: ProfilePageProps) {
   const [displayName, setDisplayName] = useState(profile?.displayName ?? "");
   const [nameSaving, setNameSaving] = useState(false);
@@ -174,6 +183,14 @@ export function ProfilePage({
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const [highlights, setHighlights] = useState<UserHighlightDoc[]>([]);
   const [showLedger, setShowLedger] = useState(false);
+  // Which openLedgerRequest (by nonce) has already been applied — same
+  // "adjust state during render" pattern as PathEventList's focusRequest.
+  const [handledLedgerRequestNonce, setHandledLedgerRequestNonce] = useState<number | null>(null);
+
+  if (openLedgerRequest !== null && openLedgerRequest !== handledLedgerRequestNonce) {
+    setHandledLedgerRequestNonce(openLedgerRequest);
+    if (!showLedger) setShowLedger(true);
+  }
 
   useEffect(() => {
     return subscribeToHighlights(uid, setHighlights);
@@ -232,6 +249,7 @@ export function ProfilePage({
         lessons={lessons}
         getIdToken={getIdToken}
         onBack={() => setShowLedger(false)}
+        onNavigateToVerse={onNavigateToVerse}
       />
     );
   }

@@ -5,8 +5,16 @@ import { BIBLE_BOOKS, fetchChapter, type BibleVerse } from "@/lib/bible";
 import { highlightVerse, removeHighlight, subscribeToHighlights } from "@/lib/db/highlights";
 import type { HighlightColor, UserHighlightDoc } from "@/types/firestore";
 
+/** A request from outside (Matthew's Ledger — "go to this passage" on a
+ * highlighted verse) to jump straight to a book/chapter. `nonce` only
+ * exists so two requests for the same passage in a row still re-trigger
+ * the effect below (object identity, not value equality, drives it) —
+ * same pattern as PathEventList's PathFocusRequest. */
+export type WordFocusRequest = { book: string; chapter: number; nonce: number };
+
 type WordTabProps = {
   uid: string;
+  focusRequest?: WordFocusRequest | null;
 };
 
 const HIGHLIGHT_LABEL: Record<HighlightColor, string> = {
@@ -42,7 +50,7 @@ const HIGHLIGHT_COLORS: HighlightColor[] = ["clay", "sage", "stone"];
  * identical to one that worked, which is exactly what made highlighting
  * feel unreliable.
  */
-export function WordTab({ uid }: WordTabProps) {
+export function WordTab({ uid, focusRequest = null }: WordTabProps) {
   const [book, setBook] = useState("John");
   const [chapter, setChapter] = useState(3);
   const [verses, setVerses] = useState<BibleVerse[]>([]);
@@ -52,8 +60,21 @@ export function WordTab({ uid }: WordTabProps) {
   const [openVerse, setOpenVerse] = useState<number | null>(null);
   const [savingVerse, setSavingVerse] = useState<number | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  // Which focusRequest (by nonce) has already been applied — same
+  // "adjust state during render" pattern as PathEventList's focusRequest
+  // handling, so a repeat "go to this passage" tap lands even if it's the
+  // same book/chapter already showing.
+  const [handledFocusNonce, setHandledFocusNonce] = useState<number | null>(null);
 
-  const bookInfo = BIBLE_BOOKS.find((b) => b.name === book) ?? BIBLE_BOOKS[0];
+  let effectiveBook = book;
+  if (focusRequest && focusRequest.nonce !== handledFocusNonce) {
+    effectiveBook = focusRequest.book;
+    setHandledFocusNonce(focusRequest.nonce);
+    setBook(focusRequest.book);
+    setChapter(focusRequest.chapter);
+  }
+
+  const bookInfo = BIBLE_BOOKS.find((b) => b.name === effectiveBook) ?? BIBLE_BOOKS[0];
 
   useEffect(() => {
     return subscribeToHighlights(uid, setHighlights);

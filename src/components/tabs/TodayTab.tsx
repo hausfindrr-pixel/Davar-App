@@ -1,13 +1,17 @@
 import { ApostleMessageCard } from "@/components/ApostleMessageCard";
 import { DailyContentBackdrop } from "@/components/DailyContentBackdrop";
+import { LedgerShortcut } from "@/components/LedgerShortcut";
 import { MascotHero } from "@/components/MascotHero";
 import { NextStoryTeaser } from "@/components/NextStoryTeaser";
 import { StreakVisual } from "@/components/StreakVisual";
 import type { ApostleMoment } from "@/lib/apostle-moment";
 import type { PathEvent } from "@/lib/roadmap";
-import type { DailyDevotionalDoc, DailyPrayerDoc, DailyVerseDoc } from "@/types/firestore";
+import type { DailyDevotionalDoc, DailyPrayerDoc, DailyVerseDoc, LessonDoc } from "@/types/firestore";
 
 type TodayTabProps = {
+  uid: string;
+  timeZone: string;
+  lessons: LessonDoc[];
   currentCount: number;
   longestCount: number;
   checkedInToday: boolean;
@@ -20,6 +24,7 @@ type TodayTabProps = {
   dailyVerse: DailyVerseDoc | null;
   dailyDevotional: DailyDevotionalDoc | null;
   dailyPrayer: DailyPrayerDoc | null;
+  onOpenLedger: () => void;
 };
 
 /** Today — John's always-on greeting up top (MascotHero), a teaser
@@ -28,10 +33,15 @@ type TodayTabProps = {
  * own progress there), the app's daily content (verse, devotional, guided
  * prayer, rotating one pick per calendar date — see
  * src/lib/dailyContent.ts), Peter/Matthew/Thomas' situational nudges when
- * one applies (see pickApostleMoment), and the streak. The Path (a
+ * one applies (see pickApostleMoment), and the streak. A compact
+ * `LedgerShortcut` sits last, after the streak, so it stays secondary to
+ * Today's real content rather than competing with it. The Path (a
  * separate tab) holds the structured, book-organized lesson library
  * instead — nothing here repeats there, and vice versa. */
 export function TodayTab({
+  uid,
+  timeZone,
+  lessons,
   currentCount,
   longestCount,
   checkedInToday,
@@ -44,6 +54,7 @@ export function TodayTab({
   dailyVerse,
   dailyDevotional,
   dailyPrayer,
+  onOpenLedger,
 }: TodayTabProps) {
   return (
     <div className="flex-1 flex flex-col items-center gap-6 p-6">
@@ -103,6 +114,8 @@ export function TodayTab({
         checkingIn={checkingIn}
         onCheckIn={onCheckIn}
       />
+
+      <LedgerShortcut uid={uid} timeZone={timeZone} lessons={lessons} onOpen={onOpenLedger} />
     </div>
   );
 }

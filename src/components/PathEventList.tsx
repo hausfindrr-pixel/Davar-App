@@ -6,6 +6,7 @@ import { LessonFlow } from "@/components/LessonFlow";
 import { PathEventCard } from "@/components/PathEventCard";
 import { PathProgressBar } from "@/components/PathProgressBar";
 import type { PlanId } from "@/lib/plisio/plans";
+import { shouldShowPremiumNudge, type PremiumNudgeState } from "@/lib/premiumNudge";
 import { flattenPathEvents, nextLesson } from "@/lib/roadmap";
 import { dailyEventLimit, type LessonDoc } from "@/types/firestore";
 
@@ -38,6 +39,18 @@ type PathEventListProps = {
    * the lesson's title up so PathTab can hand it to the prayer journal as
    * context. Closes the open lesson itself; the caller doesn't need to. */
   onPrayAboutThis?: (lessonTitle: string) => void;
+  /** "YYYY-MM-DD" in the user's timezone — used only for the premium
+   * nudge's eligibility check (shouldShowPremiumNudge). */
+  today: string;
+  /** The nudge's own throttling state, off the user doc — see
+   * shouldShowPremiumNudge, src/lib/premiumNudge.ts. */
+  premiumNudgeState: PremiumNudgeState;
+  /** Fires once when the nudge becomes visible on a resolution screen —
+   * records it as shown. */
+  onPremiumNudgeShown?: (completedCount: number) => void;
+  /** The nudge's own link — closes the lesson and hands off to the
+   * upgrade flow, same shape as onPrayAboutThis. */
+  onPremiumNudgeTap?: () => void;
   onComplete: (lesson: LessonDoc) => Promise<void>;
   onUpgrade: (plan: PlanId) => Promise<void>;
 };
@@ -67,6 +80,10 @@ export function PathEventList({
   focusRequest = null,
   onLessonOpenChange,
   onPrayAboutThis,
+  today,
+  premiumNudgeState,
+  onPremiumNudgeShown,
+  onPremiumNudgeTap,
   onComplete,
   onUpgrade,
 }: PathEventListProps) {
@@ -93,6 +110,9 @@ export function PathEventList({
       })();
   const libraryComplete = !isPremium && events.length === 0 && lessons.length > 0;
   const completedCount = lessons.filter((lesson) => allTimeCompletedLessonIds.includes(lesson.id)).length;
+  // Never true for premium — shouldShowPremiumNudge doesn't take a tier
+  // argument, so the gate lives here, the one call site that matters.
+  const showPremiumNudge = !isPremium && shouldShowPremiumNudge(completedCount, premiumNudgeState, today);
 
   let effectiveOpenLessonId = openLessonId;
   if (focusRequest && focusRequest.nonce !== handledFocusNonce) {
@@ -109,6 +129,11 @@ export function PathEventList({
   function handlePrayAboutThis(lesson: LessonDoc) {
     setOpenLessonId(null);
     onPrayAboutThis?.(lesson.title);
+  }
+
+  function handlePremiumNudgeTap() {
+    setOpenLessonId(null);
+    onPremiumNudgeTap?.();
   }
 
   async function handleComplete(lesson: LessonDoc) {
@@ -158,6 +183,9 @@ export function PathEventList({
           isPending={pendingId === openLesson.id}
           onComplete={() => handleComplete(openLesson)}
           onPrayAboutThis={onPrayAboutThis ? () => handlePrayAboutThis(openLesson) : undefined}
+          showPremiumNudge={showPremiumNudge}
+          onPremiumNudgeShown={() => onPremiumNudgeShown?.(completedCount)}
+          onPremiumNudgeTap={handlePremiumNudgeTap}
         />
       </section>
     );

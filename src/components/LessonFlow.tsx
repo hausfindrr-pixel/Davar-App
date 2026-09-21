@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FillBlankCard } from "@/components/FillBlankCard";
 import { ArrowLeftIcon } from "@/components/icons";
 import { saveLessonAnswer } from "@/lib/db/lessonAnswers";
@@ -26,6 +26,16 @@ type LessonFlowProps = {
    * up only when the caller wants it (PathEventList does, to hand off to
    * the prayer journal). Never required to finish the lesson. */
   onPrayAboutThis?: () => void;
+  /** Whether to show the passive premium nudge below it — computed by the
+   * caller (shouldShowPremiumNudge, src/lib/premiumNudge.ts) and never
+   * true for premium users. */
+  showPremiumNudge?: boolean;
+  /** Fires once, the moment the nudge becomes visible — separate from
+   * tapping it, records the "shown" half of its cadence throttling. */
+  onPremiumNudgeShown?: () => void;
+  /** The nudge's own link — closes the lesson and opens the upgrade flow,
+   * same "closes lesson, hands off" shape as onPrayAboutThis. */
+  onPremiumNudgeTap?: () => void;
 };
 
 function ContextDropdown({ context }: { context: string }) {
@@ -301,14 +311,30 @@ function ResolutionScreen({
   isPending,
   onComplete,
   onPrayAboutThis,
+  showPremiumNudge,
+  onPremiumNudgeShown,
+  onPremiumNudgeTap,
 }: {
   lesson: LessonDoc;
   isLocked: boolean;
   isPending: boolean;
   onComplete: () => Promise<void>;
   onPrayAboutThis?: () => void;
+  showPremiumNudge?: boolean;
+  onPremiumNudgeShown?: () => void;
+  onPremiumNudgeTap?: () => void;
 }) {
   const [completing, setCompleting] = useState(false);
+
+  // Fires once when this screen mounts with the nudge visible — records
+  // it as shown so the interval-based cadence advances regardless of
+  // whether the user taps it. Doesn't need to re-fire on every render
+  // (showPremiumNudge/onPremiumNudgeShown are stable for this screen's
+  // lifetime), only once per time the resolution screen is reached.
+  useEffect(() => {
+    if (showPremiumNudge) onPremiumNudgeShown?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleComplete() {
     setCompleting(true);
@@ -347,6 +373,18 @@ function ResolutionScreen({
         )}
       </div>
       {isLocked && <p className="text-xs text-stone">You&apos;ve reached today&apos;s limit — come back tomorrow to finish this one.</p>}
+      {showPremiumNudge && (
+        <p className="text-xs text-stone">
+          The story doesn&apos;t have to wait until tomorrow.{" "}
+          <button
+            type="button"
+            onClick={onPremiumNudgeTap}
+            className="underline hover:text-clay-700 transition-colors"
+          >
+            See what&apos;s next
+          </button>
+        </p>
+      )}
     </div>
   );
 }
@@ -367,6 +405,9 @@ export function LessonFlow({
   isPending,
   onComplete,
   onPrayAboutThis,
+  showPremiumNudge,
+  onPremiumNudgeShown,
+  onPremiumNudgeTap,
 }: LessonFlowProps) {
   const [step, setStep] = useState(0);
   const meta = CONTENT_TYPE_META[lesson.track];
@@ -471,6 +512,9 @@ export function LessonFlow({
           isPending={isPending}
           onComplete={onComplete}
           onPrayAboutThis={onPrayAboutThis}
+          showPremiumNudge={showPremiumNudge}
+          onPremiumNudgeShown={onPremiumNudgeShown}
+          onPremiumNudgeTap={onPremiumNudgeTap}
         />
       )}
     </div>

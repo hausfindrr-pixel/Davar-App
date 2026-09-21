@@ -1,4 +1,12 @@
-import type { CheckInDoc, LessonAnswerDoc, LessonDoc, PrayerDoc } from "@/types/firestore";
+import { dateKeyInTimeZone } from "@/lib/date";
+import type {
+  CheckInDoc,
+  HighlightColor,
+  LessonAnswerDoc,
+  LessonDoc,
+  PrayerDoc,
+  UserHighlightDoc,
+} from "@/types/firestore";
 
 export type LedgerLessonAnswer = {
   screenId: string;
@@ -24,6 +32,19 @@ export type LedgerEntry =
       timestampMs: number;
       prayerId: string;
       text: string;
+    }
+  | {
+      kind: "highlight";
+      key: string;
+      date: string;
+      timestampMs: number;
+      book: string;
+      chapter: number;
+      verse: number;
+      reference: string;
+      text: string;
+      color: HighlightColor;
+      notes: string | null;
     };
 
 export interface LedgerDay {
@@ -32,15 +53,21 @@ export interface LedgerDay {
 }
 
 /**
- * Combines lesson completions and prayers into one reverse-chronological
- * list of Ledger entries — reusing existing data end to end, nothing new
- * stored: `lessonCheckIns` (fetchLessonCheckIns, src/lib/db/checkIns.ts)
- * gives each completed lesson's real completion date; `lessonAnswers`
- * (fetchLessonAnswers, src/lib/db/lessonAnswers.ts) supplies the written
- * scenario/short-answer text, joined here by `lessonId`; `lessons` (the
- * app's existing lesson list) supplies each screen's own prompt so an
- * expanded entry shows the question next to the answer; `prayers`
- * (subscribeToPrayers, src/lib/db/prayers.ts) is used as-is.
+ * Combines lesson completions, prayers, and highlighted verses into one
+ * reverse-chronological list of Ledger entries — reusing existing data end
+ * to end, nothing new stored: `lessonCheckIns` (fetchLessonCheckIns,
+ * src/lib/db/checkIns.ts) gives each completed lesson's real completion
+ * date; `lessonAnswers` (fetchLessonAnswers, src/lib/db/lessonAnswers.ts)
+ * supplies the written scenario/short-answer text, joined here by
+ * `lessonId`; `lessons` (the app's existing lesson list) supplies each
+ * screen's own prompt so an expanded entry shows the question next to the
+ * answer; `prayers` (subscribeToPrayers, src/lib/db/prayers.ts) is used
+ * as-is; `highlights` (subscribeToHighlights, src/lib/db/highlights.ts —
+ * the SAME live subscription The Word tab itself uses, not a copy, so a
+ * highlight deleted from either place is just gone from the one
+ * underlying doc, never out of sync) is used as-is too, except a
+ * highlight has no `date` field of its own, so one is derived here from
+ * `createdAt` in `timeZone`.
  *
  * A lesson only becomes a Ledger entry once its check-in exists — answers
  * saved mid-lesson (via back-navigation, before the lesson is finished)
@@ -51,6 +78,8 @@ export function buildLedgerEntries(
   lessonAnswers: LessonAnswerDoc[],
   lessons: LessonDoc[],
   prayers: PrayerDoc[],
+  highlights: UserHighlightDoc[],
+  timeZone: string,
 ): LedgerEntry[] {
   const lessonsById = new Map(lessons.map((lesson) => [lesson.id, lesson]));
   const answersByLesson = new Map<string, LessonAnswerDoc[]>();
@@ -91,6 +120,23 @@ export function buildLedgerEntries(
       timestampMs: prayer.createdAt?.toMillis() ?? 0,
       prayerId: prayer.id,
       text: prayer.text,
+    });
+  }
+
+  for (const highlight of highlights) {
+    const timestampMs = highlight.createdAt?.toMillis() ?? 0;
+    entries.push({
+      kind: "highlight",
+      key: `highlight_${highlight.id}`,
+      date: timestampMs ? dateKeyInTimeZone(new Date(timestampMs), timeZone) : "",
+      timestampMs,
+      book: highlight.book,
+      chapter: highlight.chapter,
+      verse: highlight.verse,
+      reference: highlight.reference,
+      text: highlight.text,
+      color: highlight.color,
+      notes: highlight.notes,
     });
   }
 
@@ -148,14 +194,22 @@ export function findOnThisDay(entries: LedgerEntry[], todayKey: string): OnThisD
 }
 
 /** Plain substring search (Premium) over a Ledger entry's own text —
- * prayer text, or a lesson's title plus every saved answer. Client-side
- * over the already-loaded entries; this app's per-user ledger is small
- * enough that it doesn't need a search index. */
+ * prayer text, a lesson's title plus every saved answer, or a highlight's
+ * verse text/reference/note. Client-side over the already-loaded entries;
+ * this app's per-user ledger is small enough that it doesn't need a
+ * search index. */
 export function searchLedgerEntries(entries: LedgerEntry[], queryText: string): LedgerEntry[] {
   const needle = queryText.trim().toLowerCase();
   if (!needle) return entries;
   return entries.filter((entry) => {
     if (entry.kind === "prayer") return entry.text.toLowerCase().includes(needle);
+    if (entry.kind === "highlight") {
+      return (
+        entry.text.toLowerCase().includes(needle) ||
+        entry.reference.toLowerCase().includes(needle) ||
+        (entry.notes?.toLowerCase().includes(needle) ?? false)
+      );
+    }
     return (
       entry.title.toLowerCase().includes(needle) ||
       entry.answers.some((answer) => answer.text.toLowerCase().includes(needle))

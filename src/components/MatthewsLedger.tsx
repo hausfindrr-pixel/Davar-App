@@ -2,10 +2,11 @@
 
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeftIcon, LockIcon, SearchIcon, TrashIcon } from "@/components/icons";
+import { ArrowLeftIcon, CompassIcon, LockIcon, SearchIcon, TrashIcon } from "@/components/icons";
 import { UnlockCard, blurredPreviewClass } from "@/components/PremiumGate";
 import { MATTHEW_LEDGER_MESSAGES, pickFromList } from "@/lib/apostles";
 import { fetchLessonCheckIns } from "@/lib/db/checkIns";
+import { removeHighlight, subscribeToHighlights } from "@/lib/db/highlights";
 import { deleteLessonAnswer, fetchLessonAnswers } from "@/lib/db/lessonAnswers";
 import { deletePrayer, subscribeToPrayers } from "@/lib/db/prayers";
 import { dateKeyInTimeZone, formatDayLabel } from "@/lib/date";
@@ -16,7 +17,14 @@ import {
   searchLedgerEntries,
   type LedgerEntry,
 } from "@/lib/ledger";
-import type { CheckInDoc, LessonAnswerDoc, LessonDoc, PrayerDoc } from "@/types/firestore";
+import type {
+  CheckInDoc,
+  HighlightColor,
+  LessonAnswerDoc,
+  LessonDoc,
+  PrayerDoc,
+  UserHighlightDoc,
+} from "@/types/firestore";
 
 type MatthewsLedgerProps = {
   uid: string;
@@ -25,12 +33,28 @@ type MatthewsLedgerProps = {
   lessons: LessonDoc[];
   getIdToken: () => Promise<string>;
   onBack: () => void;
+  /** Jumps to The Word tab, open to this book/chapter — see WordFocusRequest
+   * (src/components/tabs/WordTab.tsx). Closes the Ledger itself. */
+  onNavigateToVerse: (book: string, chapter: number) => void;
 };
 
-type EntryFilter = "all" | "lesson" | "prayer";
+type EntryFilter = "all" | "lesson" | "prayer" | "highlight";
+
+const HIGHLIGHT_LABEL: Record<HighlightColor, string> = {
+  clay: "Clay",
+  sage: "Sage",
+  stone: "Stone",
+};
+
+const HIGHLIGHT_DOT: Record<HighlightColor, string> = {
+  clay: "bg-clay-400",
+  sage: "bg-sage-400",
+  stone: "bg-stone",
+};
 
 function entrySummary(entry: LedgerEntry): string {
   if (entry.kind === "lesson") return entry.title;
+  if (entry.kind === "highlight") return entry.reference;
   const trimmed = entry.text.trim();
   return trimmed.length > 72 ? `${trimmed.slice(0, 72)}…` : trimmed;
 }
@@ -40,34 +64,46 @@ function formatEntryTime(timestampMs: number): string {
   return new Date(timestampMs).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 }
 
+const ENTRY_KIND_LABEL: Record<LedgerEntry["kind"], string> = {
+  lesson: "Lesson",
+  prayer: "Prayer",
+  highlight: "Highlight",
+};
+
 function EntryRow({
   entry,
   isOpen,
   onToggle,
   onDelete,
+  onNavigateToVerse,
   deleting,
 }: {
   entry: LedgerEntry;
   isOpen: boolean;
   onToggle: () => void;
   onDelete: () => Promise<void>;
+  onNavigateToVerse: (book: string, chapter: number) => void;
   deleting: boolean;
 }) {
   const [confirming, setConfirming] = useState(false);
-  const canDelete = entry.kind === "prayer" || entry.answers.length > 0;
+  const canDelete = entry.kind !== "lesson" || entry.answers.length > 0;
+
+  const dotClass =
+    entry.kind === "lesson"
+      ? "bg-clay-600"
+      : entry.kind === "prayer"
+        ? "bg-dusk-600"
+        : HIGHLIGHT_DOT[entry.color];
 
   return (
     <div className="border-b border-mist last:border-b-0 py-3">
       <button type="button" onClick={onToggle} className="w-full flex items-start justify-between gap-3 text-left">
         <div className="flex items-start gap-2.5 min-w-0">
-          <span
-            className={`mt-1.5 h-1.5 w-1.5 rounded-full shrink-0 ${
-              entry.kind === "lesson" ? "bg-clay-600" : "bg-dusk-600"
-            }`}
-          />
+          <span className={`mt-1.5 h-1.5 w-1.5 rounded-full shrink-0 ${dotClass}`} />
           <div className="min-w-0">
             <span className="text-[10px] font-semibold uppercase tracking-wide text-stone">
-              {entry.kind === "lesson" ? "Lesson" : "Prayer"}
+              {ENTRY_KIND_LABEL[entry.kind]}
+              {entry.kind === "highlight" && ` · ${HIGHLIGHT_LABEL[entry.color]}`}
               {formatEntryTime(entry.timestampMs) && ` · ${formatEntryTime(entry.timestampMs)}`}
             </span>
             <p className="text-sm text-ink font-serif leading-snug truncate">{entrySummary(entry)}</p>
@@ -78,8 +114,8 @@ function EntryRow({
 
       {isOpen && (
         <div className="mt-2.5 pl-4 flex flex-col gap-3">
-          {entry.kind === "lesson" ? (
-            entry.answers.length > 0 ? (
+          {entry.kind === "lesson" &&
+            (entry.answers.length > 0 ? (
               entry.answers.map((answer) => (
                 <div key={answer.screenId} className="flex flex-col gap-1">
                   {answer.prompt && <p className="text-xs text-stone leading-relaxed">{answer.prompt}</p>}
@@ -90,9 +126,29 @@ function EntryRow({
               ))
             ) : (
               <p className="text-xs text-stone">No saved answers for this lesson.</p>
-            )
-          ) : (
+            ))}
+
+          {entry.kind === "prayer" && (
             <p className="text-sm text-ink/85 font-serif leading-relaxed whitespace-pre-wrap">{entry.text}</p>
+          )}
+
+          {entry.kind === "highlight" && (
+            <div className="flex flex-col gap-2">
+              <p className="text-sm text-ink/85 font-serif leading-relaxed whitespace-pre-wrap">{entry.text}</p>
+              {entry.notes && (
+                <p className="text-xs text-ink/70 leading-relaxed border-l-2 border-mist pl-2.5">
+                  {entry.notes}
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={() => onNavigateToVerse(entry.book, entry.chapter)}
+                className="self-start flex items-center gap-1.5 text-xs font-medium text-clay-600 hover:text-clay-700 transition-colors"
+              >
+                <CompassIcon className="h-3.5 w-3.5" />
+                Go to {entry.book} {entry.chapter} in The Word
+              </button>
+            </div>
           )}
 
           {canDelete && (
@@ -131,13 +187,24 @@ function EntryRow({
 }
 
 /** "Matthew's Ledger (Archives)" — a personal, private record of completed
- * lessons and prayers, kept as a reverse-chronological timeline grouped by
- * day. Reuses existing data end to end (see src/lib/ledger.ts) — no new
- * Firestore collection. */
-export function MatthewsLedger({ uid, timeZone, isPremium, lessons, getIdToken, onBack }: MatthewsLedgerProps) {
+ * lessons, prayers, and highlighted verses, kept as a reverse-chronological
+ * timeline grouped by day. Reuses existing data end to end (see
+ * src/lib/ledger.ts) — no new Firestore collection. Highlights load via
+ * the same live subscription The Word tab uses, so deleting one here (or
+ * there) is never out of sync with the other. */
+export function MatthewsLedger({
+  uid,
+  timeZone,
+  isPremium,
+  lessons,
+  getIdToken,
+  onBack,
+  onNavigateToVerse,
+}: MatthewsLedgerProps) {
   const [checkIns, setCheckIns] = useState<CheckInDoc[]>([]);
   const [lessonAnswers, setLessonAnswers] = useState<LessonAnswerDoc[]>([]);
   const [prayers, setPrayers] = useState<PrayerDoc[]>([]);
+  const [highlights, setHighlights] = useState<UserHighlightDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [filter, setFilter] = useState<EntryFilter>("all");
@@ -172,9 +239,16 @@ export function MatthewsLedger({ uid, timeZone, isPremium, lessons, getIdToken, 
     return subscribeToPrayers(uid, setPrayers);
   }, [uid]);
 
+  // Live, not a one-time fetch — the same subscription The Word tab
+  // itself uses, so a highlight deleted from either place is just gone
+  // from the one underlying doc; the two views never need reconciling.
+  useEffect(() => {
+    return subscribeToHighlights(uid, setHighlights);
+  }, [uid]);
+
   const allEntries = useMemo(
-    () => buildLedgerEntries(checkIns, lessonAnswers, lessons, prayers),
-    [checkIns, lessonAnswers, lessons, prayers],
+    () => buildLedgerEntries(checkIns, lessonAnswers, lessons, prayers, highlights, timeZone),
+    [checkIns, lessonAnswers, lessons, prayers, highlights, timeZone],
   );
 
   const todayKey = dateKeyInTimeZone(new Date(), timeZone);
@@ -201,6 +275,10 @@ export function MatthewsLedger({ uid, timeZone, isPremium, lessons, getIdToken, 
     try {
       if (entry.kind === "prayer") {
         await deletePrayer(uid, entry.prayerId);
+      } else if (entry.kind === "highlight") {
+        await removeHighlight(uid, entry.book, entry.chapter, entry.verse);
+        // subscribeToHighlights updates highlights (and so The Word tab)
+        // on its own — no local state to reconcile here.
       } else {
         await Promise.all(entry.answers.map((answer) => deleteLessonAnswer(uid, entry.lessonId, answer.screenId)));
         setLessonAnswers((prev) => prev.filter((answer) => answer.lessonId !== entry.lessonId));
@@ -283,8 +361,8 @@ export function MatthewsLedger({ uid, timeZone, isPremium, lessons, getIdToken, 
         ))}
 
       <div className="w-full max-w-sm flex flex-col gap-3">
-        <div className="flex items-center gap-2">
-          {(["all", "lesson", "prayer"] as EntryFilter[]).map((f) => (
+        <div className="flex items-center gap-2 flex-wrap">
+          {(["all", "lesson", "prayer", "highlight"] as EntryFilter[]).map((f) => (
             <button
               key={f}
               type="button"
@@ -293,7 +371,7 @@ export function MatthewsLedger({ uid, timeZone, isPremium, lessons, getIdToken, 
                 filter === f ? "bg-clay-600 text-paper" : "bg-paper border border-mist text-stone"
               }`}
             >
-              {f === "all" ? "All" : f === "lesson" ? "Lessons" : "Prayers"}
+              {f === "all" ? "All" : f === "lesson" ? "Lessons" : f === "prayer" ? "Prayers" : "Highlights"}
             </button>
           ))}
         </div>
@@ -324,7 +402,8 @@ export function MatthewsLedger({ uid, timeZone, isPremium, lessons, getIdToken, 
         {!loading && !loadError && days.length === 0 && (
           <div className="rounded-2xl bg-paper border border-mist p-5 text-center">
             <p className="text-sm text-stone">
-              Nothing here yet — complete a lesson or write a prayer, and Matthew starts keeping the record.
+              Nothing here yet — complete a lesson, write a prayer, or highlight a verse, and Matthew starts
+              keeping the record.
             </p>
           </div>
         )}
@@ -342,6 +421,7 @@ export function MatthewsLedger({ uid, timeZone, isPremium, lessons, getIdToken, 
                   isOpen={openKey === entry.key}
                   onToggle={() => setOpenKey((prev) => (prev === entry.key ? null : entry.key))}
                   onDelete={() => handleDeleteEntry(entry)}
+                  onNavigateToVerse={onNavigateToVerse}
                   deleting={deletingKey === entry.key}
                 />
               ))}
