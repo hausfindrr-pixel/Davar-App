@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ArrowLeftIcon } from "@/components/icons";
 import { LessonFlow } from "@/components/LessonFlow";
 import { PathEventCard } from "@/components/PathEventCard";
+import { PathProgressBar } from "@/components/PathProgressBar";
 import type { PlanId } from "@/lib/plisio/plans";
 import { flattenPathEvents, nextLesson } from "@/lib/roadmap";
 import { dailyEventLimit, type LessonDoc } from "@/types/firestore";
@@ -81,6 +82,7 @@ export function PathEventList({
         return next ? [next] : [];
       })();
   const libraryComplete = !isPremium && events.length === 0 && lessons.length > 0;
+  const completedCount = lessons.filter((lesson) => allTimeCompletedLessonIds.includes(lesson.id)).length;
 
   let effectiveOpenLessonId = openLessonId;
   if (focusRequest && focusRequest.nonce !== handledFocusNonce) {
@@ -143,6 +145,8 @@ export function PathEventList({
 
   return (
     <section className="w-full max-w-sm flex flex-col gap-3">
+      <PathProgressBar completed={completedCount} total={lessons.length} />
+
       <div className="flex items-center justify-between px-1">
         <h2 className="text-sm font-medium text-ink">The Path</h2>
         <span className="text-xs text-stone">

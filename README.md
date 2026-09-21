@@ -370,6 +370,28 @@ inside the illustrated band.
 - **No XP, no completion state, read-only for v1** — these are things to
   read, not tasks to complete, unlike lessons.
 
+### The Path: journey progress and stages
+
+`PathProgressBar.tsx` sits above the card feed (both tiers, list view
+only — not shown inside an open lesson's flow, which has its own
+per-lesson step progress instead) and tracks **library-wide** progress:
+how many of the current `lessons` the user has ever completed
+(`allTimeCompletedLessonIds` again, not a separate counter), out of the
+current library size — deliberately a percentage-based read on the whole
+library, not a fixed lesson count, so it keeps meaning the same thing as
+more lessons are added later rather than needing to be re-tuned.
+
+`currentStage` (`src/lib/stages.ts`) maps that percentage onto six named
+stages — `PATH_STAGES`, each a `{ name, minProgress }` band: **Scholar**
+(0%) → **Rabbi** (20%) → **Sage** (40%) → **Elder** (60%) → **Shepherd**
+(80%) → **Faithful Witness** (100%). The bar shows the current stage as a
+small badge, `completed`/`total`, and how many more lessons reach the
+next stage (`lessonsToNext`) — or a completion message once every lesson
+in the library is done. Bands are fractions of `total`, so `currentStage`
+takes `total` as a parameter rather than hardcoding it — the same
+function keeps working correctly whether the library has 10 lessons or
+60.
+
 ### The Path: an event-first card feed
 
 The Path is a flat, scrollable feed of event cards — `PathEventList.tsx`
