@@ -958,13 +958,34 @@ crypto payment gateway — no card processor involved.
   server calls this on every status change for an invoice. It verifies
   Plisio's HMAC signature (`src/lib/plisio/verify.ts`) first, before anything
   else — an invalid/missing `verify_hash` gets a 400 (permanent failure,
-  never retried) and no Firestore access at all. Only `status === "completed"`
-  ever grants anything — Plisio's own status set (`pending`, `new`,
-  `mismatch`, `expired`, `cancelled`, `error`, `completed`) already keeps an
-  underpaid invoice out of `"completed"` (that's `"mismatch"` instead), so
-  there's no separate amount check to get out of sync with Plisio's own
-  logic. Every other status is still logged (see `payment_events` below) and
-  ignored — nothing to grant, no retry needed, just a 200.
+  never retried) and no Firestore access at all.
+  - **`status === "completed"`** always grants.
+  - **`status === "mismatch"`** — Plisio's status for "amount received !=
+    amount invoiced" — used to be treated as "nothing to grant" on the
+    assumption that a mismatch only ever meant underpayment. **A real
+    incident (Sept 2026) disproved that**: a Solana payment overpaid by
+    ~6% (some wallets round/truncate the exact quoted amount) went through
+    `"mismatch"` and never reached `"completed"` at all, silently
+    stranding a paying customer with no grant and no error — see the
+    postmortem in git history for the full investigation. The webhook now
+    checks the actual amount itself (`isMismatchAmountSufficient`,
+    `src/lib/plisio/amountCheck.ts`) against what this order should have
+    cost (`PLANS[plan].amount`, set by us at invoice creation, never
+    trusted from the client): received-at-least-that-much (within a
+    $0.05 tolerance for float/display rounding, not a real underpayment
+    allowance) grants exactly like `"completed"`; a real shortfall never
+    grants, logged as `payment_events` result `"underpaid"` — distinct
+    from a generic `"ignored"` since real, partial funds did change
+    hands and the customer needs following up (no automated "pay the
+    difference" flow exists yet — Plisio invoices don't support topping
+    up an existing one, so today this means a manual conversation, not a
+    UI). Regression-tested (`npm run test:plisio-amount`): exact match,
+    the real overpayment, boundary tolerance cases, a genuine
+    underpayment, and a missing/unparseable amount (never treated as
+    "close enough").
+  - Every other status (`pending`, `new`, `expired`, `cancelled`, `error`)
+    is still logged (see `payment_events` below) and ignored — nothing to
+    grant, no retry needed, just a 200.
   - **Granting itself is `grantPremium()`** (`src/lib/plisio/grant.ts`, kept
     separate from the route so it's directly testable — see
     `scripts/plisio-grant.test.mjs`), run inside a single Firestore
@@ -996,8 +1017,8 @@ crypto payment gateway — no card processor involved.
   - **Every delivery is logged to `payment_events`** (Admin SDK only, denied
     to clients by `firestore.rules` the same way as `premium_grants` — see
     `PaymentEventDoc`/`PremiumGrantDoc`, `src/types/firestore.ts`), whatever
-    the outcome (`granted`, `duplicate`, `ignored`, or `error`), with the
-    order number, uid, plan, status, `txn_id`, and amount fields Plisio sent
+    the outcome (`granted`, `duplicate`, `underpaid`, `ignored`, or `error`),
+    with the order number, uid, plan, status, `txn_id`, and amount fields Plisio sent
     — so a customer's payment can actually be traced later instead of
     relying on Vercel's rolling function logs. Never logs `verify_hash` or
     any computed hash (an attacker who could read these logs could use one

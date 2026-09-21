@@ -12,7 +12,8 @@
     "test:rules": "firebase emulators:exec --only firestore --project demo-davar-test \"node scripts/rules-test.mjs\"",
     "test:plisio-grant": "firebase emulators:exec --only firestore --project demo-davar-test \"node --experimental-strip-types scripts/plisio-grant.test.mjs\"",
     "test:plisio": "node --experimental-strip-types scripts/plisio-verify.test.mjs",
-    "test:premium": "node --experimental-strip-types scripts/premium-extend.test.mjs"
+    "test:premium": "node --experimental-strip-types scripts/premium-extend.test.mjs",
+    "test:plisio-amount": "node --experimental-strip-types scripts/plisio-amount-check.test.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.125.0",

@@ -3,8 +3,16 @@ import { Timestamp } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase-admin";
 import { verifyPlisioCallback } from "@/lib/plisio/verify";
 import { grantPremium } from "@/lib/plisio/grant";
-import { isPlanId } from "@/lib/plisio/plans";
+import { isPlanId, PLANS } from "@/lib/plisio/plans";
+import { isMismatchAmountSufficient, parseAmount } from "@/lib/plisio/amountCheck";
 import { COLLECTIONS, type PaymentEventDoc } from "@/types/firestore";
+
+// Absorbs float/display rounding between Plisio and us (or a wallet UI that
+// truncates to fewer decimals than the exact quoted amount) — not a real
+// underpayment allowance. A dollar, not a percentage: the plans are cheap
+// enough that a percentage tolerance would be too forgiving on the yearly
+// plan and too strict on the monthly one.
+const PAYMENT_AMOUNT_TOLERANCE_USD = 0.05;
 
 // Needs Node's crypto/Admin SDK — not compatible with the edge runtime.
 export const runtime = "nodejs";
@@ -101,13 +109,35 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  if (status !== "completed") {
-    // Plisio's own status set (pending/new/mismatch/expired/cancelled/
-    // error/completed) already keeps anything short of a fully-paid
-    // invoice out of "completed" — an underpayment surfaces as
-    // "mismatch", not "completed" with a smaller amount. Nothing to grant
-    // here, but log it so a stuck/underpaid/expired payment is visible
-    // later instead of silently vanishing.
+  // Only "completed" is unconditionally a grant. "mismatch" is Plisio's
+  // catch-all for "amount received != amount invoiced" — in *either*
+  // direction, not just underpayment (a real overpaid Solana invoice was
+  // seen going through this status without ever reaching "completed" at
+  // all). Since we know exactly what this order should have cost
+  // (PLANS[plan].amount, set by us at invoice creation, never trusted from
+  // the client), a "mismatch" callback that reports at least that much
+  // received is verified, real payment — grant it exactly like
+  // "completed" rather than stranding a customer who paid enough just
+  // because the amount wasn't penny-exact. Anything under that amount
+  // (beyond a small rounding tolerance) is a genuine underpayment: never
+  // grant, but log it distinctly (not a generic "ignored") since real,
+  // partial funds did change hands and the customer needs following up.
+  let shouldGrant = status === "completed";
+  let underpaidAmount: number | null = null;
+
+  if (!shouldGrant && status === "mismatch") {
+    const requiredAmount = Number(PLANS[plan].amount);
+    const receivedNumber = parseAmount(sourceAmount) ?? parseAmount(receivedAmount);
+    if (isMismatchAmountSufficient(requiredAmount, receivedNumber, PAYMENT_AMOUNT_TOLERANCE_USD)) {
+      shouldGrant = true;
+    } else {
+      underpaidAmount = receivedNumber;
+    }
+  }
+
+  if (!shouldGrant) {
+    // Covers: pending/new/expired/cancelled/error, a mismatch we
+    // couldn't verify the amount for, and genuine underpayment.
     await logPaymentEvent({
       orderNumber,
       uid,
@@ -116,8 +146,11 @@ export async function POST(req: Request) {
       txnId,
       sourceAmount,
       receivedAmount,
-      result: "ignored",
-      errorMessage: null,
+      result: underpaidAmount !== null ? "underpaid" : "ignored",
+      errorMessage:
+        underpaidAmount !== null
+          ? `received ${underpaidAmount} < required ${PLANS[plan].amount} (beyond ${PAYMENT_AMOUNT_TOLERANCE_USD} tolerance)`
+          : null,
     });
     return NextResponse.json({ ok: true });
   }
@@ -129,6 +162,7 @@ export async function POST(req: Request) {
       plan,
       orderNumber,
       txnId,
+      status,
     });
     await logPaymentEvent({
       orderNumber,

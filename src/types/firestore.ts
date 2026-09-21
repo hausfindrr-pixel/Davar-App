@@ -108,11 +108,11 @@ export interface PremiumGrantDoc {
 /**
  * payment_events/{autoId} — one document per Plisio webhook delivery the
  * server actually received, whatever its outcome (granted, a duplicate
- * redelivery, a non-"completed" status like "mismatch"/"expired", or an
- * error) — so a customer's payment can be traced after the fact instead
- * of relying on Vercel's rolling function logs. Server-only (Admin SDK);
- * see firestore.rules. Never stores `verify_hash` or any other secret
- * material from the payload.
+ * redelivery, a non-"completed" status like "expired"/"cancelled", an
+ * underpayment, or an error) — so a customer's payment can be traced
+ * after the fact instead of relying on Vercel's rolling function logs.
+ * Server-only (Admin SDK); see firestore.rules. Never stores
+ * `verify_hash` or any other secret material from the payload.
  */
 export interface PaymentEventDoc {
   orderNumber: string | null;
@@ -122,7 +122,12 @@ export interface PaymentEventDoc {
   txnId: string | null;
   sourceAmount: string | null;
   receivedAmount: string | null;
-  result: "granted" | "duplicate" | "ignored" | "error";
+  /** "underpaid": a `"mismatch"` callback where the amount actually
+   * received fell short of the plan price (beyond float-rounding
+   * tolerance) — never granted, but logged distinctly from a generic
+   * "ignored" status so it's easy to find and follow up with the
+   * customer, since real (partial) funds did change hands. */
+  result: "granted" | "duplicate" | "underpaid" | "ignored" | "error";
   errorMessage: string | null;
   receivedAt: Timestamp;
 }
