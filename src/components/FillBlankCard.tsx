@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { CONTENT_TYPE_META } from "@/lib/contentType";
 import { BLANK_TOKEN, type LessonTrack, type VerseActivity } from "@/types/firestore";
 
@@ -124,20 +124,22 @@ export function FillBlankCard({ activity, track, isDone, isLocked, isPending, on
     return (
       <div className="flex flex-col gap-2">
         {verseRenders.map((verse) => (
-          <div key={verse.reference} className="flex flex-wrap gap-1 text-sm leading-relaxed">
-            <span className="w-full text-[11px] font-semibold uppercase tracking-wide text-stone">
+          <div key={verse.reference} className="flex flex-col gap-1">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-stone">
               {verse.reference}
             </span>
-            {verse.segments.map((segment, i) => (
-              <span key={i}>
-                {segment}
-                {i < verse.blankCount && (
-                  <span className="font-semibold text-sage-700">
-                    {flatAnswers[verse.startIndex + i]}
-                  </span>
-                )}
-              </span>
-            ))}
+            <p className="text-lg leading-relaxed font-normal text-ink">
+              {verse.segments.map((segment, i) => (
+                <Fragment key={i}>
+                  {segment}
+                  {i < verse.blankCount && (
+                    <span className="font-semibold text-sage-700">
+                      {flatAnswers[verse.startIndex + i]}
+                    </span>
+                  )}
+                </Fragment>
+              ))}
+            </p>
           </div>
         ))}
       </div>
@@ -148,36 +150,38 @@ export function FillBlankCard({ activity, track, isDone, isLocked, isPending, on
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-2.5">
         {verseRenders.map((verse) => (
-          <div key={verse.reference} className="flex flex-wrap items-center gap-1.5 text-sm leading-relaxed">
-            <span className="w-full text-[11px] font-semibold uppercase tracking-wide text-stone">
+          <div key={verse.reference} className="flex flex-col gap-1">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-stone">
               {verse.reference}
             </span>
-            {verse.segments.map((segment, i) => {
-              const blankIndex = verse.startIndex + i;
-              return (
-                <span key={i} className="contents">
-                  <span>{segment}</span>
-                  {i < verse.blankCount && (
-                    <button
-                      type="button"
-                      disabled={!interactive || blanks[blankIndex] === null}
-                      onClick={() => clearBlank(blankIndex)}
-                      className={`inline-flex min-w-[4.5rem] items-center justify-center rounded-lg border-2 px-2.5 py-1 text-sm font-bold transition-colors ${
-                        blanks[blankIndex] === null
-                          ? `border-dashed ${meta.emptyBlankClass} text-transparent select-none`
-                          : feedback === "correct"
-                            ? "border-transparent bg-sage-700 text-paper"
-                            : feedback === "incorrect"
-                              ? "border-transparent bg-ink text-paper"
-                              : `border-transparent ${meta.activeBgClass}`
-                      }`}
-                    >
-                      {blanks[blankIndex] ?? "___"}
-                    </button>
-                  )}
-                </span>
-              );
-            })}
+            <p className="text-lg leading-relaxed font-normal text-ink">
+              {verse.segments.map((segment, i) => {
+                const blankIndex = verse.startIndex + i;
+                return (
+                  <Fragment key={i}>
+                    {segment}
+                    {i < verse.blankCount && (
+                      <button
+                        type="button"
+                        disabled={!interactive || blanks[blankIndex] === null}
+                        onClick={() => clearBlank(blankIndex)}
+                        className={`mx-1 inline-flex min-w-[4.5rem] items-center justify-center rounded-lg border-2 px-2.5 py-1 align-middle text-sm font-bold transition-colors ${
+                          blanks[blankIndex] === null
+                            ? `border-dashed ${meta.emptyBlankClass} text-transparent select-none`
+                            : feedback === "correct"
+                              ? "border-transparent bg-sage-700 text-paper"
+                              : feedback === "incorrect"
+                                ? "border-transparent bg-ink text-paper"
+                                : `border-transparent ${meta.activeBgClass}`
+                        }`}
+                      >
+                        {blanks[blankIndex] ?? "___"}
+                      </button>
+                    )}
+                  </Fragment>
+                );
+              })}
+            </p>
           </div>
         ))}
       </div>
