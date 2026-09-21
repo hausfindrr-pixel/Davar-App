@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { Timestamp } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase-admin";
 import { verifyPlisioCallback } from "@/lib/plisio/verify";
-import { PLANS, isPlanId } from "@/lib/plisio/plans";
+import { grantPremium } from "@/lib/plisio/grant";
+import { isPlanId } from "@/lib/plisio/plans";
+import { COLLECTIONS, type PaymentEventDoc } from "@/types/firestore";
 
 // Needs Node's crypto/Admin SDK — not compatible with the edge runtime.
 export const runtime = "nodejs";
@@ -31,6 +33,28 @@ async function parseBody(req: Request): Promise<Record<string, unknown>> {
   }
 }
 
+function str(payload: Record<string, unknown>, key: string): string | null {
+  const value = payload[key];
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+/** Best-effort audit-trail write — every delivery gets one row here so a
+ * customer's payment can be traced later, but a logging failure must never
+ * itself change the response Plisio sees (that response is decided purely
+ * by whether premium was actually granted — see POST below). */
+async function logPaymentEvent(event: Omit<PaymentEventDoc, "receivedAt">): Promise<void> {
+  try {
+    await adminDb()
+      .collection(COLLECTIONS.paymentEvents)
+      .add({ ...event, receivedAt: Timestamp.now() });
+  } catch (err) {
+    console.error("plisio webhook: failed to write payment_events audit log", {
+      orderNumber: event.orderNumber,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
 export async function POST(req: Request) {
   const secretKey = process.env.PLISIO_SECRET_KEY;
   if (!secretKey) {
@@ -44,38 +68,99 @@ export async function POST(req: Request) {
     // Never log the payload or any computed hash here — an attacker who can
     // read these logs could use them as a signing oracle for the next call.
     console.warn("plisio webhook: signature verification failed", {
-      order_number: typeof payload.order_number === "string" ? payload.order_number : undefined,
-      txn_id: typeof payload.txn_id === "string" ? payload.txn_id : undefined,
+      order_number: str(payload, "order_number"),
+      txn_id: str(payload, "txn_id"),
     });
+    // 400, not 5xx: an invalid signature will never become valid on retry.
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
-  const orderNumber = typeof payload.order_number === "string" ? payload.order_number : "";
-  const [uid, plan] = orderNumber.split("__");
-  const status = typeof payload.status === "string" ? payload.status : null;
+  const orderNumber = str(payload, "order_number");
+  const [uid, plan] = orderNumber ? orderNumber.split("__") : [null, null];
+  const status = str(payload, "status");
+  const txnId = str(payload, "txn_id");
+  const sourceAmount = str(payload, "source_amount");
+  const receivedAmount = str(payload, "amount");
 
-  if (uid && isPlanId(plan) && status === "completed") {
-    // Anchor premiumUntil to the SAME instant stored as premiumSince,
-    // rather than computing it independently — keeps the "premiumSince +
-    // plan length = premiumUntil" relationship exact, not just approximate.
-    const premiumSince = Timestamp.now();
-    const premiumUntil = Timestamp.fromMillis(premiumSince.toMillis() + PLANS[plan].days * 24 * 60 * 60 * 1000);
-    try {
-      await adminDb()
-        .collection("users")
-        .doc(uid)
-        .update({ tier: "premium", premiumSince, premiumUntil, planId: plan });
-      console.log("plisio webhook: upgraded user to premium", { uid, plan, txn_id: payload.txn_id });
-    } catch (err) {
-      // Log and move on rather than returning non-2xx: Plisio retries
-      // failed callbacks, and a transient Firestore error shouldn't turn
-      // into a retry storm. This needs a human to look at the log instead.
-      console.error("plisio webhook: failed to upgrade user", {
-        uid,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
+  if (!orderNumber || !uid || !isPlanId(plan)) {
+    // Malformed/unrecognized order_number — nothing to act on, but still
+    // worth a permanent record in case it points at a real bug elsewhere
+    // (e.g. an order created before an order_number format change).
+    console.warn("plisio webhook: unrecognized order_number", { orderNumber, status, txnId });
+    await logPaymentEvent({
+      orderNumber,
+      uid,
+      plan: isPlanId(plan) ? plan : null,
+      status,
+      txnId,
+      sourceAmount,
+      receivedAmount,
+      result: "error",
+      errorMessage: "unrecognized or malformed order_number",
+    });
+    return NextResponse.json({ ok: true });
   }
 
-  return NextResponse.json({ ok: true });
+  if (status !== "completed") {
+    // Plisio's own status set (pending/new/mismatch/expired/cancelled/
+    // error/completed) already keeps anything short of a fully-paid
+    // invoice out of "completed" — an underpayment surfaces as
+    // "mismatch", not "completed" with a smaller amount. Nothing to grant
+    // here, but log it so a stuck/underpaid/expired payment is visible
+    // later instead of silently vanishing.
+    await logPaymentEvent({
+      orderNumber,
+      uid,
+      plan,
+      status,
+      txnId,
+      sourceAmount,
+      receivedAmount,
+      result: "ignored",
+      errorMessage: null,
+    });
+    return NextResponse.json({ ok: true });
+  }
+
+  try {
+    const { duplicate } = await grantPremium(adminDb(), orderNumber, uid, plan, txnId);
+    console.log(duplicate ? "plisio webhook: duplicate delivery, already granted" : "plisio webhook: upgraded user to premium", {
+      uid,
+      plan,
+      orderNumber,
+      txnId,
+    });
+    await logPaymentEvent({
+      orderNumber,
+      uid,
+      plan,
+      status,
+      txnId,
+      sourceAmount,
+      receivedAmount,
+      result: duplicate ? "duplicate" : "granted",
+      errorMessage: null,
+    });
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    console.error("plisio webhook: failed to upgrade user", { uid, plan, orderNumber, error: errorMessage });
+    await logPaymentEvent({
+      orderNumber,
+      uid,
+      plan,
+      status,
+      txnId,
+      sourceAmount,
+      receivedAmount,
+      result: "error",
+      errorMessage,
+    });
+    // 500, not 200: this was a real, verified "completed" payment that
+    // failed to apply — Plisio must retry rather than give up, and the
+    // transaction above guarantees a retry is safe (nothing was written
+    // unless it fully committed, so there's nothing for a retry to
+    // double-apply).
+    return NextResponse.json({ ok: false }, { status: 500 });
+  }
 }

@@ -42,3 +42,20 @@ export function shouldShowRenewalReminder(
 export function isPremiumExpired(premiumUntil: TimestampLike | null, now: number = Date.now()): boolean {
   return premiumUntil !== null && premiumUntil.toMillis() <= now;
 }
+
+/** New `premiumUntil` (as epoch millis) for a grant of `days` days,
+ * anchored at `now`. If the user is still currently premium
+ * (`currentPremiumUntil` is in the future), extends from there instead of
+ * from `now` — so renewing early (the renewal-reminder banner's whole
+ * point) never forfeits the remaining paid time. Otherwise — a lapsed
+ * grant, or a first-time purchase — starts fresh from `now`. Used by the
+ * Plisio webhook (`src/app/api/plisio/webhook/route.ts`); kept here,
+ * dependency-free, so the math is unit-testable without Firestore. */
+export function extendPremiumUntil(
+  currentPremiumUntil: TimestampLike | null,
+  days: number,
+  now: number = Date.now(),
+): number {
+  const base = currentPremiumUntil && currentPremiumUntil.toMillis() > now ? currentPremiumUntil.toMillis() : now;
+  return base + days * 24 * 60 * 60 * 1000;
+}

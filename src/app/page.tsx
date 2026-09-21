@@ -363,10 +363,27 @@ function Dashboard({ uid }: { uid: string }) {
   const { user, signOut } = useAuth();
   const searchParams = useSearchParams();
   const justUpgraded = searchParams.get("upgraded") === "1";
+  // When this landed on "still confirming" (justUpgraded but not yet
+  // premium) — used only to time out the "this can take a few minutes"
+  // message into a "contact support" hint if it's genuinely stuck (an
+  // underpaid/"mismatch" payment, for instance, will never confirm on its
+  // own). Deliberately scoped to this page load, not persisted: a refresh
+  // resets the clock, which is fine — the common stuck case is someone
+  // leaving the tab open, not repeatedly reloading.
+  const [confirmingSince] = useState<number | null>(() => (justUpgraded ? Date.now() : null));
+  const [confirmingTooLong, setConfirmingTooLong] = useState(false);
 
   const timeZone = profile?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
   const today = dateKeyInTimeZone(new Date(), timeZone);
   const isPremium = profile?.tier === "premium";
+
+  useEffect(() => {
+    if (confirmingSince === null || isPremium) return;
+    const remainingMs = confirmingSince + 60 * 60 * 1000 - Date.now();
+    const timer = setTimeout(() => setConfirmingTooLong(true), Math.max(0, remainingMs));
+    return () => clearTimeout(timer);
+  }, [confirmingSince, isPremium]);
+
   const showRenewalReminder = shouldShowRenewalReminder(isPremium, profile?.premiumUntil ?? null);
   const daysUntilPremiumEnds = daysUntilExpiry(profile?.premiumUntil ?? null);
   const dailyVerse = pickForDate(dailyVerses, today);
@@ -544,7 +561,9 @@ function Dashboard({ uid }: { uid: string }) {
         >
           {isPremium
             ? "You're Premium — 3 stories and 15 prayers a day, and the full library, are unlocked."
-            : "Payment received — your upgrade is confirming on the network. This can take a few minutes; this page will update on its own, no need to refresh."}
+            : confirmingTooLong
+              ? "This is taking longer than usual — if it's been over an hour since you paid, the payment may not have gone through as expected. Contact support and we'll sort it out."
+              : "Payment received — your upgrade is confirming on the network. This can take a few minutes; this page will update on its own, no need to refresh."}
         </div>
       )}
 

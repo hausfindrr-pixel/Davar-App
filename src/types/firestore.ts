@@ -19,6 +19,8 @@ export const COLLECTIONS = {
   dailyVerses: "daily_verses",
   dailyDevotionals: "daily_devotionals",
   dailyPrayers: "daily_prayers",
+  premiumGrants: "premium_grants",
+  paymentEvents: "payment_events",
 } as const;
 
 export type UserTier = "free" | "premium";
@@ -81,6 +83,48 @@ export interface UserDoc {
   premiumNudgeLastShownDate: string | null; // "YYYY-MM-DD"
   premiumNudgeLastShownCompletedCount: number | null;
   premiumNudgeLastTappedDate: string | null; // "YYYY-MM-DD"
+}
+
+/**
+ * premium_grants/{orderNumber} — created exactly once, by the Plisio
+ * webhook, the moment a "completed" callback for that order actually
+ * grants (or extends) premium. Its existence is the webhook's idempotency
+ * guard: if the same order's "completed" callback is ever redelivered
+ * (Plisio's own retry, or a manual resend), finding this doc already
+ * there is what stops a second, duplicate extension. Server-only (Admin
+ * SDK) — see firestore.rules, which denies all client access, the same
+ * way as watch_chat_usage.
+ */
+export interface PremiumGrantDoc {
+  orderNumber: string;
+  uid: string;
+  plan: PlanId;
+  txnId: string | null;
+  grantedAt: Timestamp;
+  previousPremiumUntil: Timestamp | null;
+  newPremiumUntil: Timestamp;
+}
+
+/**
+ * payment_events/{autoId} — one document per Plisio webhook delivery the
+ * server actually received, whatever its outcome (granted, a duplicate
+ * redelivery, a non-"completed" status like "mismatch"/"expired", or an
+ * error) — so a customer's payment can be traced after the fact instead
+ * of relying on Vercel's rolling function logs. Server-only (Admin SDK);
+ * see firestore.rules. Never stores `verify_hash` or any other secret
+ * material from the payload.
+ */
+export interface PaymentEventDoc {
+  orderNumber: string | null;
+  uid: string | null;
+  plan: PlanId | null;
+  status: string | null;
+  txnId: string | null;
+  sourceAmount: string | null;
+  receivedAmount: string | null;
+  result: "granted" | "duplicate" | "ignored" | "error";
+  errorMessage: string | null;
+  receivedAt: Timestamp;
 }
 
 /** streaks/{uid} — one streak-state document per user. */

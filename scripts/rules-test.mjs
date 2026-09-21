@@ -519,6 +519,35 @@ await check("alice cannot write her own watch_chat_usage counter", async () => {
   );
 });
 
+// --- premium_grants / payment_events: the Plisio webhook's idempotency
+// guard and audit trail (see PremiumGrantDoc/PaymentEventDoc,
+// src/types/firestore.ts) — server-only, same as watch_chat_usage above.
+// A client that could read/write premium_grants directly could pre-create
+// a grant doc for an order it never paid for, blocking the real webhook's
+// idempotency check from ever granting it (a denial-of-service against
+// its own purchase) — so this needs to be denied just as firmly as the
+// entitlement fields themselves.
+await testEnv.withSecurityRulesDisabled(async (ctx) => {
+  await setDoc(doc(ctx.firestore(), "premium_grants", "order-1"), { uid: ALICE, plan: "monthly" });
+  await setDoc(doc(ctx.firestore(), "payment_events", "event-1"), { uid: ALICE, status: "completed" });
+});
+
+await check("alice cannot read a premium_grants doc", async () => {
+  await assertFails(getDoc(doc(aliceDb, "premium_grants", "order-1")));
+});
+
+await check("alice cannot write her own premium_grants doc", async () => {
+  await assertFails(setDoc(doc(aliceDb, "premium_grants", "order-2"), { uid: ALICE, plan: "monthly" }));
+});
+
+await check("alice cannot read a payment_events doc", async () => {
+  await assertFails(getDoc(doc(aliceDb, "payment_events", "event-1")));
+});
+
+await check("alice cannot write a payment_events doc", async () => {
+  await assertFails(setDoc(doc(aliceDb, "payment_events", "event-2"), { uid: ALICE, status: "completed" }));
+});
+
 // --- users/{uid}/prayers: the custom prayer journal ---
 await check("alice can create her own prayer (id field matches the docId)", async () => {
   await assertSucceeds(

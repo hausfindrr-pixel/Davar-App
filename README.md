@@ -955,21 +955,81 @@ crypto payment gateway — no card processor involved.
   server-side, asks Plisio for a hosted invoice, and returns its URL for the
   browser to redirect to.
 - `POST /api/plisio/webhook` (`src/app/api/plisio/webhook/route.ts`) — Plisio's
-  server calls this once a payment completes. It verifies Plisio's HMAC
-  signature (`src/lib/plisio/verify.ts`) and, if valid and `status ===
-  "completed"`, writes `tier: "premium"`, `premiumSince` (now), `premiumUntil`
-  (`premiumSince` + 30 days for monthly or 365 for yearly — both computed
-  from the same `Timestamp.now()` call, so the relationship between them is
-  exact, not approximate), and `planId` (`"monthly"` | `"yearly"`, parsed
-  from the same `order_number` the webhook already splits apart) on the
-  user's Firestore doc via the Admin SDK (bypassing `firestore.rules`,
-  which is exactly why only this server-side path can grant premium — see
-  the `users` rule above; all four are locked from client writes the same
-  way). `premiumUntil`/`planId` power Profile's "Your Plan" section (see
-  "Profile" above) and the expiry cron below.
+  server calls this on every status change for an invoice. It verifies
+  Plisio's HMAC signature (`src/lib/plisio/verify.ts`) first, before anything
+  else — an invalid/missing `verify_hash` gets a 400 (permanent failure,
+  never retried) and no Firestore access at all. Only `status === "completed"`
+  ever grants anything — Plisio's own status set (`pending`, `new`,
+  `mismatch`, `expired`, `cancelled`, `error`, `completed`) already keeps an
+  underpaid invoice out of `"completed"` (that's `"mismatch"` instead), so
+  there's no separate amount check to get out of sync with Plisio's own
+  logic. Every other status is still logged (see `payment_events` below) and
+  ignored — nothing to grant, no retry needed, just a 200.
+  - **Granting itself is `grantPremium()`** (`src/lib/plisio/grant.ts`, kept
+    separate from the route so it's directly testable — see
+    `scripts/plisio-grant.test.mjs`), run inside a single Firestore
+    transaction against two documents:
+    - `users/{uid}`: `tier: "premium"`, `premiumSince` (now), `premiumUntil`,
+      `planId`.
+    - `premium_grants/{orderNumber}`: created as part of the same
+      transaction — its existence is the idempotency guard. If Plisio
+      redelivers the same `"completed"` callback (their own retry, or a
+      manual resend), the transaction sees the grant doc already exists and
+      returns early as a no-op — the same order can never grant or extend
+      premium twice.
+    - **`premiumUntil` extends from the user's *current* `premiumUntil`
+      if they're still premium, not from `now`** (`extendPremiumUntil`,
+      `src/lib/premium.ts`) — renewing 3 days before expiry (the renewal
+      banner below) adds the new plan's days on top of those 3 remaining
+      days, rather than discarding them. A lapsed or first-time grant still
+      starts fresh from `now`. Regression-tested for both the pure math
+      (`npm run test:premium`) and the real transaction against the
+      Firestore emulator, including the redelivery/idempotency case (`npm
+      run test:plisio-grant`).
+  - **If the transaction fails** (a transient Firestore error, or — this
+    shouldn't happen in practice — a `uid` with no user doc), the route
+    returns a **500**, not 200: this was a real, signature-verified,
+    `"completed"` payment that failed to apply, so Plisio needs to retry it
+    rather than silently give up. The transaction guarantees a retry is
+    safe — nothing is written unless the whole thing commits, so there's
+    nothing for a retry to double-apply.
+  - **Every delivery is logged to `payment_events`** (Admin SDK only, denied
+    to clients by `firestore.rules` the same way as `premium_grants` — see
+    `PaymentEventDoc`/`PremiumGrantDoc`, `src/types/firestore.ts`), whatever
+    the outcome (`granted`, `duplicate`, `ignored`, or `error`), with the
+    order number, uid, plan, status, `txn_id`, and amount fields Plisio sent
+    — so a customer's payment can actually be traced later instead of
+    relying on Vercel's rolling function logs. Never logs `verify_hash` or
+    any computed hash (an attacker who could read these logs could use one
+    as a signing oracle for the next callback).
 - `/premium/success` and `/premium/failed` — plain pages Plisio redirects the
   browser to after checkout, independent of the webhook (the webhook is what
   actually grants premium; these pages are just user-facing confirmation).
+
+**Verified from this sandbox** (real Admin SDK credentials aren't available
+here — see "Not verifiable from this sandbox" below): `grantPremium()`
+directly against the Firestore emulator (`npm run test:plisio-grant`) covers
+a first-time purchase, a redelivered/duplicate `"completed"` callback (must
+not double-extend), a renewal 5 days before expiry (must extend from the
+existing `premiumUntil`, not from `now` — this is the exact bug this section
+used to have), a lapsed grant (must renew from `now`, not the stale expiry
+date), and a grant attempt against a nonexistent user (must throw, not
+silently no-op). `extendPremiumUntil`'s own pure math is separately covered
+by `npm run test:premium`. The client-side entitlement lock (`tier`,
+`premiumSince`, `premiumUntil`, `planId` all rejected on a direct client
+write) was independently re-verified against **real production Firestore**
+with a throwaway signed-up test user and deleted afterward, not just the
+emulator.
+
+**Not verifiable from this sandbox:** a real Plisio callback end to end —
+Plisio's docs site and API are both unreachable from every sandbox this
+project has had (see `src/lib/plisio/verify.ts`'s own comment), and Plisio
+only sends callbacks from an IP-allowlisted production server. The HMAC
+algorithm was reconstructed from Plisio's PHP SDK/plugins and is unit-tested
+against hand-computed vectors (`npm run test:plisio`), but **the first real
+payment in production is the actual test of the signature check and the
+exact field names Plisio sends** — see the test plan below for what to
+watch in the logs when that happens.
 
 ### Environment variables
 
@@ -1384,7 +1444,10 @@ scripts/          seed-lessons.mjs + lessons-data.mjs (Admin SDK lesson seeding)
                   seed-daily-content.mjs + daily-content-data.mjs (Admin SDK
                   Today-tab daily-content seeding),
                   rules-test.mjs (firestore.rules tests, npm run test:rules),
-                  plisio-verify.test.mjs (webhook signature tests, npm run test:plisio)
+                  plisio-verify.test.mjs (webhook signature tests, npm run test:plisio),
+                  premium-extend.test.mjs (renewal-math tests, npm run test:premium),
+                  plisio-grant.test.mjs (webhook grant/idempotency tests against
+                  the Firestore emulator, npm run test:plisio-grant)
 ```
 
 ## Deploying

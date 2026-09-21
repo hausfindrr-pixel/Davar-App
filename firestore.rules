@@ -221,5 +221,18 @@ service cloud.firestore {
     match /watch_chat_usage/{docId} {
       allow read, write: if false;
     }
+
+    // The Plisio webhook's idempotency guard and payment audit trail (see
+    // PremiumGrantDoc/PaymentEventDoc, src/types/firestore.ts) — written
+    // only by the webhook's Admin SDK call, which bypasses these rules
+    // entirely. Never read or written by the client, same pattern as
+    // watch_chat_usage above.
+    match /premium_grants/{orderNumber} {
+      allow read, write: if false;
+    }
+
+    match /payment_events/{docId} {
+      allow read, write: if false;
+    }
   }
 }
