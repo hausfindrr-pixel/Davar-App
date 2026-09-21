@@ -63,6 +63,25 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // A user's own free-text answer to a lesson's scenario screen(s) — no
+    // right/wrong, just preserved (same "not graded" spirit as the prayer
+    // journal above). docId is "{lessonId}_{screenId}" so writing again
+    // (e.g. after using the lesson flow's back-navigation to revise an
+    // answer) updates the same doc rather than creating a duplicate —
+    // unlike prayers, this isn't a journal entry, so update is allowed
+    // for the owner. No daily cap of its own: it's part of a lesson
+    // attempt, already bounded by that lesson's own completion cap.
+    match /users/{uid}/lessonAnswers/{answerId} {
+      allow read: if isOwner(uid);
+      allow create, update: if isOwner(uid) &&
+        answerId == request.resource.data.lessonId + '_' + request.resource.data.screenId &&
+        request.resource.data.id == answerId &&
+        request.resource.data.text is string &&
+        request.resource.data.text.size() > 0 &&
+        request.resource.data.text.size() <= 2000;
+      allow delete: if false;
+    }
+
     match /streaks/{uid} {
       allow read, write: if isOwner(uid);
     }

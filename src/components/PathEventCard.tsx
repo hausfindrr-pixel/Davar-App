@@ -1,3 +1,5 @@
+import Image from "next/image";
+import { useState } from "react";
 import { CheckIcon, LockIcon } from "@/components/icons";
 import { CONTENT_TYPE_META } from "@/lib/contentType";
 import type { PathEvent } from "@/lib/roadmap";
@@ -9,22 +11,25 @@ type PathEventCardProps = {
 
 /** One event's card in The Path's flat list — the event/story is the
  * heading, the book is a small subheading underneath it (not the other
- * way around, as it was when books were the top-level unit). An
- * image-placeholder area up top stands in for illustrations to come
- * later; today it's the content type's icon on a tinted gradient. Only
- * "completed"/"current" cards are tappable; "sequenceLocked" names the
- * specific story blocking it, reading as a plain locked card, dimmed,
- * rather than the old small locked node, since there's room here to say
- * why. Premium-only: free tier never sees a locked card at all — its
- * single visible event is always "current" (strict per-tier visibility,
- * see PathEventList). */
+ * way around, as it was when books were the top-level unit). The image
+ * area shows the lesson's own `imageUrl` when set (falling back to the
+ * content type's icon on a tinted gradient if it's null or fails to
+ * load) — one illustration per lesson, reused here as the card thumbnail
+ * and again as LessonFlow's opening screen. Only "completed"/"current"
+ * cards are tappable; "sequenceLocked" names the specific lesson blocking
+ * it, reading as a plain locked card, dimmed, rather than the old small
+ * locked node, since there's room here to say why. Premium-only: free
+ * tier never sees a locked card at all — its single visible event is
+ * always "current" (strict per-tier visibility, see PathEventList). */
 export function PathEventCard({ event, onSelect }: PathEventCardProps) {
-  const { lesson, book, state, blockingTitle } = event;
+  const { lesson, state, blockingTitle } = event;
+  const [imgError, setImgError] = useState(false);
   const meta = CONTENT_TYPE_META[lesson.track];
   const Icon = meta.icon;
   const isTappable = state === "completed" || state === "current";
   const isCurrent = state === "current";
   const isLocked = state === "sequenceLocked";
+  const showImage = lesson.imageUrl && !imgError && !isLocked;
 
   return (
     <button
@@ -40,7 +45,16 @@ export function PathEventCard({ event, onSelect }: PathEventCardProps) {
       <div
         className={`relative h-[150px] flex items-center justify-center ${isLocked ? "bg-mist" : meta.imageBgClass}`}
       >
-        {isLocked ? (
+        {showImage ? (
+          <Image
+            src={lesson.imageUrl!}
+            alt=""
+            fill
+            sizes="(min-width: 640px) 400px, 90vw"
+            className={`object-cover ${state === "completed" ? "opacity-70" : ""}`}
+            onError={() => setImgError(true)}
+          />
+        ) : isLocked ? (
           <LockIcon className="h-10 w-10 text-stone" />
         ) : (
           <Icon className={`h-12 w-12 ${meta.imageIconClass} ${state === "completed" ? "opacity-70" : ""}`} />
@@ -64,7 +78,7 @@ export function PathEventCard({ event, onSelect }: PathEventCardProps) {
 
       <div className="p-4 flex flex-col gap-1.5">
         <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-stone">
-          <span>{book}</span>
+          <span>{lesson.lessonBook}</span>
           <span className="text-mist">·</span>
           <span className={meta.labelClass}>{meta.label}</span>
         </div>

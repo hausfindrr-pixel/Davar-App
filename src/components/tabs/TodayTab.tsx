@@ -4,7 +4,7 @@ import { MascotHero } from "@/components/MascotHero";
 import { NextStoryTeaser } from "@/components/NextStoryTeaser";
 import { StreakVisual } from "@/components/StreakVisual";
 import type { ApostleMoment } from "@/lib/apostle-moment";
-import type { NextStory } from "@/lib/roadmap";
+import type { PathEvent } from "@/lib/roadmap";
 import type { DailyDevotionalDoc, DailyPrayerDoc, DailyVerseDoc } from "@/types/firestore";
 
 type TodayTabProps = {
@@ -17,8 +17,8 @@ type TodayTabProps = {
   onCheckIn: () => void;
   apostleMoment: ApostleMoment | null;
   mascotMessage: string;
-  nextStory: NextStory | null;
-  onContinueStory: (story: NextStory) => void;
+  nextStory: PathEvent | null;
+  onContinueStory: (story: PathEvent) => void;
   dailyVerse: DailyVerseDoc | null;
   dailyDevotional: DailyDevotionalDoc | null;
   dailyPrayer: DailyPrayerDoc | null;

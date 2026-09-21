@@ -43,12 +43,13 @@ try {
 initializeApp({ credential: cert(serviceAccount) });
 const db = getFirestore();
 
-// Fields from lesson shapes this schema no longer has (the old
-// ReadingLessonDoc/FillBlankLessonDoc split, replaced by a single LessonDoc
-// with `summary` + `verseActivity`) — explicitly deleted below so
-// merge:true doesn't leave them stranded on docs seeded under the old
-// shape (the 3 lessons that used to be pure fillBlank entries).
-const OBSOLETE_FIELDS = ["lessonType", "template", "answers", "wordBank"];
+// Fields from lesson shapes this schema no longer has — explicitly deleted
+// below so merge:true doesn't leave them stranded on a doc seeded under an
+// older shape: the original ReadingLessonDoc/FillBlankLessonDoc split
+// (lessonType/template/answers/wordBank), the per-book `order` field, and
+// the single-verseActivity-per-lesson shape (verseActivity itself, now
+// nested inside individual `screens` entries instead).
+const OBSOLETE_FIELDS = ["lessonType", "template", "answers", "wordBank", "order", "verseActivity"];
 
 for (const lesson of lessons) {
   const { id, ...fields } = lesson;

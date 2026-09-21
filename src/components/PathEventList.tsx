@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { ArrowLeftIcon } from "@/components/icons";
-import { LessonCard } from "@/components/LessonCard";
+import { LessonFlow } from "@/components/LessonFlow";
 import { PathEventCard } from "@/components/PathEventCard";
 import type { PlanId } from "@/lib/plisio/plans";
-import { flattenPathEvents, nextEventForFreeTier } from "@/lib/roadmap";
+import { flattenPathEvents, nextLesson } from "@/lib/roadmap";
 import { dailyEventLimit, type LessonDoc } from "@/types/firestore";
 
 /** A request from outside (the Today tab's "Continue Your Story" teaser)
@@ -15,15 +15,13 @@ import { dailyEventLimit, type LessonDoc } from "@/types/firestore";
 export type PathFocusRequest = { lessonId: string; nonce: number };
 
 type PathEventListProps = {
+  uid: string;
   lessons: LessonDoc[];
   /** Every lesson `uid` has EVER completed, across all days — see
    * fetchAllCompletedLessonIds (src/lib/db/lessons.ts). Drives gating for
-   * both tiers; unlike `completedLessonIds` below, this never resets. */
+   * both tiers, and whether an opened lesson shows its full interactive
+   * flow or the read-only "already completed" recap. */
   allTimeCompletedLessonIds: string[];
-  /** Lessons completed strictly *today* — only used to know whether the
-   * currently open lesson has already been done today for its Complete
-   * button state; gating itself uses allTimeCompletedLessonIds. */
-  completedLessonIds: string[];
   isPremium: boolean;
   /** Event lessons completed today — see dailyEventLimit
    * (src/types/firestore.ts). Separate from the prayer journal's own cap. */
@@ -37,22 +35,23 @@ type PathEventListProps = {
 
 /** The Path's story library as a flat, event-first card feed — the event
  * ("The Creation of the World") is each card's heading, with its Bible
- * book as a small subheading, not the other way around. Visibility is
- * strict per tier, not just locked states: PREMIUM sees the full flattened
- * library (flattenPathEvents), sequentially gated per (book, track) group
- * exactly as before. FREE sees exactly one card — the single system-wide
- * active event (nextEventForFreeTier) — and nothing else is rendered at
- * all, not even dimmed/locked. That one event is completion-gated, not
- * date-based: it advances to the next lesson in the library the moment
- * it's completed (still capped at dailyEventLimit's 1/day, so an engaged
- * free user advances exactly one event per day they complete something;
- * skipping a day just leaves the same event waiting). Tapping a
- * completed/current card swaps the feed for that story's detail
- * (LessonCard, unchanged) with a "back to path" button. */
+ * book as a small subheading, not the other way around. Every lesson
+ * unlocks strictly in order along one single chronological sequence
+ * (`chronologicalOrder`, src/lib/roadmap.ts) — both tiers walk the same
+ * line now. Visibility is still strict per tier: PREMIUM sees the full
+ * sequence (flattenPathEvents). FREE sees exactly one card — the single
+ * next lesson in that sequence (nextLesson) — and nothing else is
+ * rendered at all, not even dimmed/locked. That one lesson is completion-
+ * gated, not date-based: it advances to the next lesson the moment it's
+ * completed (still capped at dailyEventLimit's 1/day, so an engaged free
+ * user advances exactly one lesson per day they complete something;
+ * skipping a day just leaves the same lesson waiting). Tapping a
+ * completed/current card swaps the feed for that lesson's guided
+ * screen-by-screen flow (LessonFlow) with a "back to path" button. */
 export function PathEventList({
+  uid,
   lessons,
   allTimeCompletedLessonIds,
-  completedLessonIds,
   isPremium,
   todayEventCount,
   suppressUpgradeNag = false,
@@ -78,7 +77,7 @@ export function PathEventList({
   const events = isPremium
     ? flattenPathEvents(lessons, allTimeCompletedLessonIds)
     : (() => {
-        const next = nextEventForFreeTier(lessons, allTimeCompletedLessonIds);
+        const next = nextLesson(lessons, allTimeCompletedLessonIds);
         return next ? [next] : [];
       })();
   const libraryComplete = !isPremium && events.length === 0 && lessons.length > 0;
@@ -130,10 +129,11 @@ export function PathEventList({
           <ArrowLeftIcon className="h-3.5 w-3.5" />
           Back to path
         </button>
-        <LessonCard
+        <LessonFlow
           lesson={openLesson}
-          isDone={completedLessonIds.includes(openLesson.id)}
-          isLocked={atLimit && !completedLessonIds.includes(openLesson.id)}
+          uid={uid}
+          isDone={allTimeCompletedLessonIds.includes(openLesson.id)}
+          isLocked={atLimit && !allTimeCompletedLessonIds.includes(openLesson.id)}
           isPending={pendingId === openLesson.id}
           onComplete={() => handleComplete(openLesson)}
         />

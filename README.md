@@ -97,11 +97,16 @@ Types for every collection live in `src/types/firestore.ts`:
 
 - **`users/{uid}`** — profile, XP, level, `tier` (`"free"` | `"premium"`)
 - **`streaks/{uid}`** — current/longest streak count, last check-in date, streak freezes
-- **`lessons/{lessonId}`** — scripture/prayer/devotional content items; a
-  narrative `summary` paired with an embedded `verseActivity` (see "The
-  Path: lesson content and verse activity" below)
+- **`lessons/{lessonId}`** — a guided, one-screen-at-a-time sequence, not a
+  single scrolling card: intro (`summary`) → question `screens` → a
+  `resolution` + `nextHook` cliffhanger (see "The Path: guided lesson
+  screens" below). `chronologicalOrder` places it in the single sequence
+  the whole library now runs on.
 - **`users/{uid}/prayers/{prayerId}`** — a user's own free-text prayers (see
   "The Path: prayer journal" below)
+- **`users/{uid}/lessonAnswers/{lessonId}_{screenId}`** — a user's own
+  free-text answer to a lesson's scenario screen, no right/wrong, same
+  spirit as the prayer journal (see "The Path: guided lesson screens" below)
 - **`check_ins/{checkInId}`** — a completed lesson, prayer, reading, etc. for a given day
 - **`daily_lesson_progress/{uid}_{date}`** — which lessons a user completed on a given day; the server-side source of truth for the free-tier daily lesson cap
 - **`accountability_links/{linkId}`** — a pending/active/ended pairing between two users
@@ -128,7 +133,11 @@ only read/write their own `users`/`streaks` docs and their own `check_ins`,
 and `user_highlights` docs (docId derived from `{uid}_{book}_{chapter}_{verse}`)
 are only readable/writable by the user they belong to — editing just the
 `notes` field on an existing highlight is an "update" under this same rule,
-no separate carve-out needed. `conversations/{uid}/messages/{messageId}` is
+no separate carve-out needed. `users/{uid}/lessonAnswers/{answerId}`
+(docId `{lessonId}_{screenId}`) is owner-only create/read/update, no
+delete — unlike the prayer journal, update is allowed, since a lesson's
+back-navigation (see "guided lesson screens" below) lets a user revise a
+scenario answer before finishing. `conversations/{uid}/messages/{messageId}` is
 readable only by `{uid}` and **not writable by any client at all** — only
 the Admin SDK (via `/api/watch-chat`) writes to it, so the crisis-detection
 and apostle-routing logic in that route can't be bypassed by writing
@@ -226,7 +235,7 @@ progress — the set is always derived from the same per-day docs the caps
 above already validate. `src/app/page.tsx` fetches this once on mount and
 again after every `completeLesson()` call, storing it as
 `allTimeCompletedLessonIds` and passing it to `PathTab`/`PathEventList`
-and to `nextStoryAcrossBooks`/`nextEventForFreeTier` — everywhere gating
+and to `flattenPathEvents`/`nextLesson` — everywhere gating
 used to read `lessonProgress.completedLessonIds` (today-only) now reads
 this instead.
 
@@ -249,7 +258,7 @@ Until those have been run against your actual project, both collections
 have zero documents in them — confirmed directly against production more
 than once in this app's history for `lessons` — so `fetchLessons()`
 (`src/lib/db/lessons.ts`), the free-tier gating that consumes it
-(`nextEventForFreeTier`, `src/lib/roadmap.ts`), and
+(`nextLesson`, `src/lib/roadmap.ts`), and
 `fetchDailyVerses`/`fetchDailyDevotionals`/`fetchDailyPrayers`
 (`src/lib/db/dailyContent.ts`) all work correctly, there's simply nothing
 for them to return yet. **`lessonBook` specifically**: if `lessons` was
@@ -279,7 +288,7 @@ scroll. Each tab is its own component under `src/components/tabs/`:
 | Tab | Component | Access |
 | --- | --- | --- |
 | Today | `TodayTab.tsx` | Everyone — John's mascot greeting, a "Continue Your Story" teaser into The Path, Today's Verse/Devotional/Prayer (see below), streak, XP, level, the apostle companion message, check-in |
-| The Path | `PathTab.tsx` | Free: exactly one active event at a time, completion-gated (1/day cap); 3 prayers/day. Premium: the whole library, sequentially gated per book (3 events/day, 15 prayers/day) — see "Daily caps" and "The Path: strict visibility and completion-gated rotation" above/below |
+| The Path | `PathTab.tsx` | Free: exactly one lesson at a time, completion-gated (1/day cap); 3 prayers/day. Premium: the whole library, all in one chronological sequence (3 lessons/day, 15 prayers/day) — see "Daily caps" and "The Path: strict visibility and completion-gated rotation" above/below |
 | The Armory | `ArmoryTab.tsx` | Free: teaser (see below). Premium: full access |
 | Peter's Watch | `WatchTab.tsx` | Free: teaser. Premium: full access |
 | The Word | `WordTab.tsx` | Everyone, never gated |
@@ -288,27 +297,18 @@ scroll. Each tab is its own component under `src/components/tabs/`:
 ### Today: story teaser
 
 A "Continue Your Story" card (`NextStoryTeaser.tsx`,
-`src/components/NextStoryTeaser.tsx`) points at whatever card is
-"current" for this user right now — tier-aware, computed in
-`src/app/page.tsx`:
+`src/components/NextStoryTeaser.tsx`) points at whatever lesson is
+"current" for this user right now — `nextLesson` (`src/lib/roadmap.ts`),
+the first not-yet-completed lesson in the library's single chronological
+sequence. Both tiers walk the same one line now, so there's only ever one
+"next" lesson regardless of tier — the teaser and The Path's own view
+always point at the same lesson.
 
-- **Premium** uses `nextStoryAcrossBooks` (`src/lib/roadmap.ts`), which
-  scans `(book, track)` groups in canonical order and returns the first one
-  with a `current` story — several groups can each have their own current
-  card at once (every book's Lessons/Prayer/Devotion progresses
-  independently), so this shows whichever comes first in the feed's own
-  top-to-bottom order, matching what a user would see if they opened The
-  Path themselves.
-- **Free tier** uses `nextEventForFreeTier` (`src/lib/roadmap.ts`) instead —
-  there's exactly one active event system-wide for free accounts (see
-  "strict visibility and completion-gated rotation" below), so the teaser
-  and The Path's own single visible card always point at the same story.
-
-Both are derived from `allTimeCompletedLessonIds` (see "All-time completion
+Derived from `allTimeCompletedLessonIds` (see "All-time completion
 tracking" above), not from today's progress doc alone. This is **not** a
 fourth daily-rotation pool: there's no new collection, no XP awarded here,
 nothing completable from Today itself. It's a pointer into the user's own
-progress in The Path, which is why it changes the moment a story is
+progress in The Path, which is why it changes the moment a lesson is
 completed rather than once a day.
 
 Tapping "Continue" switches to The Path tab and jumps straight to that
@@ -374,99 +374,86 @@ inside the illustrated band.
 
 The Path is a flat, scrollable feed of event cards — `PathEventList.tsx`
 (`src/components/PathEventList.tsx`, mounted by `PathTab.tsx`), one card
-per story (`PathEventCard.tsx`). Each card's main heading is the
+per lesson (`PathEventCard.tsx`). Each card's main heading is the
 event/story title ("The Creation of the World"), with its Bible book and
-content type as a small "GENESIS · LESSONS" subheading underneath, and a
-prominent image-placeholder area on top (today a tinted gradient with the
-content type's icon; swap-ready for real illustrations later) — the book
-is identifying context, not the primary unit, which is the reverse of an
-earlier version of this screen that led with the book as a collapsible
-container.
+content type as a small "GENESIS · LESSONS" subheading underneath, and an
+image area on top — the lesson's own `imageUrl` if set, falling back to a
+tinted gradient with the content type's icon (no illustrations generated
+yet) — the book is identifying context, not the primary unit.
 
 - **Schema:** every `LessonDoc` (`src/types/firestore.ts`) has a required
   `lessonBook: string`, an exact `BIBLE_BOOKS` (`src/lib/bible.ts`) entry
-  name (e.g. `"Psalms"`, not `"Psalm"`), plus the pre-existing `track`
+  name (e.g. `"Psalms"`, not `"Psalm"`), plus `track`
   (`"scripture" | "prayer" | "devotional"`) used for the content-type label
-  and color — no schema change for any of this, it's a presentation layer
-  over fields that already existed.
-- **Ordering (premium):** `flattenPathEvents` (`src/lib/roadmap.ts`)
-  produces the feed's order — canonical book order, then
-  `CONTENT_TYPE_ORDER` (Lessons/Prayer/Devotion) within a book, then each
-  group's own `order` — and computes each card's state via
-  `roadmapNodeStates`, one of:
+  and color — display metadata only; see "guided lesson screens" below for
+  what actually drives ordering and gating now.
+- **Ordering:** `flattenPathEvents` (`src/lib/roadmap.ts`, premium only —
+  see below) sorts every lesson into **one single chronological sequence**
+  across the whole library, by `chronologicalOrder` — not grouped by book
+  or track anymore. Each card's state comes from where it sits in that one
+  line:
   - **`completed`** — checkmark badge on the image, green "Completed" chip.
-  - **`current`** — the first not-yet-completed story in its `(book,
-    track)` group: a colored "UP NEXT" tag, an accent border/ring, and a
-    "Continue" pill. Several `(book, track)` groups can each have their own
-    current card at once — every book's Lessons, Prayer, and Devotion
-    progress independently.
-  - **`sequenceLocked`** — an earlier story in the same `(book, track)`
-    group isn't done yet. Names the specific story blocking it ("Complete
-    'Noah and the Flood' first") — there's room for that on a full card,
-    unlike the small roadmap nodes this replaced. Nobody skips ahead within
-    a group.
+  - **`current`** — the first not-yet-completed lesson in the whole
+    sequence: a colored "UP NEXT" tag, an accent border/ring, and a
+    "Continue" pill. There's exactly **one** current lesson for the whole
+    library now, not one per book/track group as before.
+  - **`sequenceLocked`** — everything after the current lesson. Names the
+    specific lesson blocking it ("Complete 'Noah and the Flood' first").
+    Nobody, on either tier, can skip ahead.
   - Only `completed`/`current` cards are tappable; tapping swaps the whole
-    feed for that story's detail — `LessonCard.tsx`, unchanged, with a
-    "back to path" button — rather than expanding in place.
+    feed for that lesson's guided screen-by-screen flow — `LessonFlow.tsx`
+    — with a "back to path" button.
 - **Strict per-tier visibility (free tier):** free accounts never see
   `flattenPathEvents`'s full list at all — `PathEventList` renders exactly
-  one card, from `nextEventForFreeTier` (see "strict visibility and
-  completion-gated rotation" below). There's no locked/dimmed card for
-  anything else in the library; the rest simply isn't rendered. This
-  replaced an earlier design where free tier saw the whole feed with most
-  of it shown as a `paywallLocked` card ("Unlock with Premium") — that
-  state (and a bottom-of-feed `UnlockCard`) no longer exists;
-  `RoadmapNodeState` is now just `"completed" | "current" |
-  "sequenceLocked"`.
+  one card, from `nextLesson` (see "strict visibility and completion-gated
+  rotation" below). There's no locked/dimmed card for anything else in the
+  library; the rest simply isn't rendered.
 - **Content-type color identity:** `CONTENT_TYPE_META`
   (`src/lib/contentType.ts`) holds each track's label, icon, and literal
   Tailwind class strings (image gradient, accent border/ring, button,
-  badge) — Lessons stays `clay` (existing), Prayer is new `dusk`, Devotion
-  is new `gold`, both built to the same 50/200/400/600/700 ramp and muted
-  character as `clay`/`sage` in `globals.css`. Classes are all literal,
-  defined once in this object — Tailwind's build-time scanner can't see a
-  class assembled at runtime (`` `bg-${accent}-600` `` never works), so
-  every consumer just indexes into the shared object instead. Locked cards
-  stay neutral (`mist`) regardless of accent on purpose: richness belongs
-  to what's active, not to what's out of reach.
-- **Only `scripture` has real content today** — all 10 seeded stories are
+  badge) — Lessons stays `clay` (existing), Prayer is `dusk`, Devotion is
+  `gold`, all built to the same 50/200/400/600/700 ramp and muted character
+  as `clay`/`sage` in `globals.css`. Classes are all literal, defined once
+  in this object — Tailwind's build-time scanner can't see a class
+  assembled at runtime (`` `bg-${accent}-600` `` never works), so every
+  consumer just indexes into the shared object instead. Locked cards stay
+  neutral (`mist`) regardless of accent on purpose: richness belongs to
+  what's active, not to what's out of reach.
+- **Only `scripture` has real content today** — all 10 seeded lessons are
   that track (see "event-based stories" below), so every Prayer/Devotion
   card in the feed today is a preview of the color system rather than
   something to complete yet.
 
 ### The Path: strict visibility and completion-gated rotation
 
-Free and premium tiers now work fundamentally differently, not just at
-different caps:
+Both tiers now walk the **same single chronological sequence** — that's
+the headline change from the earlier per-book-parallel-tracks design.
+They differ only in how much of it is shown and the daily cap:
 
-- **Premium** sees the whole library, unlocked and browsable, from day
-  one — matching the "Full gamified lesson library" pricing copy. Each
-  `(book, track)` group progresses independently via
-  `roadmapNodeStates`/`flattenPathEvents`, so several stories across
-  different books/tracks can each be "current" at once. Only the daily
-  *completions* ceiling applies (`PREMIUM_DAILY_EVENT_LIMIT`, 3/day) — this
-  is a cost/abuse ceiling, not a meaningful product restriction.
-- **Free tier** collapses to exactly **one active event, system-wide** —
-  not per-book, not per-track. `nextEventForFreeTier`
-  (`src/lib/roadmap.ts`) scans the whole library in canonical order (book,
-  then `CONTENT_TYPE_ORDER`, then each group's own `order` — the same
-  ordering `flattenPathEvents` uses) and returns the first lesson not yet
-  in `allTimeCompletedLessonIds`. That's the only card free tier's Path
-  ever renders.
+- **Premium** sees the whole sequence, unlocked and browsable, from day
+  one — matching the "Full gamified lesson library" pricing copy. There's
+  exactly one "current" lesson for the whole library (not one per book/
+  track group as before this restructure), so premium's advantage is
+  "sees the full list + higher daily cap," not "several parallel tracks."
+  Only the daily *completions* ceiling applies
+  (`PREMIUM_DAILY_EVENT_LIMIT`, 3/day) — a cost/abuse ceiling, not a
+  meaningful product restriction.
+- **Free tier** collapses to exactly **one active lesson, system-wide**.
+  `nextLesson` (`src/lib/roadmap.ts`) sorts the whole library by
+  `chronologicalOrder` and returns the first lesson not yet in
+  `allTimeCompletedLessonIds`. That's the only card free tier's Path ever
+  renders — and it's the same function premium's Today teaser uses too
+  (see "Today: story teaser" above), since there's only ever one "next"
+  lesson regardless of tier.
 - **Completion-gated, not date-based.** There's no persisted
-  rotation-position field anywhere — "today's active event" is always
+  rotation-position field anywhere — "today's active lesson" is always
   derived functionally from the all-time completed set (see "All-time
-  completion tracking" above). The moment the active event is completed,
-  the very next call to `nextEventForFreeTier` returns the next lesson in
-  the library — but `FREE_DAILY_EVENT_LIMIT` (1/day) still blocks
-  completing a second one the same day, so in practice a free user advances
-  exactly one event per day they complete something, and a skipped day
-  just leaves the same event waiting rather than advancing or expiring.
-  This replaced an earlier date-based reveal
-  (`visibleLessonsForFreeTier`/`FREE_DAILY_LESSON_LIMIT`, both removed —
-  `src/lib/lessons.ts` no longer exists) that unlocked lessons on a
-  calendar schedule regardless of whether the user had actually done
-  anything.
+  completion tracking" above). The moment the active lesson is completed,
+  the very next call to `nextLesson` returns the next one in the sequence —
+  but `FREE_DAILY_EVENT_LIMIT` (1/day) still blocks completing a second one
+  the same day, so in practice a free user advances exactly one lesson per
+  day they complete something, and a skipped day just leaves the same
+  lesson waiting rather than advancing or expiring.
 - Once every lesson in the library has been completed, `PathEventList`
   shows a "You've completed every story in the library" message instead of
   a card — the library hasn't been designed to cycle back to the start yet.
@@ -500,51 +487,68 @@ orphaned docs, at the cost of a user who'd completed the old single-verse
 version of an ID showing as having completed the new story version too
 (harmless over-credit, not under-credit).
 
-### The Path: lesson content and verse activity
+### The Path: guided lesson screens
 
-`LessonDoc` (`src/types/firestore.ts`) is a single shape — no discriminated
-union — every lesson always has both:
+A lesson is a guided, one-screen-at-a-time sequence — `LessonFlow.tsx`
+(`src/components/LessonFlow.tsx`) — not a single scrolling card. `LessonDoc`
+(`src/types/firestore.ts`) shapes it as:
 
-- **`summary`** — the narrative reading, unchanged from before.
-- **`verseActivity`** — a Duolingo-style fill-in-the-blank activity built
-  from the passage's own verses, embedded in the same card
-  (`LessonCard.tsx`) right below the summary, not a separate lesson entry.
-  **Completing a lesson means solving this activity** — there's no
-  standalone "Complete" button anymore; the summary and the verse
-  challenge are one piece of content.
+1. **Intro screen** — `imageUrl` (or the placeholder gradient+icon) and
+   `summary`, the scene setup. Deliberately doesn't give away the ending —
+   `resolution` does that on the final screen, so the two aren't redundant.
+2. **One question screen per entry in `screens: LessonScreen[]`** — a
+   progress bar and "X of N" indicator sit above every screen, and a back
+   arrow lets the user step to the previous screen (not just exit to The
+   Path — `PathEventList`'s own "back to path" link still does that at the
+   outer level). Only the current screen's own prompt is ever shown — no
+   scrolling past it to see the next one.
+3. **Resolution screen** — `resolution` (what actually happened in
+   Scripture) plus `nextHook` (a cliffhanger pointing at the next lesson in
+   chronological order) in a separate callout. **This is where completing
+   a lesson actually fires** — `completeLesson()` (`src/lib/db/lessons.ts`)
+   needed **zero changes** for any of this restructure, since it only ever
+   touched `lesson.id`/`lesson.xpReward`.
 
-`verseActivity` is `{ verses: VerseBlank[], wordBank: string[] }`:
+`LessonScreen` is a union of four types, each its own component inside
+`LessonFlow.tsx`:
 
-- **`verses`** — up to 5 of the passage's most important verses (fewer if
-  the passage doesn't have that many worth quizzing — never padded to 5).
-  Each `VerseBlank` is `{ reference, template, answers }`: `template` is
-  that one verse with each blank marked by the literal substring
-  `BLANK_TOKEN` (`"_____"`, `src/types/firestore.ts`); `answers` gives the
-  correct word per blank, in order.
-- **`wordBank`** — every verse's answers pooled together, plus a roughly
-  matching number of decoy words (so a 5-verse activity's bank has ~10
-  words, not the single verse's old 5) — deliberately a bigger, richer
-  bank than the original one-verse-per-lesson version, per the "more word
-  bank" request that prompted this.
+- **`scenario`** — "You're standing with the Israelites at the sea — what
+  do you say to Moses?" Free text, no right/wrong answer; advancing just
+  requires something written. The text is saved via `saveLessonAnswer`
+  (`src/lib/db/lessonAnswers.ts`) to `users/{uid}/lessonAnswers/{lessonId}_
+  {screenId}` — preserved, never graded, same spirit as the prayer journal
+  below. Writing again (e.g. after stepping back to revise) just overwrites
+  the same doc, unlike the prayer journal's immutability.
+- **`multipleChoice`** — a recall question with plausible distractors.
+  Picking `correctIndex` unlocks Continue; a wrong pick shows a gentle "not
+  quite" and stays open to retry — never a dead end, matching the app's
+  tone everywhere else.
+- **`shortAnswer`** — a typed, **self-marked** reflection: the user answers,
+  taps "Check my thinking" to reveal it was worth writing down, then
+  Continue. Not an auto-graded exact match — those tend to false-negative a
+  reasonable but differently worded answer, which would undercut the
+  app's grace-first tone.
+- **`verseBlank`** — the existing Duolingo-style fill-in-the-blank activity,
+  reused as one screen type among several rather than a lesson's only
+  interactive content. Its `activity` field is the same `VerseActivity`
+  shape as before (`{ verses: VerseBlank[], wordBank: string[] }`) — up to
+  5 of the passage's most important verses (fewer when the passage doesn't
+  have that many worth quizzing), each with a `template` marking blanks
+  with the literal substring `BLANK_TOKEN` (`"_____"`). Verse selection
+  favors the passage's most quotable line(s) or its theological/narrative
+  turning point, not necessarily its first verse — e.g. Noah and the Flood
+  picks the rainbow-covenant verse (9:13) over the flood's opening or
+  mechanics, a judgment call made case by case.
 
-**Verse selection:** the verse(s) chosen for each lesson are the passage's
-most quotable line(s) or its theological/narrative turning point — not
-necessarily the first verse of the range. For a short passage (John 8:1-11,
-Mark 4:35-41) this is naturally fewer than 5; a long passage (Genesis
-9:5-9:17, four chapters covering the flood *and* the rainbow covenant) is
-a real judgment call, resolved case by case rather than defaulting to
-whichever verse comes first — e.g. Noah and the Flood picks the
-rainbow-covenant verse (9:13) as the passage's climax over its opening or
-the flood's mechanics.
-
-`FillBlankCard` (`src/components/FillBlankCard.tsx`) renders every verse
-in the activity on its own line (with a small reference label), flattens
-their blanks into one running sequence so the word bank fills them in
-document order regardless of which verse a tap targets, shuffles the bank
-for display (not relying on storage order), and checks all blanks across
-every verse at once — not one verse at a time. On a wrong attempt: a
-gentle "Not quite — take another look and try again" with a reset, never
-a locked-out failure state.
+`FillBlankCard` (`src/components/FillBlankCard.tsx`) itself is **completely
+unchanged** by this restructure — it already took `activity`/`track` props
+independent of how it was embedded, so it drops straight into a
+`verseBlank` screen. It renders every verse on its own line (with a
+reference label), flattens their blanks into one running sequence so the
+word bank fills them in document order, shuffles the bank for display, and
+checks all blanks across the whole activity at once. On a wrong attempt: a
+gentle "Not quite — take another look and try again" with a reset, never a
+locked-out failure state.
 
 **Contrast:** word-bank pills and a filled-but-unchecked blank use
 `CONTENT_TYPE_META.activeBgClass` (`src/lib/contentType.ts`) — each
@@ -568,34 +572,41 @@ was nearly invisible. The completion/XP backend (`completeLesson`,
 `src/lib/db/lessons.ts`) needed **zero changes** — it only ever touched
 `lesson.id`/`lesson.xpReward`, unaffected by this.
 
-**Migration note:** the 3 lessons that used to be pure fill-blank entries
-under the old `lessonType`-discriminated schema (`day-08` David and
-Goliath, `day-09` Jesus Calms the Storm, `day-10` The Resurrection) gained
-a `summary` for the first time here, and `npm run seed:lessons`
+**Migration note:** all 10 seeded lessons moved from the old single-card
+shape (`summary` + one embedded `verseActivity`) to this screen-flow shape
+in the same pass that added `chronologicalOrder`/`imageUrl` — every
+lesson's `verseActivity` became a `verseBlank` entry inside `screens`,
+each also gained a `scenario`, `multipleChoice`, and `shortAnswer` screen,
+and each got a `resolution`/`nextHook`. `npm run seed:lessons`
 (`scripts/seed-lessons.mjs`) explicitly `FieldValue.delete()`s the old
-flat `lessonType`/`template`/`answers`/`wordBank` fields on existing docs
-— otherwise `merge: true` would leave them stranded alongside the new
-`verseActivity` shape rather than replacing them.
+flat `lessonType`/`template`/`answers`/`wordBank` fields (from the
+original reading/fillBlank split) *and* the old top-level `order`/
+`verseActivity` fields (from the single-card era) on existing docs —
+otherwise `merge: true` would leave them stranded alongside the current
+shape rather than replacing them.
 
 **A schema change alone doesn't update already-written documents** —
 `npm run seed:lessons` has to actually be re-run against a project for its
-existing `lessons` docs to gain `verseActivity`. Until that happens,
+existing `lessons` docs to gain the current shape. Until that happens,
 `fetchLessons()` (`src/lib/db/lessons.ts`) runs every doc through
-`isValidLessonDoc` (checks `summary` is a string and `verseActivity.verses`
-is a non-empty array of well-formed `VerseBlank`s) and **drops any doc that
-fails it**, logging `console.error` with the doc ID rather than returning
-it — this is the fix for a real incident where a still-unmigrated doc's
-missing `verseActivity` crashed `FillBlankCard` (`activity.verses` on
-`undefined`) and took down the whole lesson-detail page with a generic
-Next.js error screen. A user on free tier, whose one visible lesson is
-whichever unmigrated doc sorts first, would see this on every open; a
-premium user browsing the rest of the library might not hit an affected
-doc at all — same root cause, tier-shaped only by which lesson each tier
-happens to load. A filtered-out lesson simply doesn't appear (same
-"nothing to show yet" experience as an empty collection) until it's
-re-seeded correctly, and `src/app/error.tsx` is a last-resort boundary so
-any other unexpected render error shows a friendly retry card instead of a
-blank page.
+`isValidLessonDoc` (checks `summary`/`resolution`/`nextHook` are strings,
+`chronologicalOrder` is a number, and `screens` is a non-empty array where
+every entry matches its declared `type`) and **drops any doc that fails
+it**, logging `console.error` with the doc ID rather than returning it —
+this is the fix for a real incident, during the previous single-card
+schema, where a still-unmigrated doc's missing `verseActivity` crashed
+`FillBlankCard` (`activity.verses` on `undefined`) and took down the whole
+lesson-detail page with a generic Next.js error screen. A user on free
+tier, whose one visible lesson is whichever unmigrated doc sorts first,
+would see this on every open; a premium user browsing the rest of the
+library might not hit an affected doc at all — same root cause,
+tier-shaped only by which lesson each tier happens to load. A
+filtered-out lesson simply doesn't appear (same "nothing to show yet"
+experience as an empty collection) until it's re-seeded correctly, and
+`src/app/error.tsx` is a last-resort boundary so any other unexpected
+render error shows a friendly retry card instead of a blank page.
+
+### The Path: prayer journal
 
 Below the lesson feed, `PathTab.tsx` renders `PrayerJournal.tsx` — a place
 to write a free-text prayer instead of only reading guided ones. Submitting
@@ -1227,29 +1238,32 @@ src/
                   api/plisio/create-invoice, api/plisio/webhook,
                   api/bible (route handlers — the last proxies bible-api.com)
   components/     UI components (StreakVisual, PlantIcon, PathEventList,
-                  PathEventCard, LessonCard, MascotHero, DailyContentBackdrop,
-                  NextStoryTeaser, PricingSection, AuthForm, ApostleAvatar,
-                  ApostleMessageCard, BottomTabBar, PremiumGate (UnlockCard
-                  + blurredPreviewClass),
+                  PathEventCard, LessonFlow (the guided screen-by-screen
+                  lesson sequence — see "guided lesson screens" above),
+                  FillBlankCard (the verseBlank screen type), MascotHero,
+                  DailyContentBackdrop, NextStoryTeaser, PricingSection,
+                  AuthForm, ApostleAvatar, ApostleMessageCard, BottomTabBar,
+                  PremiumGate (UnlockCard + blurredPreviewClass),
                   ProfileButton, ProfilePage, icons.tsx — shared line icons)
                   tabs/ — TodayTab, PathTab, ArmoryTab, WatchTab, WordTab
                   (see "Navigation" above)
   lib/            firebase.ts (client SDK init, incl. Storage), firebase-admin.ts
                   (server-only Admin SDK init), auth-context.tsx, streak.ts,
                   xp.ts, date.ts (pure logic),
-                  roadmap.ts (per-(book,track) node states, nextStoryAcrossBooks,
-                  nextEventForFreeTier — see "strict visibility and
+                  roadmap.ts (the single chronological sequence, flattenPathEvents,
+                  nextLesson — see "strict visibility and
                   completion-gated rotation" above),
                   contentType.ts (Lessons/Prayer/Devotion tab metadata —
                   see "content-type tabs and color identity" above),
                   dailyContent.ts (pickForDate rotation — see "Today: daily
                   content" above), apostles.ts, apostle-moment.ts
                   (see "Apostle Companion" above), armory.ts (Armory content),
-                  bible.ts (book list + /api/bible client, also BIBLE_BOOKS
-                  for The Path's book ordering), storage.ts
+                  bible.ts (book list + /api/bible client — BIBLE_BOOKS is
+                  now display-only for lessons, chronologicalOrder drives
+                  ordering), storage.ts
                   (profile photo upload), db/ (Firestore reads/writes,
-                  including highlights.ts, accountability.ts, and
-                  dailyContent.ts),
+                  including highlights.ts, accountability.ts, lessonAnswers.ts
+                  (scenario-screen answers), and dailyContent.ts),
                   plisio/ (plans.ts, checkout.ts, verify.ts — see "Payments" below)
   types/          firestore.ts (Firestore document types)
 public/

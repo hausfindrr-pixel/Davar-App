@@ -18,6 +18,7 @@ import {
   dailyEventLimit,
   type DailyLessonProgressDoc,
   type LessonDoc,
+  type LessonScreen,
   type StreakDoc,
   type UserDoc,
   type VerseBlank,
@@ -35,40 +36,76 @@ function isValidVerseBlank(value: unknown): value is VerseBlank {
   );
 }
 
+function isValidScreen(value: unknown): value is LessonScreen {
+  if (typeof value !== "object" || value === null) return false;
+  const s = value as Record<string, unknown>;
+  if (typeof s.id !== "string" || typeof s.prompt !== "string") return false;
+  switch (s.type) {
+    case "scenario":
+      return true;
+    case "multipleChoice":
+      return (
+        Array.isArray(s.options) &&
+        s.options.length > 0 &&
+        s.options.every((o) => typeof o === "string") &&
+        typeof s.correctIndex === "number" &&
+        s.correctIndex >= 0 &&
+        s.correctIndex < s.options.length
+      );
+    case "shortAnswer":
+      return true;
+    case "verseBlank": {
+      const activity = s.activity as Record<string, unknown> | undefined;
+      return (
+        typeof activity === "object" &&
+        activity !== null &&
+        Array.isArray(activity.verses) &&
+        activity.verses.length > 0 &&
+        activity.verses.every(isValidVerseBlank) &&
+        Array.isArray(activity.wordBank)
+      );
+    }
+    default:
+      return false;
+  }
+}
+
 /**
  * Firestore returns `unknown` data with no runtime shape guarantee — a
- * lesson doc still seeded under an older schema (missing `summary` or
- * `verseActivity`, e.g. before the verse-activity rewrite) would otherwise
- * pass straight through an unchecked `as LessonDoc` cast and crash
- * FillBlankCard the moment its card is opened (it reads
- * `verseActivity.verses` unconditionally). This is the boundary where that
- * gets caught instead.
+ * lesson doc still seeded under an older schema (e.g. before the
+ * screen-flow rewrite, missing `screens`/`chronologicalOrder`) would
+ * otherwise pass straight through an unchecked `as LessonDoc` cast and
+ * crash LessonFlow the moment its card is opened. This is the boundary
+ * where that gets caught instead.
  */
 function isValidLessonDoc(data: unknown): data is LessonDoc {
   if (typeof data !== "object" || data === null) return false;
   const d = data as Record<string, unknown>;
-  if (typeof d.id !== "string" || typeof d.title !== "string" || typeof d.summary !== "string") {
-    return false;
-  }
-  const activity = d.verseActivity as Record<string, unknown> | undefined;
   return (
-    typeof activity === "object" &&
-    activity !== null &&
-    Array.isArray(activity.verses) &&
-    activity.verses.length > 0 &&
-    activity.verses.every(isValidVerseBlank) &&
-    Array.isArray(activity.wordBank)
+    typeof d.id === "string" &&
+    typeof d.title === "string" &&
+    typeof d.summary === "string" &&
+    typeof d.resolution === "string" &&
+    typeof d.nextHook === "string" &&
+    typeof d.chronologicalOrder === "number" &&
+    Array.isArray(d.screens) &&
+    d.screens.length > 0 &&
+    d.screens.every(isValidScreen)
   );
 }
 
-/** All lessons, ordered for display. Only called for a signed-in user.
- * Silently drops any doc that doesn't match the current LessonDoc shape
- * (see isValidLessonDoc) rather than returning it and letting a later
- * render crash — a lesson stuck on an old schema (not yet re-seeded via
- * `npm run seed:lessons`) just doesn't appear until it's fixed, the same
- * way "no lessons yet" is already handled when the collection is empty. */
+/** All lessons, ordered for display (chronologically — see
+ * `chronologicalOrder`, src/types/firestore.ts). Only called for a
+ * signed-in user. Silently drops any doc that doesn't match the current
+ * LessonDoc shape (see isValidLessonDoc) rather than returning it and
+ * letting a later render crash — a lesson stuck on an old schema (not yet
+ * re-seeded via `npm run seed:lessons`) just doesn't appear until it's
+ * fixed, the same way "no lessons yet" is already handled when the
+ * collection is empty. */
 export async function fetchLessons(): Promise<LessonDoc[]> {
-  const snap = await getDocs(query(collection(db!, COLLECTIONS.lessons), orderBy("order")));
+  const snap = await getDocs(
+    query(collection(db!, COLLECTIONS.lessons), orderBy("chronologicalOrder")),
+  );
   const lessons: LessonDoc[] = [];
   for (const docSnap of snap.docs) {
     const data = docSnap.data();
@@ -76,7 +113,7 @@ export async function fetchLessons(): Promise<LessonDoc[]> {
       lessons.push(data);
     } else {
       console.error(
-        `Skipping malformed lesson doc "${docSnap.id}" — missing or invalid summary/verseActivity. Run npm run seed:lessons to migrate it.`,
+        `Skipping malformed lesson doc "${docSnap.id}" — missing or invalid screen-flow fields. Run npm run seed:lessons to migrate it.`,
       );
     }
   }
@@ -90,8 +127,8 @@ function progressDocId(uid: string, date: string): string {
 /**
  * Every lesson `uid` has EVER completed, across all of their
  * daily_lesson_progress docs (one per calendar day) — not just today's. The
- * Path's gating (roadmapNodeStates, flattenPathEvents, nextEventForFreeTier
- * — src/lib/roadmap.ts) needs this all-time set, not the day-scoped one
+ * Path's gating (flattenPathEvents, nextLesson — src/lib/roadmap.ts) needs
+ * this all-time set, not the day-scoped one
  * subscribeToLessonProgress returns, since a lesson completed yesterday
  * should still count as done today. Allowed by the existing
  * daily_lesson_progress read rule (`resource.data.userId ==

@@ -32,7 +32,8 @@ import { subscribeToUser } from "@/lib/db/users";
 import { dateKeyInTimeZone } from "@/lib/date";
 import { pickForDate } from "@/lib/dailyContent";
 import { daysUntilExpiry, shouldShowRenewalReminder } from "@/lib/premium";
-import { nextEventForFreeTier, nextStoryAcrossBooks, type NextStory } from "@/lib/roadmap";
+import { nextLesson } from "@/lib/roadmap";
+import type { PathEvent } from "@/lib/roadmap";
 import { startCheckout } from "@/lib/plisio/checkout";
 import type { PlanId } from "@/lib/plisio/plans";
 import type {
@@ -374,16 +375,14 @@ function Dashboard({ uid }: { uid: string }) {
   // completion action, so they're not part of either count.
   const todayEventCount = lessonProgress?.completedLessonIds.length ?? 0;
   const todayPrayerCount = lessonProgress?.prayerCount ?? 0;
-  // A pointer into The Path's own roadmap, not a separate rotation pool —
-  // see NextStoryTeaser and the "Today: story teaser" README section.
-  // Premium has one "current" node per (book, track) group; free tier has
-  // exactly one system-wide active event (nextEventForFreeTier) — both are
-  // derived from the all-time completed set, not today's.
-  const nextStory: NextStory | null = isPremium
-    ? nextStoryAcrossBooks(lessons, allTimeCompletedLessonIds)
-    : nextEventForFreeTier(lessons, allTimeCompletedLessonIds);
+  // A pointer into The Path's own single chronological sequence, not a
+  // separate rotation pool — see NextStoryTeaser and the "Today: story
+  // teaser" README section. Both tiers now share one line, so there's
+  // only ever one "next" lesson regardless of tier — derived from the
+  // all-time completed set, not today's.
+  const nextStory: PathEvent | null = nextLesson(lessons, allTimeCompletedLessonIds);
 
-  function handleContinueStory(story: NextStory) {
+  function handleContinueStory(story: PathEvent) {
     setActiveTab("path");
     setPathFocusRequest({ lessonId: story.lesson.id, nonce: Date.now() });
   }
@@ -563,7 +562,6 @@ function Dashboard({ uid }: { uid: string }) {
                 timeZone={timeZone}
                 lessons={lessons}
                 allTimeCompletedLessonIds={allTimeCompletedLessonIds}
-                completedLessonIds={lessonProgress?.completedLessonIds ?? []}
                 isPremium={isPremium}
                 todayEventCount={todayEventCount}
                 todayPrayerCount={todayPrayerCount}

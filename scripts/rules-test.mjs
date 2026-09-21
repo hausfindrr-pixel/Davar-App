@@ -598,6 +598,76 @@ await check("alice cannot delete her own prayer", async () => {
   await assertFails(deleteDoc(doc(aliceDb, "users", ALICE, "prayers", "prayer-1")));
 });
 
+// --- users/{uid}/lessonAnswers: a lesson's scenario-screen answers ---
+const aliceAnswerId = "lesson-x_q1";
+
+await check("alice can create her own lesson answer (docId matches lessonId_screenId)", async () => {
+  await assertSucceeds(
+    setDoc(doc(aliceDb, "users", ALICE, "lessonAnswers", aliceAnswerId), {
+      id: aliceAnswerId,
+      lessonId: "lesson-x",
+      screenId: "q1",
+      text: "I'd tell Moses I was scared but trusted him.",
+    }),
+  );
+});
+
+await check("alice can revise her own lesson answer (update allowed, unlike prayers)", async () => {
+  await assertSucceeds(
+    setDoc(doc(aliceDb, "users", ALICE, "lessonAnswers", aliceAnswerId), {
+      id: aliceAnswerId,
+      lessonId: "lesson-x",
+      screenId: "q1",
+      text: "Revised: I'd tell Moses I was scared but trusted him anyway.",
+    }),
+  );
+});
+
+await check("alice cannot create a lesson answer whose docId doesn't match lessonId_screenId", async () => {
+  await assertFails(
+    setDoc(doc(aliceDb, "users", ALICE, "lessonAnswers", "mismatched-id"), {
+      id: "mismatched-id",
+      lessonId: "lesson-x",
+      screenId: "q1",
+      text: "Should be blocked.",
+    }),
+  );
+});
+
+await check("alice cannot create an empty lesson answer", async () => {
+  await assertFails(
+    setDoc(doc(aliceDb, "users", ALICE, "lessonAnswers", "lesson-x_q2"), {
+      id: "lesson-x_q2",
+      lessonId: "lesson-x",
+      screenId: "q2",
+      text: "",
+    }),
+  );
+});
+
+await check("alice cannot write a lesson answer under bob's uid", async () => {
+  await assertFails(
+    setDoc(doc(aliceDb, "users", BOB, "lessonAnswers", aliceAnswerId), {
+      id: aliceAnswerId,
+      lessonId: "lesson-x",
+      screenId: "q1",
+      text: "Not mine to write.",
+    }),
+  );
+});
+
+await check("bob cannot read alice's lesson answers", async () => {
+  await assertFails(getDoc(doc(bobDb, "users", ALICE, "lessonAnswers", aliceAnswerId)));
+});
+
+await check("alice can read her own lesson answer", async () => {
+  await assertSucceeds(getDoc(doc(aliceDb, "users", ALICE, "lessonAnswers", aliceAnswerId)));
+});
+
+await check("alice cannot delete her own lesson answer", async () => {
+  await assertFails(deleteDoc(doc(aliceDb, "users", ALICE, "lessonAnswers", aliceAnswerId)));
+});
+
 // --- prayers have their own daily cap, separate from event completions ---
 // Seed a completed event lesson already used today, via the progress doc —
 // this should NOT count against the prayer cap, since the two are tracked

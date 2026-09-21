@@ -82,15 +82,29 @@ interface LessonDocBase {
   id: string;
   title: string;
   track: LessonTrack;
-  order: number;
+  /**
+   * Position in the single chronological sequence across every lesson in
+   * the library, every book and track alike — this is what The Path's
+   * gating uses now (see "single global sequence" in src/lib/roadmap.ts),
+   * replacing the old per-book `order` field entirely. Sparse (multiples
+   * of 100: 100, 200, 300…), not dense, so a later lesson can be inserted
+   * between two existing ones (e.g. 150) without renumbering the rest of
+   * the library.
+   */
+  chronologicalOrder: number;
   scriptureReference: string | null;
   /**
    * Which book of the Bible this lesson belongs to — the exact `name` of an
    * entry in `BIBLE_BOOKS` (src/lib/bible.ts), e.g. "Genesis" or "Psalms".
-   * Drives The Path's book-organized sections; there's no separate books
-   * collection, BIBLE_BOOKS is reused as the canonical ordering.
+   * Display metadata only (the book subheading on a card) — it no longer
+   * drives ordering or gating; `chronologicalOrder` does that now.
    */
   lessonBook: string;
+  /** A single illustration for the lesson, shown on its opening screen
+   * (and as the card thumbnail in the list) — null renders the existing
+   * placeholder gradient+icon. Deliberately one per lesson, not one per
+   * screen. */
+  imageUrl: string | null;
   xpReward: number;
   estimatedMinutes: number;
   createdAt: Timestamp;
@@ -125,16 +139,93 @@ export interface VerseActivity {
 /** The exact substring a VerseBlank's `template` uses to mark each blank. */
 export const BLANK_TOKEN = "_____";
 
+export type LessonScreenType = "scenario" | "multipleChoice" | "shortAnswer" | "verseBlank";
+
+interface LessonScreenBase {
+  /** Stable within the lesson (e.g. "q1") — also the `screenId` half of a
+   * scenario answer's docId in LessonAnswerDoc below. */
+  id: string;
+  type: LessonScreenType;
+  prompt: string;
+  /** Optional extra context behind a collapsed chevron on the screen —
+   * the fuller passage, background detail, or a hint. Collapsed by
+   * default so the screen itself stays clean. */
+  context?: string;
+}
+
+/** "You're standing with the Israelites at the sea — what do you say to
+ * Moses?" Free text, no right/wrong answer — advancing just requires
+ * something written, and the text is saved to the user's own record (see
+ * LessonAnswerDoc) rather than checked against anything. */
+export interface ScenarioScreen extends LessonScreenBase {
+  type: "scenario";
+  placeholder?: string;
+}
+
+/** A recall question with plausible distractors, not obvious filler.
+ * Picking `correctIndex` unlocks Continue; a wrong pick shows a gentle
+ * "not quite" and stays open to retry, never a dead end. */
+export interface MultipleChoiceScreen extends LessonScreenBase {
+  type: "multipleChoice";
+  options: string[];
+  correctIndex: number;
+}
+
+/** A typed, self-marked reflection — the user answers, then marks for
+ * themselves whether they got the idea, rather than an auto-graded exact
+ * match (which tends to false-negative a reasonable but differently
+ * worded answer). */
+export interface ShortAnswerScreen extends LessonScreenBase {
+  type: "shortAnswer";
+}
+
+/** The existing verse fill-in-the-blank activity, reused as one screen
+ * type among several rather than a lesson's only interactive content. */
+export interface VerseBlankScreen extends LessonScreenBase {
+  type: "verseBlank";
+  activity: VerseActivity;
+}
+
+export type LessonScreen = ScenarioScreen | MultipleChoiceScreen | ShortAnswerScreen | VerseBlankScreen;
+
+export function isMultipleChoiceScreen(screen: LessonScreen): screen is MultipleChoiceScreen {
+  return screen.type === "multipleChoice";
+}
+
 /**
- * lessons/{lessonId} — a narrative summary of the event, paired with a
- * verseActivity built from the passage's own verses (see VerseActivity) —
- * every event has both; they're rendered together in one card
- * (LessonCard.tsx), and completing a lesson means solving its verse
- * activity, not just reading the summary.
+ * lessons/{lessonId} — a lesson is a guided, one-screen-at-a-time sequence
+ * (LessonFlow.tsx), not a single scrolling card:
+ *
+ * 1. Intro screen — `imageUrl` (or the placeholder) + `summary` (the scene
+ *    setup — deliberately doesn't give away the ending; see `resolution`).
+ * 2. One question screen per entry in `screens`, one of the four
+ *    LessonScreen types above.
+ * 3. Resolution screen — `resolution` (what actually happened in
+ *    Scripture) plus `nextHook` (a cliffhanger pointing at the next
+ *    lesson in chronological order). This is where completing the lesson
+ *    actually fires (completeLesson, src/lib/db/lessons.ts) — unchanged
+ *    XP/streak/daily-cap mechanics, still keyed on `id`/`xpReward`.
  */
 export interface LessonDoc extends LessonDocBase {
   summary: string;
-  verseActivity: VerseActivity;
+  screens: LessonScreen[];
+  resolution: string;
+  nextHook: string;
+}
+
+/**
+ * users/{uid}/lessonAnswers/{lessonId}_{screenId} — a user's own free-text
+ * answer to a lesson's scenario screen. No right/wrong, same "just
+ * preserved, not graded" spirit as the prayer journal (PrayerDoc) — this
+ * is that same pattern applied to in-lesson scenario responses instead of
+ * a standalone journal entry.
+ */
+export interface LessonAnswerDoc {
+  id: string;
+  lessonId: string;
+  screenId: string;
+  text: string;
+  createdAt: Timestamp;
 }
 
 /**
