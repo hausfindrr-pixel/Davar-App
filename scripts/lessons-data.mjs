@@ -40,7 +40,7 @@ export const lessons = [
     chronologicalOrder: 100,
     scriptureReference: "Genesis 1:1-2:3",
     lessonBook: "Genesis",
-    imageUrl: null,
+    imageUrl: "/events/creation.webp",
     summary:
       "In six days, God speaks a formless world into shape — light, sky, land, and every living thing — and calls it good. Before anything else is said about who you are, this is who God is: a Creator who speaks order out of chaos, on purpose.",
     screens: [
@@ -99,7 +99,7 @@ export const lessons = [
     chronologicalOrder: 200,
     scriptureReference: "Genesis 6:5-9:17",
     lessonBook: "Genesis",
-    imageUrl: null,
+    imageUrl: "/events/noah-flood.webp",
     summary:
       "When the world's evil grieves God's heart, He chooses one faithful family to carry creation through judgment — not to punish for its own sake, but to start again. Noah spends over a year on a boat he built on dry land, trusting a flood he was told was coming.",
     screens: [
@@ -163,7 +163,7 @@ export const lessons = [
     chronologicalOrder: 300,
     scriptureReference: "Exodus 14:1-31",
     lessonBook: "Exodus",
-    imageUrl: null,
+    imageUrl: "/events/moses-red-sea.webp",
     summary:
       "Trapped between Pharaoh's army and the sea, Israel has nowhere left to run. Moses raises his hand toward the water and tells a terrified people to stand firm and watch what God is about to do.",
     screens: [
@@ -227,7 +227,7 @@ export const lessons = [
     chronologicalOrder: 400,
     scriptureReference: "1 Samuel 17:1-50",
     lessonBook: "1 Samuel",
-    imageUrl: null,
+    imageUrl: "/events/david-goliath.webp",
     summary:
       "A giant no one else will face, and a shepherd boy who shows up with a sling and a reason bigger than fear. Goliath brings a sword; David brings a name.",
     screens: [
@@ -291,7 +291,7 @@ export const lessons = [
     chronologicalOrder: 500,
     scriptureReference: "Daniel 6:1-23",
     lessonBook: "Daniel",
-    imageUrl: null,
+    imageUrl: "/events/daniel-lions-den.webp",
     summary:
       "Daniel keeps praying three times a day even after a law is passed specifically to trap him for it — because some things matter more than staying safe. That night, he's thrown into a den of lions.",
     screens: [
