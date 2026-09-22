@@ -807,8 +807,249 @@ export const lessons = [
     resolution:
       "God gives Israel ten commandments on Mount Sinai — the first four about loving God, the last six about loving neighbor — as the shape of a free life, not a return to slavery under a different master.",
     nextHook:
-      "Generations pass — through wilderness wandering, conquest, and judges — until Israel asks for a king. Next in the story: a shepherd boy squares off against a giant no soldier in Israel's army would face. Next: David and Goliath.",
+      "Israel leaves Sinai for a promised land already occupied — and the first city standing in the way has walls nobody expects to fall by marching. Next: The Battle of Jericho.",
     estimatedMinutes: 8,
+  },
+  {
+    id: "joshua-and-jericho",
+    title: "The Battle of Jericho",
+    track: "scripture",
+    chronologicalOrder: 320,
+    scriptureReference: "Joshua 6:1-20",
+    lessonBook: "Joshua",
+    imageUrl: null,
+    summary:
+      "God commands Israel to march around the walled city of Jericho once a day for six days, seven times on the seventh, then blow trumpets and shout — no siege engines, no battering ram, just obedience shaped like a parade.",
+    screens: [
+      {
+        id: "q1",
+        type: "scenario",
+        prompt:
+          "You're one of Joshua's soldiers, marching in silence around a walled city for the sixth straight day, carrying no weapon but a trumpet. Nothing has happened yet. What's going through your mind?",
+        placeholder: "Write what you'd be thinking…",
+        context:
+          "Joshua 6:10 — Joshua commanded the army \"not to give a war cry, not to raise your voices, not to say a word until the day I tell you to shout. Then, shout!\"",
+      },
+      {
+        id: "q2",
+        type: "multipleChoice",
+        prompt: "What finally brought Jericho's walls down?",
+        options: ["A battering ram", "A trumpet blast and a shout", "A surprise night attack", "A siege that starved the city"],
+        correctIndex: 1,
+        context:
+          "Joshua 6:20 — \"the wall collapsed; so everyone charged straight in, and they took the city.\"",
+      },
+      {
+        id: "q3",
+        type: "shortAnswer",
+        prompt:
+          "Israel's part in the miracle was walking in a circle and yelling — nothing that would actually knock down a wall by itself. Why do you think God asked for obedience that, on its own, looked useless?",
+        context:
+          "Hebrews 11:30 later names this a matter of faith, not strategy: \"By faith the walls of Jericho fell, after the army had marched around them for seven days.\"",
+      },
+      {
+        id: "verse",
+        type: "verseBlank",
+        prompt: "Fill in the verse",
+        activity: {
+          verses: [
+            { reference: "Joshua 6:2", template: "See, I have delivered Jericho into your _____.", answers: ["hands"] },
+            { reference: "Joshua 6:5", template: "the wall of the city will _____ and the people will go up, everyone straight in.", answers: ["collapse"] },
+            { reference: "Joshua 6:10", template: "do not say a _____ until the day I tell you to shout. Then, shout!", answers: ["word"] },
+            { reference: "Joshua 6:16", template: "Joshua said to the people, 'Shout! For the LORD has given you the _____!'", answers: ["city"] },
+            { reference: "Joshua 6:27", template: "the LORD was with Joshua, and his fame spread throughout the _____.", answers: ["land"] },
+          ],
+          wordBank: ["hands", "collapse", "word", "city", "land", "wall", "shout", "trumpet", "silence", "gate"],
+        },
+      },
+    ],
+    resolution:
+      "For six days, Israel marches around Jericho in silence. On the seventh, seven priests blow trumpets, the people shout, and the walls collapse outward — the city falls to obedience, not to any weapon Israel carried.",
+    nextHook:
+      "Jericho falls to a shout — but the next fight won't be won by trumpets at all. It'll take three hundred men, torches hidden in jars, and a leader almost too afraid to lead. Next: Gideon and the Three Hundred.",
+    estimatedMinutes: 7,
+  },
+  {
+    id: "gideon-and-the-three-hundred",
+    title: "Gideon and the Three Hundred",
+    track: "scripture",
+    chronologicalOrder: 330,
+    scriptureReference: "Judges 7:1-22",
+    lessonBook: "Judges",
+    imageUrl: null,
+    summary:
+      "God keeps shrinking Gideon's army — from thirty-two thousand down to three hundred — before sending them into battle with nothing but torches, jars, and trumpets, so that when the victory comes, no one can say they won it themselves.",
+    screens: [
+      {
+        id: "q1",
+        type: "scenario",
+        prompt:
+          "God has just cut your army from thirty-two thousand men down to three hundred, right before the biggest fight of your life. You're Gideon. What do you pray that night?",
+        placeholder: "Write your prayer…",
+        context:
+          "Judges 7:2 — \"the LORD said to Gideon, 'You have too many men for me to deliver Midian into their hands. In order that Israel may not boast against me that her own strength has saved her…'\"",
+      },
+      {
+        id: "q2",
+        type: "multipleChoice",
+        prompt: "What weapons did Gideon's three hundred men actually carry into battle?",
+        options: ["Swords and shields", "Bows and arrows", "Trumpets, torches, and empty jars", "Nothing at all"],
+        correctIndex: 2,
+        context:
+          "Judges 7:16 — Gideon \"put trumpets and empty jars into the hands of all of them, with torches inside the jars.\"",
+      },
+      {
+        id: "q3",
+        type: "shortAnswer",
+        prompt:
+          "God shrinks the army specifically so Israel can't take credit for the win. Is there a place in your own life where a smaller, harder path might actually be the more honest one?",
+        context:
+          "Judges 7:2, in full — the whole strategy exists so that \"Israel may not boast against me, 'My own strength has saved me.'\"",
+      },
+      {
+        id: "verse",
+        type: "verseBlank",
+        prompt: "Fill in the verse",
+        activity: {
+          verses: [
+            { reference: "Judges 7:2", template: "so that Israel may not boast against me, 'My own strength has saved _____.'", answers: ["me"] },
+            { reference: "Judges 7:7", template: "I will save you and give the Midianites into your _____. All the other men, let them go home.", answers: ["hands"] },
+            { reference: "Judges 7:16", template: "He put trumpets and empty jars into the hands of all of them, with _____ inside the jars.", answers: ["torches"] },
+            { reference: "Judges 7:18", template: "shout: 'For the LORD and for _____!'", answers: ["Gideon"] },
+            { reference: "Judges 7:21", template: "every man held his position around the camp, and all the Midianites ran, crying out as they _____.", answers: ["fled"] },
+          ],
+          wordBank: ["me", "hands", "torches", "Gideon", "fled", "trumpets", "shout", "jars", "army", "sword"],
+        },
+      },
+    ],
+    resolution:
+      "With just three hundred men, torches hidden inside jars, and a shout, Gideon's tiny force routs the entire Midianite army in one night — proof, exactly as God intended, that the win was never about the size of the army.",
+    nextHook:
+      "A judge who needed convincing gives way to another kind of story — one about staying faithful in someone else's grief, when leaving would have been so much easier. Next: Ruth's Loyalty.",
+    estimatedMinutes: 7,
+  },
+  {
+    id: "ruth-and-naomi",
+    title: "Ruth's Loyalty",
+    track: "scripture",
+    chronologicalOrder: 340,
+    scriptureReference: "Ruth 1:1-18",
+    lessonBook: "Ruth",
+    imageUrl: null,
+    summary:
+      "Widowed, foreign, and free to go back to her own people, Ruth instead makes an oath to stay with her equally widowed mother-in-law Naomi — one of the most quoted vows of loyalty in Scripture, made to someone with nothing left to offer her.",
+    screens: [
+      {
+        id: "q1",
+        type: "scenario",
+        prompt:
+          "You're Naomi, urging your widowed daughters-in-law to go back to their own families and start over — it's the practical, sensible thing for them to do. One agrees. Ruth won't leave. What do you say to her?",
+        placeholder: "Write what you'd say…",
+        context:
+          "Ruth 1:8 — Naomi tells them, \"Go back, each of you, to your mother's home. May the LORD show you kindness, as you have shown kindness to your dead husbands and to me.\"",
+      },
+      {
+        id: "q2",
+        type: "multipleChoice",
+        prompt: "What does Ruth say when she refuses to leave Naomi?",
+        options: [
+          "\"Where you go I will go, and where you stay I will stay\"",
+          "\"I will go only if you provide for me\"",
+          "\"I have nowhere else to go\"",
+          "She says nothing and simply follows",
+        ],
+        correctIndex: 0,
+        context:
+          "Ruth 1:16-17 — Ruth's full vow: \"Where you go I will go, and where you stay I will stay. Your people will be my people and your God my God.\"",
+      },
+      {
+        id: "q3",
+        type: "shortAnswer",
+        prompt:
+          "Ruth had every practical reason to leave — she was young, foreign, and free to remarry among her own people. What do you think made her stay anyway?",
+        context:
+          "Ruth later becomes King David's great-grandmother (Ruth 4:17) and appears in Jesus' genealogy (Matthew 1:5) — her loyalty to Naomi ends up woven into the story of the Messiah.",
+      },
+      {
+        id: "verse",
+        type: "verseBlank",
+        prompt: "Fill in the verse",
+        activity: {
+          verses: [
+            { reference: "Ruth 1:16", template: "Where you go I will go, and where you stay I will _____.", answers: ["stay"] },
+            { reference: "Ruth 1:16", template: "Your people will be my people and your _____ my God.", answers: ["God"] },
+            { reference: "Ruth 1:17", template: "Where you die I will die, and there I will be _____.", answers: ["buried"] },
+            { reference: "Ruth 1:17", template: "May the LORD deal with me, be it ever so severely, if even death separates you and _____.", answers: ["me"] },
+            { reference: "Ruth 1:18", template: "When Naomi realized that Ruth was determined to go with her, she stopped _____ her.", answers: ["urging"] },
+          ],
+          wordBank: ["stay", "God", "buried", "me", "urging", "people", "home", "widow", "Moab", "kindness"],
+        },
+      },
+    ],
+    resolution:
+      "Ruth refuses to leave, binding herself to Naomi, to Naomi's people, and to Naomi's God with a vow she keeps. A foreigner with nothing to gain becomes, generations later, the great-grandmother of King David.",
+    nextHook:
+      "Ruth's steady loyalty in a quiet field sets up a much noisier calling — a boy asleep in a temple, hearing his name in the dark, not yet sure whose voice it is. Next: The Lord Calls Samuel.",
+    estimatedMinutes: 7,
+  },
+  {
+    id: "the-lord-calls-samuel",
+    title: "The Lord Calls Samuel",
+    track: "scripture",
+    chronologicalOrder: 350,
+    scriptureReference: "1 Samuel 3:1-21",
+    lessonBook: "1 Samuel",
+    imageUrl: null,
+    summary:
+      "In the dark of the temple, a boy hears his name called three times and runs to Eli each time, thinking it's him — until Eli realizes it's the LORD calling, and tells Samuel exactly how to answer.",
+    screens: [
+      {
+        id: "q1",
+        type: "scenario",
+        prompt:
+          "You're a boy sleeping in the temple, and a voice calls your name in the dark for the third time tonight. Twice you ran to the old priest, sure it was him. Now he's told you it's God. What do you feel, waiting for the voice to call again?",
+        placeholder: "Write what you'd feel…",
+        context:
+          "1 Samuel 3:7 — \"Samuel did not yet know the LORD: The word of the LORD had not yet been revealed to him.\" This was new to him, not routine.",
+      },
+      {
+        id: "q2",
+        type: "multipleChoice",
+        prompt: "What did Eli tell Samuel to say the next time the voice called?",
+        options: ["\"Who is speaking?\"", "\"Speak, LORD, for your servant is listening\"", "\"I am too young for this\"", "\"Send someone else\""],
+        correctIndex: 1,
+        context:
+          "1 Samuel 3:9 — Eli's exact instruction: \"if he calls you, say, 'Speak, LORD, for your servant is listening.'\"",
+      },
+      {
+        id: "q3",
+        type: "shortAnswer",
+        prompt:
+          "The message God actually gives Samuel that night is a hard one — bad news for Eli's own household. What do you think it takes to deliver a hard word faithfully, the way Samuel does the next morning?",
+        context:
+          "1 Samuel 3:18 — Samuel \"told him everything, hiding nothing from him\" when Eli asked, and Eli's response was simply, \"He is the LORD; let him do what is good in his eyes.\"",
+      },
+      {
+        id: "verse",
+        type: "verseBlank",
+        prompt: "Fill in the verse",
+        activity: {
+          verses: [
+            { reference: "1 Samuel 3:4", template: "the LORD called Samuel, and he said, 'Here I _____.'", answers: ["am"] },
+            { reference: "1 Samuel 3:9", template: "Speak, LORD, for your servant is _____.", answers: ["listening"] },
+            { reference: "1 Samuel 3:10", template: "The LORD came and stood there, calling as at the other times, '_____! Samuel!'", answers: ["Samuel"] },
+            { reference: "1 Samuel 3:19", template: "The LORD was with him and let none of his words fall to the _____.", answers: ["ground"] },
+            { reference: "1 Samuel 3:20", template: "all Israel… recognized that Samuel was attested as a _____ of the LORD.", answers: ["prophet"] },
+          ],
+          wordBank: ["am", "listening", "Samuel", "ground", "prophet", "voice", "temple", "Eli", "servant", "night"],
+        },
+      },
+    ],
+    resolution:
+      "Samuel answers the way Eli taught him — 'Speak, LORD, for your servant is listening' — and from that night on, none of his words fall to the ground. A boy who didn't yet know the LORD becomes one of Israel's most trusted prophets.",
+    nextHook:
+      "Samuel grows into the prophet who anoints Israel's first king, then its greatest — a shepherd boy who'll one day stand in a valley across from a giant nobody else will face. Next: David and Goliath.",
+    estimatedMinutes: 6,
   },
   {
     id: "day-08-fillblank-john-3-16",
@@ -871,7 +1112,71 @@ export const lessons = [
     resolution:
       "A giant no one else would face, and a shepherd boy who shows up with a sling and a reason bigger than fear. 'The battle is the LORD's' — and David triumphs with nothing but that sling and a stone.",
     nextHook:
-      "David's own story doesn't stay this simple — a king's life gets complicated in ways a shepherd's never does. Centuries later, another young man faces his own impossible test, not with a sling but with prayer, in a den of lions. Next: Daniel.",
+      "David's own story doesn't stay this simple — a king's life gets complicated in ways a shepherd's never does. Generations later, one of his kingdom's prophets faces down four hundred fifty rivals with nothing but a single prayer. Next: Elijah and the Prophets of Baal.",
+    estimatedMinutes: 8,
+  },
+  {
+    id: "elijah-and-the-prophets-of-baal",
+    title: "Elijah and the Prophets of Baal",
+    track: "scripture",
+    chronologicalOrder: 420,
+    scriptureReference: "1 Kings 18:20-39",
+    lessonBook: "1 Kings",
+    imageUrl: null,
+    summary:
+      "One prophet of the LORD against four hundred fifty prophets of Baal, on a mountain, with two altars and no matches — whichever god answers by fire is God. Baal never answers. The LORD does.",
+    screens: [
+      {
+        id: "q1",
+        type: "scenario",
+        prompt:
+          "You're standing on Mount Carmel, watching four hundred fifty prophets shout and cut themselves for hours, begging their god to light a soaked altar on fire. Nothing happens. Then one man — outnumbered, alone — steps up and simply prays. What are you thinking as he starts?",
+        placeholder: "Write what you'd be thinking…",
+        context:
+          "1 Kings 18:27 — Elijah taunts Baal's prophets: \"Shout louder! Surely he is a god! Perhaps he is deep in thought, or busy, or traveling. Maybe he is sleeping and must be awakened.\"",
+      },
+      {
+        id: "q2",
+        type: "multipleChoice",
+        prompt: "What did Elijah do to the altar before praying, to make the miracle unmistakable?",
+        options: [
+          "Nothing unusual — he just prayed",
+          "He soaked the wood and the offering in water, three times",
+          "He built the altar out of gold",
+          "He asked the king to light it first",
+        ],
+        correctIndex: 1,
+        context:
+          "1 Kings 18:33-35 — Elijah has them pour four large jars of water over the offering and wood three separate times, until it filled the trench around the altar, removing any doubt that the fire could start naturally.",
+      },
+      {
+        id: "q3",
+        type: "shortAnswer",
+        prompt:
+          "Elijah doesn't just want to win — he specifically removes every possible natural explanation before he prays. Why might that kind of care matter, for the people watching and not just for Elijah himself?",
+        context:
+          "1 Kings 18:37 — Elijah's prayer explains the point: \"so these people will know that you, LORD, are God, and that you are turning their hearts back again.\"",
+      },
+      {
+        id: "verse",
+        type: "verseBlank",
+        prompt: "Fill in the verse",
+        activity: {
+          verses: [
+            { reference: "1 Kings 18:21", template: "How long will you waver between two opinions? If the LORD is God, follow him; but if Baal is God, follow _____.", answers: ["him"] },
+            { reference: "1 Kings 18:24", template: "The god who answers by _____ — he is God.", answers: ["fire"] },
+            { reference: "1 Kings 18:37", template: "Answer me, LORD, answer me, so these people will know that you, LORD, are _____.", answers: ["God"] },
+            { reference: "1 Kings 18:38", template: "the fire of the LORD fell and burned up the sacrifice… and also licked up the water in the _____.", answers: ["trench"] },
+            { reference: "1 Kings 18:39", template: "they fell _____ and cried, 'The LORD — he is God!'", answers: ["prostrate"] },
+          ],
+          wordBank: ["him", "fire", "God", "trench", "prostrate", "altar", "water", "Baal", "prophets", "mountain"],
+        },
+      },
+    ],
+    resolution:
+      "Four hundred fifty prophets of Baal shout and cut themselves for hours, and nothing answers. Elijah prays once, over a soaked altar, and fire falls from heaven — so unmistakable that the watching crowd falls to the ground crying, 'The LORD — he is God!'",
+    nextHook:
+      "Centuries later, a different kind of showdown plays out far from any mountain — this time inside the private, complicated household of a foreign king, where staying faithful is a quieter kind of fire. Next: Daniel.",
     estimatedMinutes: 8,
   },
   {
@@ -1778,8 +2083,200 @@ export const lessons = [
     resolution:
       "A woman is dragged in front of Jesus as a trap — until He tells her accusers that whoever is without sin can throw the first stone, and they walk away one by one. \"Neither do I condemn you,\" He tells her, \"go now and leave your life of sin.\"",
     nextHook:
-      "Grace this real costs something — and not long after, the people who wanted Jesus gone will finally get their way. But the story doesn't end at a cross. Next: the resurrection.",
+      "Grace this real costs something — and not long after, Jesus shares one last meal with His friends before the night that leads to a cross. Next: The Last Supper.",
     estimatedMinutes: 7,
+  },
+  {
+    id: "the-last-supper",
+    title: "The Last Supper",
+    track: "scripture",
+    chronologicalOrder: 910,
+    scriptureReference: "Matthew 26:17-30",
+    lessonBook: "Matthew",
+    imageUrl: null,
+    summary:
+      "At a Passover meal with the twelve, Jesus takes bread and wine and gives them new meaning — his body, his blood, given for them — hours before he's betrayed by one of the men at that same table.",
+    screens: [
+      {
+        id: "q1",
+        type: "scenario",
+        prompt:
+          "You're at the table with Jesus and the other eleven, and He's just said one of you will betray Him. Everyone starts asking, 'Surely not I?' What's the first thing you'd want to know?",
+        placeholder: "Write what you'd want to know…",
+        context:
+          "Matthew 26:22 — \"They were very sad and began to say to him one after the other, 'Surely you don't mean me, Lord?'\"",
+      },
+      {
+        id: "q2",
+        type: "multipleChoice",
+        prompt: "What did Jesus say the bread and the cup represented?",
+        options: [
+          "A reminder of the Passover in Egypt only",
+          "His body and his blood, given for them",
+          "A symbol with no real meaning",
+          "A test to see who truly believed",
+        ],
+        correctIndex: 1,
+        context:
+          "Matthew 26:26,28 — \"Take and eat; this is my body… this is my blood of the covenant, which is poured out for many for the forgiveness of sins.\"",
+      },
+      {
+        id: "q3",
+        type: "shortAnswer",
+        prompt:
+          "Jesus shares this meal — calls Judas 'friend' even knowing what he's about to do — fully aware of what's coming. What does that tell you about how far His love was willing to go, even for someone actively betraying Him?",
+        context:
+          "A few hours later, in Gethsemane, Jesus still calls Judas \"friend\" even as he's being betrayed with a kiss (Matthew 26:50).",
+      },
+      {
+        id: "verse",
+        type: "verseBlank",
+        prompt: "Fill in the verse",
+        activity: {
+          verses: [
+            { reference: "Matthew 26:26", template: "Take and eat; this is my _____.", answers: ["body"] },
+            { reference: "Matthew 26:28", template: "this is my blood of the _____, which is poured out for many.", answers: ["covenant"] },
+            { reference: "Matthew 26:28", template: "poured out for many for the forgiveness of _____.", answers: ["sins"] },
+            { reference: "Matthew 26:21", template: "Truly I tell you, one of you will _____ me.", answers: ["betray"] },
+            { reference: "Matthew 26:29", template: "I will drink it new with you in my Father's _____.", answers: ["kingdom"] },
+          ],
+          wordBank: ["body", "covenant", "sins", "betray", "kingdom", "bread", "cup", "blood", "Passover", "disciples"],
+        },
+      },
+    ],
+    resolution:
+      "Jesus shares one last Passover with the twelve, giving the bread and cup new meaning — His body, His blood, poured out for them — even as He tells them plainly that one of them will betray Him before the night is over.",
+    nextHook:
+      "From the table, Jesus leads them out to a garden to pray — and asks His closest friends to simply stay awake with Him for one hour. It doesn't go the way He hoped. Next: Jesus in Gethsemane.",
+    estimatedMinutes: 7,
+  },
+  {
+    id: "jesus-in-gethsemane",
+    title: "Jesus in Gethsemane",
+    track: "scripture",
+    chronologicalOrder: 920,
+    scriptureReference: "Matthew 26:36-46",
+    lessonBook: "Matthew",
+    imageUrl: null,
+    summary:
+      "Hours before His arrest, Jesus goes to a garden to pray, His soul 'overwhelmed with sorrow to the point of death.' He asks His three closest friends to stay awake with Him. Three times, they fall asleep instead.",
+    screens: [
+      {
+        id: "q1",
+        type: "scenario",
+        prompt:
+          "You're one of the three disciples Jesus asked to stay awake and pray with Him, and you keep drifting off despite trying. He wakes you a second time, clearly in agony, and asks again. What do you say to Him?",
+        placeholder: "Write what you'd say…",
+        context:
+          "Matthew 26:40-41 — Jesus finds them asleep and says, \"Couldn't you men keep watch with me for one hour?… The spirit is willing, but the flesh is weak.\"",
+      },
+      {
+        id: "q2",
+        type: "multipleChoice",
+        prompt: "What does Jesus pray, three times, in the garden?",
+        options: [
+          "\"Let this cup be taken from me\" — yet not as I will, but as you will",
+          "\"Send twelve legions of angels to protect me\"",
+          "\"Let my disciples be spared instead of me\"",
+          "He prays in silence and asks nothing specific",
+        ],
+        correctIndex: 0,
+        context:
+          "Matthew 26:39 — \"My Father, if it is possible, may this cup be taken from me. Yet not as I will, but as you will.\"",
+      },
+      {
+        id: "q3",
+        type: "shortAnswer",
+        prompt:
+          "Jesus asks for the suffering to be taken away, and then submits to it anyway. What do you think it means that even Jesus wrestled honestly with what was coming, instead of accepting it easily?",
+        context:
+          "Luke's account (22:44) adds that His sweat \"was like drops of blood falling to the ground\" — real, physical agony, not calm resignation.",
+      },
+      {
+        id: "verse",
+        type: "verseBlank",
+        prompt: "Fill in the verse",
+        activity: {
+          verses: [
+            { reference: "Matthew 26:38", template: "My soul is overwhelmed with sorrow to the point of _____.", answers: ["death"] },
+            { reference: "Matthew 26:39", template: "yet not as I will, but as you _____.", answers: ["will"] },
+            { reference: "Matthew 26:40", template: "Couldn't you men keep watch with me for one _____?", answers: ["hour"] },
+            { reference: "Matthew 26:41", template: "the spirit is willing, but the flesh is _____.", answers: ["weak"] },
+            { reference: "Matthew 26:45", template: "the hour has come, and the Son of Man is delivered into the hands of _____.", answers: ["sinners"] },
+          ],
+          wordBank: ["death", "will", "hour", "weak", "sinners", "pray", "garden", "asleep", "cup", "Father"],
+        },
+      },
+    ],
+    resolution:
+      "Three times, Jesus prays the same honest, agonized prayer — 'not as I will, but as you will' — and three times His closest friends fall asleep instead of staying with Him. He rises from the garden ready for what's next, alone in it.",
+    nextHook:
+      "Judas arrives with a kiss and a crowd, and the night that started at a table ends with Jesus arrested, tried, and handed over. Next: The Crucifixion.",
+    estimatedMinutes: 7,
+  },
+  {
+    id: "the-crucifixion",
+    title: "The Crucifixion",
+    track: "scripture",
+    chronologicalOrder: 930,
+    scriptureReference: "Matthew 27:32-54",
+    lessonBook: "Matthew",
+    imageUrl: null,
+    summary:
+      "Jesus is nailed to a cross between two criminals while a crowd mocks Him for not saving Himself. Darkness covers the land for three hours. Then, with a final cry, He gives up His spirit — and a Roman centurion, of all people, says who He really was.",
+    screens: [
+      {
+        id: "q1",
+        type: "scenario",
+        prompt:
+          "You're standing at the foot of the cross, watching the crowd mock a man who healed the sick and fed thousands, daring Him to save Himself. He doesn't answer them. What would you be feeling, watching in silence?",
+        placeholder: "Write what you'd feel…",
+        context:
+          "Matthew 27:40,42 — the crowd jeers, \"If you are the Son of God, come down from the cross!… He saved others… but he can't save himself!\"",
+      },
+      {
+        id: "q2",
+        type: "multipleChoice",
+        prompt: "What did the Roman centurion say after Jesus died?",
+        options: [
+          "\"This man deserved to die\"",
+          "\"Surely he was the Son of God\"",
+          "He said nothing at all",
+          "\"This proves he was only a man\"",
+        ],
+        correctIndex: 1,
+        context:
+          "Matthew 27:54 — after the earthquake, the centurion and those guarding Jesus \"were terrified, and exclaimed, 'Surely he was the Son of God!'\"",
+      },
+      {
+        id: "q3",
+        type: "shortAnswer",
+        prompt:
+          "The curtain in the temple — the barrier separating the Most Holy Place from everyone else — tears in two the moment Jesus dies. What do you think that tearing means about what just changed?",
+        context:
+          "Hebrews 10:19-20 later explains it directly: believers now have confidence to enter God's presence \"by a new and living way opened for us through the curtain, that is, his body.\"",
+      },
+      {
+        id: "verse",
+        type: "verseBlank",
+        prompt: "Fill in the verse",
+        activity: {
+          verses: [
+            { reference: "Matthew 27:46", template: "My God, my God, why have you forsaken _____?", answers: ["me"] },
+            { reference: "Matthew 27:50", template: "Jesus cried out again in a loud voice and gave up his _____.", answers: ["spirit"] },
+            { reference: "Matthew 27:51", template: "the curtain of the temple was torn in two, from top to _____.", answers: ["bottom"] },
+            { reference: "Matthew 27:54", template: "Surely he was the Son of _____!", answers: ["God"] },
+            { reference: "Matthew 27:45", template: "From noon until three in the afternoon darkness came over all the _____.", answers: ["land"] },
+          ],
+          wordBank: ["me", "spirit", "bottom", "God", "land", "cross", "curtain", "forsaken", "centurion", "darkness"],
+        },
+      },
+    ],
+    resolution:
+      "Jesus dies between two criminals as the sky goes dark and the temple curtain tears from top to bottom. A Roman centurion — an outsider, not a believer — is the one who says out loud what the moment means: 'Surely he was the Son of God!'",
+    nextHook:
+      "Friday ends in a borrowed tomb, sealed with a stone and a guard. Sunday doesn't. Next: The Resurrection.",
+    estimatedMinutes: 8,
   },
   {
     id: "day-10-fillblank-psalm-23-1",
@@ -1841,7 +2338,134 @@ export const lessons = [
     resolution:
       "Mary comes to grieve at an empty tomb — then a familiar voice says her name, and everything turns. She runs to tell the others the only sentence that matters: \"I have seen the Lord!\"",
     nextHook:
-      "This is where the seeded library stands today — more stories, spanning both testaments, are on their way. Come back for what's next.",
+      "Mary runs to tell the others 'I have seen the Lord' — and over the next forty days, the risen Jesus appears again and again, right up until He gives His followers one last, sweeping command. Next: The Great Commission.",
     estimatedMinutes: 6,
+  },
+  {
+    id: "the-great-commission",
+    title: "The Great Commission",
+    track: "scripture",
+    chronologicalOrder: 1010,
+    scriptureReference: "Matthew 28:16-20",
+    lessonBook: "Matthew",
+    imageUrl: null,
+    summary:
+      "On a mountain in Galilee, the risen Jesus gives His eleven remaining disciples one final, sweeping instruction — not to stay and guard what they'd been given, but to go, make disciples of every nation, and trust He'd be with them the whole way.",
+    screens: [
+      {
+        id: "q1",
+        type: "scenario",
+        prompt:
+          "You're one of the eleven disciples on that mountain — some of you are worshiping, the text says, and some are still doubting. Jesus gives this massive commission to that exact mixed group, doubts and all. What does that tell you about who He commissions?",
+        placeholder: "Write what you'd take from that…",
+        context:
+          "Matthew 28:17 — \"When they saw him, they worshiped him; but some doubted.\" The command that follows doesn't wait for the doubt to fully resolve first.",
+      },
+      {
+        id: "q2",
+        type: "multipleChoice",
+        prompt: "What does Jesus promise at the very end of the Great Commission?",
+        options: [
+          "\"You will never face hardship again\"",
+          "\"I am with you always, to the very end of the age\"",
+          "\"An angel will go before you\"",
+          "\"You will not need to teach, only baptize\"",
+        ],
+        correctIndex: 1,
+        context: "Matthew 28:20 — \"And surely I am with you always, to the very end of the age.\"",
+      },
+      {
+        id: "q3",
+        type: "shortAnswer",
+        prompt:
+          "The command is to 'go' and 'make disciples' — not just believe privately, but actively teach and baptize others. Why do you think faith, in Jesus' own words here, was never meant to stay contained to one person?",
+        context:
+          "This same sending pattern runs through Scripture — Israel was blessed \"to be a blessing\" (Genesis 12:2-3) long before this moment; the commission continues that same outward shape.",
+      },
+      {
+        id: "verse",
+        type: "verseBlank",
+        prompt: "Fill in the verse",
+        activity: {
+          verses: [
+            { reference: "Matthew 28:18", template: "All authority in heaven and on earth has been given to _____.", answers: ["me"] },
+            { reference: "Matthew 28:19", template: "Therefore go and make disciples of all _____.", answers: ["nations"] },
+            { reference: "Matthew 28:19", template: "baptizing them in the name of the Father and of the Son and of the Holy _____.", answers: ["Spirit"] },
+            { reference: "Matthew 28:20", template: "teaching them to obey everything I have commanded _____.", answers: ["you"] },
+            { reference: "Matthew 28:20", template: "surely I am with you always, to the very end of the _____.", answers: ["age"] },
+          ],
+          wordBank: ["me", "nations", "Spirit", "you", "age", "disciples", "authority", "baptize", "always", "mountain"],
+        },
+      },
+    ],
+    resolution:
+      "On a mountain, with some still doubting, Jesus sends His disciples out with the widest command He's given yet — make disciples of every nation — and the widest promise: 'I am with you always, to the very end of the age.'",
+    nextHook:
+      "Jesus ascends, and the disciples are left waiting on His promise of a Helper — until one morning in Jerusalem, that promise arrives all at once, with wind, fire, and a sound the whole city can hear. Next: The Day of Pentecost.",
+    estimatedMinutes: 7,
+  },
+  {
+    id: "the-day-of-pentecost",
+    title: "The Day of Pentecost",
+    track: "scripture",
+    chronologicalOrder: 1020,
+    scriptureReference: "Acts 2:1-21",
+    lessonBook: "Acts",
+    imageUrl: null,
+    summary:
+      "Fifty days after the resurrection, the promised Holy Spirit arrives with a sound like a rushing wind and tongues of fire — and a small room of frightened disciples suddenly speaks in languages they never learned, to a crowd gathered from all over the world.",
+    screens: [
+      {
+        id: "q1",
+        type: "scenario",
+        prompt:
+          "You're in that room when the sound of a rushing wind fills the house and something like fire rests on each person there — and you find yourself speaking a language you never learned. What's the first thing you'd want to say, once you found the words?",
+        placeholder: "Write what you'd want to say…",
+        context:
+          "Acts 2:11 — the crowd hears them \"declaring the wonders of God\" in their own native languages, without any of the disciples having studied those languages.",
+      },
+      {
+        id: "q2",
+        type: "multipleChoice",
+        prompt: "What did Peter say was happening, when the crowd accused the disciples of being drunk?",
+        options: [
+          "\"This is what was spoken by the prophet Joel\"",
+          "\"You misunderstand what you're hearing\"",
+          "\"We had a small amount of wine, nothing more\"",
+          "He said nothing and let the accusation stand",
+        ],
+        correctIndex: 0,
+        context:
+          "Acts 2:15-16 — \"These people are not drunk, as you suppose… this is what was spoken by the prophet Joel,\" quoting Joel's promise that God would pour out His Spirit on all people.",
+      },
+      {
+        id: "q3",
+        type: "shortAnswer",
+        prompt:
+          "Peter — who denied Jesus three times just weeks earlier — is the one who stands up and preaches boldly to a crowd of thousands that same day. What do you think changed between his denial and this moment?",
+        context:
+          "This is the same Peter behind Peter's Watch — denied Jesus (Luke 22:54-62), then restored (John 21:15-19) — now filled with the Spirit he'd just received, preaching the sermon that leads three thousand people to be baptized that day (Acts 2:41).",
+      },
+      {
+        id: "verse",
+        type: "verseBlank",
+        prompt: "Fill in the verse",
+        activity: {
+          verses: [
+            { reference: "Acts 2:2", template: "a sound like the blowing of a violent _____ came from heaven.", answers: ["wind"] },
+            { reference: "Acts 2:3", template: "They saw what seemed to be tongues of _____ that separated and came to rest on each of them.", answers: ["fire"] },
+            { reference: "Acts 2:4", template: "All of them were filled with the Holy Spirit and began to speak in other _____.", answers: ["tongues"] },
+            { reference: "Acts 2:21", template: "everyone who calls on the name of the Lord will be _____.", answers: ["saved"] },
+            { reference: "Acts 2:41", template: "Those who accepted his message were baptized, and about three thousand were added to their number that _____.", answers: ["day"] },
+          ],
+          wordBank: ["wind", "fire", "tongues", "saved", "day", "Spirit", "Peter", "Jerusalem", "crowd", "prophet"],
+        },
+      },
+    ],
+    resolution:
+      "The promised Holy Spirit arrives with wind, fire, and languages nobody in that room had learned — and Peter, once too afraid to admit he knew Jesus, stands up and preaches to thousands. About three thousand people are baptized that single day.",
+    nextHook:
+      "This is where the seeded library stands today — more stories, spanning both testaments, are on their way. Come back for what's next.",
+    estimatedMinutes: 8,
   },
 ];

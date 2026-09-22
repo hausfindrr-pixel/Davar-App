@@ -501,9 +501,12 @@ Goliath, the Resurrection, ...) tied to a chapter-range reference, not
 isolated verses — a content choice, not a schema change: `title`,
 `scriptureReference` (now a range like `"Exodus 14:1-31"`), `summary` (the
 narrative — what happens and why it matters), and `lessonBook` are the
-same fields `LessonDoc` already had. The 10 stories in
-`scripts/lessons-data.mjs` span both testaments across 7 books (Genesis,
-Exodus, 1 Samuel, Daniel, Luke, Mark, John).
+same fields `LessonDoc` already had. The 40 stories in
+`scripts/lessons-data.mjs` span both testaments across 13 books (Genesis,
+Exodus, Joshua, Judges, Ruth, 1 Samuel, 1 Kings, Daniel, Matthew, Mark,
+Luke, John, Acts) — Old Testament runs Creation through Daniel
+(`chronologicalOrder` 100-500), New Testament runs the Birth of Jesus
+through Pentecost (600-1020).
 
 **Migration note:** these reuse the original 10 lesson IDs
 (`day-01-creation` etc.) rather than retiring them for new ones — a
