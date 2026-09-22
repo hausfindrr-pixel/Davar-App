@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ApostleAvatar } from "@/components/ApostleAvatar";
+import Image from "next/image";
+import { ApostlePhotoAvatar } from "@/components/ApostlePhotoAvatar";
 import { SendIcon } from "@/components/icons";
 import { blurredPreviewClass, UnlockCard } from "@/components/PremiumGate";
 import { APOSTLES } from "@/lib/apostles";
@@ -33,7 +34,7 @@ function UserBubble({ text }: { text: string }) {
 function ApostleBubble({ apostleId, name, text }: { apostleId: keyof typeof APOSTLES; name: string; text: string }) {
   return (
     <div className="flex items-start gap-2">
-      <ApostleAvatar apostleId={apostleId} size="sm" />
+      <ApostlePhotoAvatar apostleId={apostleId} size="sm" />
       <div className="max-w-[80%] flex flex-col gap-1">
         <span className="text-xs font-medium text-stone px-1">{name}</span>
         <div className="rounded-2xl rounded-bl-md bg-paper border border-mist text-ink px-4 py-2.5 text-sm leading-relaxed">
@@ -125,7 +126,7 @@ function ChatInterface({
         )}
         {sending && (
           <div className="flex items-start gap-2">
-            <ApostleAvatar apostleId="peter" size="sm" />
+            <ApostlePhotoAvatar apostleId="peter" size="sm" />
             <div className="rounded-2xl rounded-bl-md bg-paper border border-mist text-stone px-4 py-2.5 text-sm italic">
               …
             </div>
@@ -188,6 +189,41 @@ function TeaserChat() {
   );
 }
 
+/** Peter's standing presence at the top of the tab — same visual pattern as
+ * John's always-on MascotHero on Today and Matthew's header on his Ledger
+ * (speech bubble + standing portrait, public/apostles/{id}.png): Peter is
+ * the one who opens this screen, even though Thomas or John may go on to
+ * answer inside the conversation below (see src/lib/chat-apostle.ts) — that
+ * back-and-forth is instead carried by ApostlePhotoAvatar next to each
+ * reply, a persistent chat-contact photo rather than a one-time image. */
+function WatchHero() {
+  return (
+    <div className="w-full max-w-sm flex items-start gap-3 shrink-0">
+      <div className="relative flex-1 rounded-2xl bg-paper border border-mist px-4 py-3">
+        <span className="text-xs font-medium uppercase tracking-wide text-clay-600">
+          Peter&apos;s Watch
+        </span>
+        <p className="mt-0.5 text-sm text-ink/85 leading-relaxed">
+          A place to be honest — with a companion who knows what it is to
+          fall, and to be restored.
+        </p>
+        <span
+          aria-hidden
+          className="absolute -right-2 bottom-4 h-4 w-4 rotate-45 bg-paper border-r border-b border-mist"
+        />
+      </div>
+      <Image
+        src="/apostles/peter.png"
+        alt="Peter"
+        width={200}
+        height={300}
+        className="h-32 w-auto shrink-0"
+        priority
+      />
+    </div>
+  );
+}
+
 /** Peter's Watch — an AI-guided conversational accountability companion.
  * Free tier: a blurred teaser of the chat concept. Premium: a real chat,
  * backed by Claude and Firestore, where Peter is the default voice but
@@ -197,13 +233,7 @@ function TeaserChat() {
 export function WatchTab({ uid, isPremium, today, timeZone, getIdToken }: WatchTabProps) {
   return (
     <div className="flex-1 min-h-0 flex flex-col items-center gap-4 p-6">
-      <div className="text-center max-w-sm shrink-0">
-        <h1 className="text-lg font-semibold text-ink">Peter&apos;s Watch</h1>
-        <p className="mt-1 text-xs text-stone leading-relaxed">
-          A place to be honest — with a companion who knows what it is to
-          fall, and to be restored.
-        </p>
-      </div>
+      <WatchHero />
 
       {isPremium ? (
         <ChatInterface uid={uid} today={today} timeZone={timeZone} getIdToken={getIdToken} />

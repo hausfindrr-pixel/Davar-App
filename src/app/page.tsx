@@ -37,6 +37,7 @@ import { nextLesson } from "@/lib/roadmap";
 import type { PathEvent } from "@/lib/roadmap";
 import { startCheckout } from "@/lib/plisio/checkout";
 import type { PlanId } from "@/lib/plisio/plans";
+import { PREMIUM_DAILY_EVENT_LIMIT, PREMIUM_DAILY_PRAYER_LIMIT } from "@/types/firestore";
 import type {
   DailyDevotionalDoc,
   DailyLessonProgressDoc,
@@ -560,7 +561,7 @@ function Dashboard({ uid }: { uid: string }) {
           }`}
         >
           {isPremium
-            ? "You're Premium — 3 stories and 15 prayers a day, and the full library, are unlocked."
+            ? `You're Premium — ${PREMIUM_DAILY_EVENT_LIMIT} stories and ${PREMIUM_DAILY_PRAYER_LIMIT} prayers a day, and the full library, are unlocked.`
             : confirmingTooLong
               ? "This is taking longer than usual — if it's been over an hour since you paid, the payment may not have gone through as expected. Contact support and we'll sort it out."
               : "Payment received — your upgrade is confirming on the network. This can take a few minutes; this page will update on its own, no need to refresh."}
