@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { blurredPreviewClass, UnlockCard } from "@/components/PremiumGate";
 import { ARMORY_CATEGORIES, type ArmoryCategoryId } from "@/lib/armory";
 
@@ -14,9 +14,18 @@ type ArmoryTabProps = {
  * crisp, but the verses themselves blurred, with an Unlock CTA; Premium
  * sees it all, no blur, no CTA. */
 export function ArmoryTab({ isPremium, getIdToken }: ArmoryTabProps) {
-  const [openCategory, setOpenCategory] = useState<ArmoryCategoryId | null>(
-    ARMORY_CATEGORIES[0].id,
-  );
+  const [openCategory, setOpenCategory] = useState<ArmoryCategoryId | null>(null);
+  const categoryRefs = useRef<Partial<Record<ArmoryCategoryId, HTMLDivElement | null>>>({});
+
+  // Stateless by design — nothing here is saved or tracked. Tapping a
+  // struggle just opens its category and scrolls it into view; it's a
+  // navigation shortcut, not a check-in log.
+  function handleCheckIn(id: ArmoryCategoryId) {
+    setOpenCategory(id);
+    requestAnimationFrame(() => {
+      categoryRefs.current[id]?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
 
   return (
     <div className="flex-1 flex flex-col items-center gap-6 p-6">
@@ -36,13 +45,35 @@ export function ArmoryTab({ isPremium, getIdToken }: ArmoryTabProps) {
         />
       )}
 
+      <div className="w-full max-w-sm rounded-2xl bg-paper border border-mist p-5">
+        <h2 className="text-sm font-semibold text-ink">What&rsquo;s been tempting you?</h2>
+        <p className="text-xs text-stone mt-0.5">
+          Tap what&rsquo;s been weighing on you — we&rsquo;ll jump straight to it.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {ARMORY_CATEGORIES.map((category) => (
+            <button
+              key={category.id}
+              type="button"
+              onClick={() => handleCheckIn(category.id)}
+              className="rounded-full border border-mist bg-ivory px-3 py-1.5 text-xs font-medium text-ink hover:border-clay-600 hover:text-clay-600 transition-colors"
+            >
+              {category.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="w-full max-w-sm flex flex-col gap-3">
         {ARMORY_CATEGORIES.map((category) => {
           const isOpen = openCategory === category.id;
           return (
             <div
               key={category.id}
-              className="rounded-2xl bg-paper border border-mist overflow-hidden"
+              ref={(el) => {
+                categoryRefs.current[category.id] = el;
+              }}
+              className="rounded-2xl bg-paper border border-mist overflow-hidden scroll-mt-4"
             >
               <button
                 type="button"
