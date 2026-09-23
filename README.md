@@ -714,8 +714,9 @@ apostles replies.
   check, and — if it didn't fire — checks the daily message limit (below),
   and if there's still quota left, fetches the last 20 messages as
   conversation history, routes to an apostle, and calls Claude via the
-  official `@anthropic-ai/sdk` (model `claude-opus-5`, `effort: "low"`,
-  `max_tokens: 400` — a short chat reply doesn't need more). It checks
+  official `@anthropic-ai/sdk` (model `claude-haiku-4-5`, `max_tokens: 400`
+  — a short chat reply doesn't need more; Haiku doesn't take an `effort`
+  param the way Opus does). It checks
   `stop_reason === "refusal"` before reading the response and falls back to
   a gentle, hard-coded line if the model declines to answer. Both the user's
   message and the reply are written via the Admin SDK, which is why clients
