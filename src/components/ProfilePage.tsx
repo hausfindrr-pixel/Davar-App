@@ -1,22 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApostleAvatar } from "@/components/ApostleAvatar";
 import { Avatar } from "@/components/Avatar";
 import { ArrowLeftIcon, CameraIcon } from "@/components/icons";
 import { MatthewsLedger } from "@/components/MatthewsLedger";
 import { UnlockCard } from "@/components/PremiumGate";
-import { updateHighlightNote, subscribeToHighlights } from "@/lib/db/highlights";
 import { updateUserProfile } from "@/lib/db/users";
 import { AVATAR_PRESETS } from "@/lib/avatars";
 import type { PlanId } from "@/lib/plisio/plans";
 import {
   FREE_DAILY_EVENT_LIMIT,
   PREMIUM_DAILY_EVENT_LIMIT,
-  type HighlightColor,
   type LessonDoc,
   type UserDoc,
-  type UserHighlightDoc,
 } from "@/types/firestore";
 
 type ProfilePageProps = {
@@ -35,12 +32,6 @@ type ProfilePageProps = {
   /** Jumps to The Word tab, open to this book/chapter — bubbled up from
    * the Ledger's "Go to passage" action on a highlighted verse. */
   onNavigateToVerse: (book: string, chapter: number) => void;
-};
-
-const HIGHLIGHT_ACCENT: Record<HighlightColor, string> = {
-  clay: "border-clay-400",
-  sage: "border-sage-400",
-  stone: "border-stone",
 };
 
 const PLAN_LABELS: Record<PlanId, string> = {
@@ -105,63 +96,6 @@ function PlanCard({ profile, getIdToken }: { profile: UserDoc | null; getIdToken
   );
 }
 
-function HighlightNoteCard({ uid, highlight }: { uid: string; highlight: UserHighlightDoc }) {
-  const [draft, setDraft] = useState(highlight.notes ?? "");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [savedFlash, setSavedFlash] = useState(false);
-  const hasEdited = useRef(false);
-
-  const dirty = draft !== (highlight.notes ?? "");
-
-  async function handleSave() {
-    setSaving(true);
-    setError(null);
-    try {
-      await updateHighlightNote(uid, highlight.book, highlight.chapter, highlight.verse, draft);
-      setSavedFlash(true);
-      setTimeout(() => setSavedFlash(false), 1500);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save that note.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <div
-      className={`rounded-2xl bg-paper border-l-4 ${HIGHLIGHT_ACCENT[highlight.color]} border-y border-r border-mist p-4 flex flex-col gap-2`}
-    >
-      <span className="text-xs font-medium uppercase tracking-wide text-clay-600">
-        {highlight.reference}
-      </span>
-      <p className="font-serif text-base leading-relaxed text-ink/90">{highlight.text}</p>
-      <textarea
-        value={draft}
-        onChange={(e) => {
-          hasEdited.current = true;
-          setDraft(e.target.value);
-        }}
-        placeholder="Add a personal note…"
-        rows={2}
-        className="w-full rounded-xl border border-mist bg-ivory px-3 py-2 text-sm text-ink placeholder:text-stone/70 resize-none"
-      />
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          disabled={saving || !dirty}
-          onClick={() => void handleSave()}
-          className="rounded-full bg-clay-600 text-paper px-4 py-1.5 text-xs font-medium hover:bg-clay-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {saving ? "Saving…" : "Save note"}
-        </button>
-        {savedFlash && <span className="text-xs text-sage-700">Saved</span>}
-        {error && <span className="text-xs text-clay-700">{error}</span>}
-      </div>
-    </div>
-  );
-}
-
 export function ProfilePage({
   uid,
   profile,
@@ -181,7 +115,6 @@ export function ProfilePage({
   const [avatarPickerOpen, setAvatarPickerOpen] = useState(false);
   const [avatarSaving, setAvatarSaving] = useState<string | null>(null);
   const [avatarError, setAvatarError] = useState<string | null>(null);
-  const [highlights, setHighlights] = useState<UserHighlightDoc[]>([]);
   const [showLedger, setShowLedger] = useState(false);
   // Which openLedgerRequest (by nonce) has already been applied — same
   // "adjust state during render" pattern as PathEventList's focusRequest.
@@ -191,10 +124,6 @@ export function ProfilePage({
     setHandledLedgerRequestNonce(openLedgerRequest);
     if (!showLedger) setShowLedger(true);
   }
-
-  useEffect(() => {
-    return subscribeToHighlights(uid, setHighlights);
-  }, [uid]);
 
   // Only adopt the server value once, when it first arrives — after that
   // the input is the user's to edit without the live subscription
@@ -206,12 +135,6 @@ export function ProfilePage({
       adoptedRef.current = true;
     }
   }, [profile]);
-
-  const sortedHighlights = useMemo(
-    () =>
-      [...highlights].sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0)),
-    [highlights],
-  );
 
   async function handleSaveName() {
     setNameSaving(true);
@@ -351,22 +274,9 @@ export function ProfilePage({
         <ApostleAvatar apostleId="matthew" />
         <div className="min-w-0">
           <h2 className="text-sm font-semibold text-ink">Matthew&apos;s Ledger</h2>
-          <p className="text-xs text-stone">(Archives) — your lessons and prayers, kept</p>
+          <p className="text-xs text-stone">(Archives) — your lessons, prayers, and highlighted verses, kept</p>
         </div>
       </button>
-
-      <div className="w-full max-w-sm flex flex-col gap-3">
-        <h2 className="text-sm font-medium text-ink px-1">Highlighted Verses</h2>
-        {sortedHighlights.length === 0 ? (
-          <div className="rounded-2xl bg-paper border border-mist p-5">
-            <p className="text-sm text-stone">
-              Verses you highlight in The Word will show up here.
-            </p>
-          </div>
-        ) : (
-          sortedHighlights.map((h) => <HighlightNoteCard key={h.id} uid={uid} highlight={h} />)
-        )}
-      </div>
 
       <button
         type="button"
