@@ -180,12 +180,13 @@ function LandingPage() {
             <Image
               src="/logo.svg"
               alt="Davar"
-              width={380}
-              height={430}
+              width={130}
+              height={130}
               priority
               className="w-24 sm:w-28 h-auto"
             />
           </div>
+          <p className="-mt-1 font-serif text-xl tracking-wide text-ink">Davar</p>
           <h1 className="font-serif text-4xl sm:text-5xl leading-tight tracking-tight text-ink max-w-md">
             A daily rhythm of Scripture, prayer, and grace.
           </h1>
