@@ -131,13 +131,14 @@ export async function POST(req: Request) {
   let reply: string;
   try {
     const response = await client.messages.create({
-      model: "claude-haiku-4-5",
+      model: "claude-sonnet-5",
       max_tokens: 400,
       system: systemPromptFor(apostleId),
       messages: history.map((m) => ({
         role: m.role,
         content: m.text,
       })),
+      output_config: { effort: "low" },
     });
 
     if (response.stop_reason === "refusal") {
