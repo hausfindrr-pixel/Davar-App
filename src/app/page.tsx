@@ -180,8 +180,8 @@ function LandingPage() {
             <Image
               src="/logo.svg"
               alt="Davar"
-              width={130}
-              height={130}
+              width={380}
+              height={430}
               priority
               className="w-24 sm:w-28 h-auto"
             />
