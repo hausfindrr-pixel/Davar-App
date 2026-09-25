@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FillBlankCard } from "@/components/FillBlankCard";
 import { ArrowLeftIcon } from "@/components/icons";
 import { saveLessonAnswer } from "@/lib/db/lessonAnswers";
@@ -489,6 +489,20 @@ export function LessonFlow({
   const [step, setStep] = useState(0);
   const meta = CONTENT_TYPE_META[lesson.track];
   const totalSteps = lesson.screens.length + 2; // intro + questions + resolution
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  // Screens vary wildly in height (a short multipleChoice vs. a long
+  // readAndAnswer passage), but they all render inside the same outer
+  // scroll container (page.tsx's flex-1 overflow-y-auto div). Without
+  // this, advancing/going back leaves the container at whatever
+  // scrollTop the previous, differently-sized screen had, so the new
+  // one can render already scrolled past its own top — the intro
+  // screen's hero image looking clipped/offset is this same bug, just
+  // triggered by opening the lesson itself (step 0's first render)
+  // rather than by stepping between screens.
+  useEffect(() => {
+    rootRef.current?.closest<HTMLElement>(".overflow-y-auto")?.scrollTo({ top: 0 });
+  }, [step]);
 
   if (isDone) {
     return (
@@ -562,7 +576,7 @@ export function LessonFlow({
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div ref={rootRef} className="flex flex-col gap-4">
       <div className="flex items-center gap-3">
         <button
           type="button"

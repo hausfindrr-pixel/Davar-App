@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowLeftIcon } from "@/components/icons";
 import { LessonFlow } from "@/components/LessonFlow";
 import { PathEventCard } from "@/components/PathEventCard";
@@ -98,6 +98,9 @@ export function PathEventList({
   // an effect here would setState after the first paint, causing an
   // extra, avoidable render.
   const [handledFocusNonce, setHandledFocusNonce] = useState<number | null>(null);
+  // Only one of the three <section> branches below is ever mounted at a
+  // time, so this ref always points at whichever is currently showing.
+  const sectionRef = useRef<HTMLElement>(null);
 
   const limit = dailyEventLimit(isPremium ? "premium" : "free");
   const atLimit = todayEventCount >= limit;
@@ -125,6 +128,24 @@ export function PathEventList({
   useEffect(() => {
     onLessonOpenChange?.(openLesson !== null);
   }, [openLesson, onLessonOpenChange]);
+
+  // Opening a lesson (or going back to the list) swaps in content of a
+  // completely different height inside the shared outer scroll container
+  // (the flex-1 overflow-y-auto div in page.tsx) — without this, the new
+  // content inherits whatever scrollTop the old one left behind, which is
+  // exactly the "hero image looks clipped/offset" bug: the intro screen
+  // renders as if already scrolled past, by an amount that depends on
+  // wherever the list happened to be scrolled to. Reset to top every time
+  // the visible lesson (including "no lesson, back to the list") changes.
+  // Sets scrollTop directly on the ancestor scroll container rather than
+  // scrollIntoView on our own section — scrollIntoView aligns *this*
+  // element's own top edge to the container's visible top, which is only
+  // the same thing as scrollTop 0 when nothing else in the container sits
+  // above it; LessonFlow's own reset (below) needed the same fix for the
+  // same reason.
+  useEffect(() => {
+    sectionRef.current?.closest<HTMLElement>(".overflow-y-auto")?.scrollTo({ top: 0 });
+  }, [effectiveOpenLessonId]);
 
   function handlePrayAboutThis(lesson: LessonDoc) {
     setOpenLessonId(null);
@@ -166,7 +187,7 @@ export function PathEventList({
 
   if (openLesson) {
     return (
-      <section className="w-full max-w-sm flex flex-col gap-3">
+      <section ref={sectionRef} className="w-full max-w-sm flex flex-col gap-3">
         <button
           type="button"
           onClick={() => setOpenLessonId(null)}
@@ -192,7 +213,7 @@ export function PathEventList({
   }
 
   return (
-    <section className="w-full max-w-sm flex flex-col gap-3">
+    <section ref={sectionRef} className="w-full max-w-sm flex flex-col gap-3">
       <PathProgressBar completed={completedCount} total={lessons.length} />
 
       <div className="flex items-center justify-between px-1">
