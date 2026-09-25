@@ -3418,7 +3418,7 @@ export const lessons = [
     chronologicalOrder: 720,
     scriptureReference: "Matthew 14:22-33",
     lessonBook: "Matthew",
-    imageUrl: null,
+    imageUrl: "/events/jesus-walks-on-water.webp",
     summary:
       "Late at night, far from shore, the disciples' boat is battered by waves — and then they see a figure walking toward them across the water and think it's a ghost. Jesus tells them exactly who He is, and Peter asks to walk out to meet Him.",
     screens: [
@@ -3533,7 +3533,7 @@ export const lessons = [
     chronologicalOrder: 730,
     scriptureReference: "Matthew 17:1-8",
     lessonBook: "Matthew",
-    imageUrl: null,
+    imageUrl: "/events/transfiguration.webp",
     summary:
       "Jesus takes Peter, James, and John up a mountain, and His appearance suddenly changes — His face shining like the sun, His clothes dazzling white. Moses and Elijah appear beside Him, and a voice from the cloud says exactly who He is.",
     screens: [
@@ -3919,7 +3919,7 @@ export const lessons = [
     chronologicalOrder: 910,
     scriptureReference: "Matthew 26:17-30",
     lessonBook: "Matthew",
-    imageUrl: null,
+    imageUrl: "/events/the-last-supper.webp",
     summary:
       "At a Passover meal with the twelve, Jesus takes bread and wine and gives them new meaning — his body, his blood, given for them — hours before he's betrayed by one of the men at that same table.",
     screens: [
@@ -4055,7 +4055,7 @@ export const lessons = [
     chronologicalOrder: 920,
     scriptureReference: "Matthew 26:36-46",
     lessonBook: "Matthew",
-    imageUrl: null,
+    imageUrl: "/events/jesus-in-gethsemane.webp",
     summary:
       "Hours before His arrest, Jesus goes to a garden to pray, His soul 'overwhelmed with sorrow to the point of death.' He asks His three closest friends to stay awake with Him. Three times, they fall asleep instead.",
     screens: [
@@ -4191,7 +4191,7 @@ export const lessons = [
     chronologicalOrder: 930,
     scriptureReference: "Matthew 27:32-54",
     lessonBook: "Matthew",
-    imageUrl: null,
+    imageUrl: "/events/the-crucifixion.webp",
     summary:
       "Jesus is nailed to a cross between two criminals while a crowd mocks Him for not saving Himself. Darkness covers the land for three hours. Then, with a final cry, He gives up His spirit — and a Roman centurion, of all people, says who He really was.",
     screens: [
