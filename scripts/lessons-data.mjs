@@ -458,7 +458,7 @@ export const lessons = [
     chronologicalOrder: 240,
     scriptureReference: "Genesis 32:22-32",
     lessonBook: "Genesis",
-    imageUrl: null,
+    imageUrl: "/events/jacob-wrestles-with-god.webp",
     summary:
       "Alone at night, on the eve of facing the brother he once cheated, Jacob wrestles with a stranger until daybreak — and won't let go until he's blessed. He walks away limping, and with a new name.",
     screens: [
@@ -517,7 +517,7 @@ export const lessons = [
     chronologicalOrder: 250,
     scriptureReference: "Genesis 37:12-36",
     lessonBook: "Genesis",
-    imageUrl: null,
+    imageUrl: "/events/joseph-sold-by-brothers.webp",
     summary:
       "Joseph's brothers hate him for their father's favoritism and his own dreams of ruling over them — enough to sell him into slavery and tell their father he's dead. Joseph disappears into Egypt with nothing but the coat that's no longer his.",
     screens: [
@@ -576,7 +576,7 @@ export const lessons = [
     chronologicalOrder: 260,
     scriptureReference: "Genesis 45:1-15",
     lessonBook: "Genesis",
-    imageUrl: null,
+    imageUrl: "/events/joseph-forgives-his-brothers.webp",
     summary:
       "Decades later, famine drives Joseph's brothers to Egypt for grain — straight to the brother they sold, now second-in-command and unrecognizable. Joseph could destroy them. Instead, he weeps, and forgives.",
     screens: [
@@ -635,7 +635,7 @@ export const lessons = [
     chronologicalOrder: 270,
     scriptureReference: "Exodus 3:1-15",
     lessonBook: "Exodus",
-    imageUrl: null,
+    imageUrl: "/events/moses-burning-bush.webp",
     summary:
       "A bush burns without burning up, and a voice from inside it calls Moses by name — then asks him to go back to the country he fled and confront the most powerful man in the world. Moses' first response is every excuse he can think of.",
     screens: [
@@ -758,7 +758,7 @@ export const lessons = [
     chronologicalOrder: 310,
     scriptureReference: "Exodus 20:1-17",
     lessonBook: "Exodus",
-    imageUrl: null,
+    imageUrl: "/events/ten-commandments.webp",
     summary:
       "Three months after leaving Egypt, God gives His freed people ten instructions on Mount Sinai — not a cage, but a design for how a rescued people can actually live free, with God and with each other.",
     screens: [
