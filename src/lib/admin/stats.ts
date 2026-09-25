@@ -352,6 +352,10 @@ export interface AdminWatchStats {
 export async function getWatchStats(): Promise<AdminWatchStats> {
   const usage = adminDb().collection(COLLECTIONS.watchChatUsage);
 
+  // Summing three fields in one aggregate() call needs a composite index
+  // covering all three (declared in firestore.indexes.json) — Firestore
+  // doesn't cover a multi-field aggregate with the automatic per-field
+  // indexing that a single count()/sum() gets.
   const agg = await usage
     .aggregate({
       totalMessages: AggregateField.sum("messageCount"),

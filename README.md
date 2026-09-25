@@ -171,8 +171,9 @@ firebase deploy --only firestore:rules
 ```
 
 The same applies to `firestore.indexes.json` (added for the admin
-dashboard's retention query — see "Admin dashboard" below): editing it
-here doesn't create the index on your live project until you also run
+dashboard's retention query, premium-expiry list, recent-payments table,
+and Peter's Watch cost aggregation — see "Admin dashboard" below): editing
+it here doesn't create the index on your live project until you also run
 
 ```bash
 firebase deploy --only firestore:indexes

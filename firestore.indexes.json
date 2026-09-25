@@ -23,6 +23,15 @@
         { "fieldPath": "result", "order": "ASCENDING" },
         { "fieldPath": "receivedAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "watch_chat_usage",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "inputTokens", "order": "ASCENDING" },
+        { "fieldPath": "messageCount", "order": "ASCENDING" },
+        { "fieldPath": "outputTokens", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
