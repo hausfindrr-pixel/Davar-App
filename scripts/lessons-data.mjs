@@ -4462,7 +4462,7 @@ export const lessons = [
     chronologicalOrder: 1010,
     scriptureReference: "Matthew 28:16-20",
     lessonBook: "Matthew",
-    imageUrl: null,
+    imageUrl: "/events/the-great-commission.webp",
     summary:
       "On a mountain in Galilee, the risen Jesus gives His eleven remaining disciples one final, sweeping instruction — not to stay and guard what they'd been given, but to go, make disciples of every nation, and trust He'd be with them the whole way.",
     screens: [
@@ -4597,7 +4597,7 @@ export const lessons = [
     chronologicalOrder: 1020,
     scriptureReference: "Acts 2:1-21",
     lessonBook: "Acts",
-    imageUrl: null,
+    imageUrl: "/events/the-day-of-pentecost.webp",
     summary:
       "Fifty days after the resurrection, the promised Holy Spirit arrives with a sound like a rushing wind and tongues of fire — and a small room of frightened disciples suddenly speaks in languages they never learned, to a crowd gathered from all over the world.",
     screens: [
