@@ -17,7 +17,7 @@ import {
   type User,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import { ensureUserDoc } from "@/lib/db/users";
+import { ensureUserDoc, recordActivity } from "@/lib/db/users";
 
 interface AuthContextValue {
   user: User | null;
@@ -32,6 +32,33 @@ const NOT_CONFIGURED_MESSAGE =
   "Firebase isn't configured yet. Copy .env.local.example to .env.local and add your project's keys — see README.md.";
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+/**
+ * Mints or clears the httpOnly session cookie /admin's server-side gate
+ * relies on (see src/app/api/auth/session/route.ts) — this app otherwise
+ * has no server session at all, so every sign-in (including a restored
+ * session on page load) needs to (re-)establish one, and every sign-out
+ * needs to tear it down. Best-effort: a failure here just means an admin
+ * might need to reload once before /admin recognizes them, never a way for
+ * a non-admin to get in, since that route independently re-verifies the
+ * cookie and the user's isAdmin flag server-side regardless of this call.
+ */
+async function syncSessionCookie(user: User | null): Promise<void> {
+  try {
+    if (user) {
+      const idToken = await user.getIdToken();
+      await fetch("/api/auth/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken }),
+      });
+    } else {
+      await fetch("/api/auth/session", { method: "DELETE" });
+    }
+  } catch {
+    // Best-effort — see comment above.
+  }
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -53,7 +80,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       if (nextUser) {
         await ensureUserDoc(nextUser);
+        await recordActivity(nextUser.uid);
       }
+      await syncSessionCookie(nextUser);
     });
   }, []);
 

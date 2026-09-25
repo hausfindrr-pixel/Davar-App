@@ -141,6 +141,20 @@ export async function POST(req: Request) {
       output_config: { effort: "low" },
     });
 
+    // Real usage off the response itself, not a message-length estimate —
+    // input cost depends heavily on how much of `history` got replayed
+    // this turn, which a length-based guess can't see. Best-effort: a
+    // failure here must never take down the reply the user is waiting on.
+    usageRef
+      .set(
+        {
+          inputTokens: FieldValue.increment(response.usage.input_tokens),
+          outputTokens: FieldValue.increment(response.usage.output_tokens),
+        },
+        { merge: true },
+      )
+      .catch((err) => console.error("watch-chat: failed to record token usage", err));
+
     if (response.stop_reason === "refusal") {
       reply =
         "I don't have a good way to answer that one — but I'm still here, and I'd love to hear how you're really doing today.";

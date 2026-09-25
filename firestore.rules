@@ -12,23 +12,27 @@ service cloud.firestore {
 
     match /users/{uid} {
       allow read: if isOwner(uid);
-      // `tier`, `premiumSince`, `premiumUntil`, and `planId` can only ever
-      // start at "free"/null/null/null, and can never be changed by the
-      // client afterward — nothing client-side should be able to grant
-      // itself "premium" or a fake plan. Only the Plisio webhook and the
-      // daily expiry cron, both writing via the Admin SDK (which bypasses
-      // these rules), can change them.
+      // `tier`, `premiumSince`, `premiumUntil`, `planId`, and `isAdmin` can
+      // only ever start at "free"/null/null/null/false, and can never be
+      // changed by the client afterward — nothing client-side should be
+      // able to grant itself "premium", a fake plan, or admin access.
+      // tier/premiumSince/premiumUntil/planId only ever change via the
+      // Plisio webhook and the daily expiry cron, both writing via the
+      // Admin SDK (which bypasses these rules); `isAdmin` only ever changes
+      // via scripts/set-admin.mjs or the Firebase console, same reason.
       allow create: if isOwner(uid) &&
         request.resource.data.uid == uid &&
         request.resource.data.tier == "free" &&
         request.resource.data.premiumSince == null &&
         request.resource.data.premiumUntil == null &&
-        request.resource.data.planId == null;
+        request.resource.data.planId == null &&
+        request.resource.data.get('isAdmin', false) == false;
       allow update: if isOwner(uid) &&
         request.resource.data.tier == resource.data.tier &&
         request.resource.data.premiumSince == resource.data.premiumSince &&
         request.resource.data.premiumUntil == resource.data.premiumUntil &&
-        request.resource.data.planId == resource.data.planId;
+        request.resource.data.planId == resource.data.planId &&
+        request.resource.data.get('isAdmin', false) == resource.data.get('isAdmin', false);
       allow delete: if false;
     }
 
@@ -168,6 +172,23 @@ service cloud.firestore {
           )
         );
 
+      allow delete: if false;
+    }
+
+    // Purely an analytics signal for the admin dashboard (see
+    // LessonStartDoc, src/types/firestore.ts) — one doc per (user, lesson),
+    // written idempotently the moment a lesson's intro screen is shown, so
+    // "started but never finished" can be measured against check_ins.
+    // docId is "{uid}_{lessonId}" so a re-open just overwrites the same
+    // doc rather than creating a duplicate. No client read (the dashboard
+    // aggregates it server-side via the Admin SDK, same as
+    // watch_chat_usage) and no delete — a user quietly reopening/abandoning
+    // a lesson again shouldn't erase the earlier signal.
+    match /lesson_starts/{docId} {
+      allow read: if false;
+      allow create, update: if isSignedIn() &&
+        request.resource.data.uid == request.auth.uid &&
+        docId == request.auth.uid + '_' + request.resource.data.lessonId;
       allow delete: if false;
     }
 

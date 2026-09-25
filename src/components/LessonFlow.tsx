@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { FillBlankCard } from "@/components/FillBlankCard";
 import { ArrowLeftIcon } from "@/components/icons";
 import { saveLessonAnswer } from "@/lib/db/lessonAnswers";
+import { recordLessonStart } from "@/lib/db/lessonStarts";
 import { CONTENT_TYPE_META } from "@/lib/contentType";
 import type {
   LessonDoc,
@@ -503,6 +504,15 @@ export function LessonFlow({
   useEffect(() => {
     rootRef.current?.closest<HTMLElement>(".overflow-y-auto")?.scrollTo({ top: 0 });
   }, [step]);
+
+  // Admin-only analytics signal (see LessonStartDoc, src/types/firestore.ts)
+  // — fires once per mount, i.e. once per open, regardless of isDone (a
+  // completed lesson being reopened to review is still a legitimate
+  // "start" for this doc's purposes, and the write is idempotent either
+  // way). Fire-and-forget: never blocks or shows an error to the user.
+  useEffect(() => {
+    void recordLessonStart(uid, lesson.id);
+  }, [uid, lesson.id]);
 
   if (isDone) {
     return (

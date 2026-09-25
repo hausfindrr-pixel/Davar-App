@@ -142,8 +142,14 @@ the Admin SDK (via `/api/watch-chat`) writes to it, so the crisis-detection
 and apostle-routing logic in that route can't be bypassed by writing
 straight to Firestore. `daily_verses`, `daily_devotionals`, and
 `daily_prayers` are read-only for any signed-in user, the same rule shape
-as `lessons`. There's no `storage.rules` — profile avatars are presets, not
-uploads (see "Profile" below), so Firebase Storage isn't used at all.
+as `lessons`. `lesson_starts/{uid}_{lessonId}` (see "Admin dashboard"
+below) is owner-only create/update, no client read at all — the admin
+dashboard reads it via the Admin SDK, which bypasses rules entirely.
+`users/{uid}`'s `isAdmin` field is locked exactly like `tier`/`premiumSince`/
+`premiumUntil`/`planId` — a client can never set it on itself, only
+`scripts/set-admin.mjs` (Admin SDK) can. There's no `storage.rules` —
+profile avatars are presets, not uploads (see "Profile" below), so
+Firebase Storage isn't used at all.
 
 **Whenever you change `firestore.rules`, you have to deploy it yourself** —
 editing it here only changes what's in the repo, not what's enforced on
@@ -163,6 +169,19 @@ installed and linked:
 ```bash
 firebase deploy --only firestore:rules
 ```
+
+The same applies to `firestore.indexes.json` (added for the admin
+dashboard's retention query — see "Admin dashboard" below): editing it
+here doesn't create the index on your live project until you also run
+
+```bash
+firebase deploy --only firestore:indexes
+```
+
+Composite indexes can take a few minutes to build after deploying — a
+query that needs one fails with an explicit "requires an index" error
+(and a console link to create it) until it's ready, rather than silently
+returning wrong results.
 
 ### Daily caps: events and prayers, tracked separately
 
@@ -1348,6 +1367,98 @@ format under "Environment variables" above.
   *is* enforced now — see "Premium expiry" above — this limitation is only
   about there being no auto-charge.
 
+## Admin dashboard
+
+`/admin` is a private operations view — signups/retention, revenue, Peter's
+Watch cost, and lesson engagement — restricted to one account (you). It's
+not linked from anywhere in the app; visit the URL directly once you're
+signed in and granted access (see below).
+
+### Granting access
+
+There's no in-app UI for this on purpose. Grant yourself access with:
+
+```bash
+node scripts/set-admin.mjs you@example.com
+# to revoke: node scripts/set-admin.mjs you@example.com --revoke
+```
+
+This sets `isAdmin: true` on your `users/{uid}` doc via the Admin SDK — the
+only way that field can ever be set (see "Security rules" above; the same
+service account key setup as `npm run seed:lessons` works here). You must
+have signed into the app at least once first, so `users/{uid}` exists.
+
+### How the gate works — no server session existed before this
+
+Every other part of this app authenticates purely client-side (Firebase
+Auth ID tokens, checked by `firestore.rules` and by each API route's own
+`adminAuth().verifyIdToken()` call) — there was no server-side session at
+all. `/admin` needed one anyway, so a non-admin hitting the URL directly is
+blocked *before* the page renders, not just hidden behind a client-side
+check:
+
+- `src/app/api/auth/session/route.ts` exchanges a fresh Firebase ID token
+  for an httpOnly session cookie (`adminAuth().createSessionCookie`).
+  `AuthProvider` (`src/lib/auth-context.tsx`) calls this on every sign-in,
+  including a restored session on page load, and clears it on sign-out —
+  this is the only server session anything in this app has, and it exists
+  solely for this gate.
+- `src/proxy.ts` (Next 16 renamed `middleware.ts` → `proxy.ts` — see
+  `node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/proxy.md`)
+  does a cheap, *optimistic* check on `/admin/:path*`: is the session
+  cookie merely present? If not, redirect to `/` at the edge. This never
+  verifies the cookie — that needs the Admin SDK, deliberately kept out of
+  Proxy.
+- `src/lib/admin/session.ts`'s `verifyAdminSession()` is the actual,
+  *secure* check: verifies the cookie server-side, then confirms that
+  uid's own `users/{uid}` doc has `isAdmin === true`. `app/admin/page.tsx`
+  is a Server Component that calls this and `redirect("/")`s immediately
+  if it fails — before fetching or rendering anything — matching the
+  Next.js authentication guide's Data Access Layer pattern
+  (`node_modules/next/dist/docs/01-app/02-guides/authentication.md`).
+
+### Data model — computed live, not from a rollup
+
+Every number on the dashboard (`src/lib/admin/stats.ts`) is computed from
+existing collections on each page load via the Admin SDK (which bypasses
+`firestore.rules` entirely, so there was no need to open up cross-user
+reads in the rules for this) — there's no nightly cron job or precomputed
+rollup collection. At this app's scale, Firestore's `count()`/`sum()`
+aggregation queries (billed per matched index entry, not per document) and
+a handful of small, `limit()`-ed reads are cheap enough that a rollup would
+be optimizing a cost that doesn't exist yet. If that ever changes, the fix
+is a Vercel Cron job (same pattern as `/api/cron/expire-premium`) writing
+compact summary docs — a caching layer in front of `stats.ts`, not a
+reshape of it.
+
+Two schema additions exist purely to make this possible:
+
+- **`UserDoc.lastActiveAt`** — set unconditionally on every sign-in (see
+  `recordActivity`, `src/lib/db/users.ts`), since nothing previously
+  recorded "opened the app." Powers active-user counts and the retention
+  cohort chart. Absent for any account created before this shipped, until
+  their next sign-in — there's no way to backfill it.
+- **`lesson_starts/{uid}_{lessonId}`** — one doc per (user, lesson),
+  written the moment a lesson's intro screen renders (`LessonFlow.tsx`).
+  Nothing previously recorded "opened but didn't finish" — `check_ins`
+  only fires on completion, and a lesson's saved answers
+  (`LessonAnswerDoc`) only exist if the user actually typed something,
+  which a user who bails out early may never do. Lesson completion rate =
+  `check_ins` count / `lesson_starts` count, per lesson. Like
+  `lastActiveAt`, this only starts counting from ship date forward.
+
+Revenue is derived from `payment_events`' existing `result`/`plan` fields
+(count of `"granted"` events per plan × that plan's fixed price in
+`PLANS`), not from the raw `sourceAmount` string logged there — that field
+is kept purely for audit fidelity and can vary slightly with crypto
+overpayment. Peter's Watch cost uses the *real* `usage.input_tokens`/
+`usage.output_tokens` off each Anthropic response (`WatchChatUsageDoc.
+inputTokens`/`outputTokens`, new fields — absent/`0` on any usage doc
+written before this shipped), priced at Sonnet 5's $2/$10 per million
+tokens — not a message-count estimate, since a reply's input cost depends
+heavily on how much conversation history got replayed that turn (see
+`HISTORY_LIMIT` in `/api/watch-chat`).
+
 ## Apostle Companion
 
 Every in-app nudge is attributed to one of four apostles rather than a
@@ -1443,8 +1554,12 @@ from their own story:
 src/
   app/            App Router pages, layout, manifest.ts (PWA manifest route)
                   premium/success, premium/failed (post-checkout pages)
+                  admin/page.tsx (server-gated dashboard — see "Admin
+                  dashboard" above)
                   api/plisio/create-invoice, api/plisio/webhook,
-                  api/bible (route handlers — the last proxies bible-api.com)
+                  api/watch-chat, api/auth/session (mints/clears the
+                  admin-only session cookie), api/bible (route handlers —
+                  the last proxies bible-api.com)
   components/     UI components (StreakVisual, PlantIcon, PathEventList,
                   PathEventCard, LessonFlow (the guided screen-by-screen
                   lesson sequence — see "guided lesson screens" above),
@@ -1458,10 +1573,16 @@ src/
                   icons)
                   tabs/ — TodayTab, PathTab, ArmoryTab, WatchTab, WordTab
                   (see "Navigation" above)
+                  admin/ — AdminDashboard.tsx, StatTile.tsx, BarChart.tsx
+                  (see "Admin dashboard" above)
   lib/            firebase.ts (client SDK init — Auth + Firestore, no
                   Storage), firebase-admin.ts
                   (server-only Admin SDK init), auth-context.tsx, streak.ts,
                   date.ts (pure logic),
+                  admin/ — session.ts (verifyAdminSession), sessionCookie.ts
+                  (the shared cookie-name constant), stats.ts (all
+                  dashboard aggregation queries), format.ts (see "Admin
+                  dashboard" above),
                   roadmap.ts (the single chronological sequence, flattenPathEvents,
                   nextLesson — see "strict visibility and
                   completion-gated rotation" above),
@@ -1478,9 +1599,12 @@ src/
                   "Matthew's Ledger" above), db/ (Firestore reads/writes,
                   including highlights.ts, accountability.ts,
                   lessonAnswers.ts (scenario/short-answer text),
-                  checkIns.ts (fetchLessonCheckIns), and dailyContent.ts),
+                  lessonStarts.ts (recordLessonStart — see "Admin
+                  dashboard" above), checkIns.ts (fetchLessonCheckIns), and
+                  dailyContent.ts),
                   plisio/ (plans.ts, checkout.ts, verify.ts — see "Payments" below)
   types/          firestore.ts (Firestore document types)
+  proxy.ts        Optimistic pre-filter for /admin (see "Admin dashboard" above)
 public/
   logo.svg        Full logo lockup (mark + wordmark + tagline), used in the
                   landing page hero
@@ -1490,9 +1614,14 @@ public/
                   portraits for the landing page (see "Apostle Companion"
                   above); falls back to an icon avatar if one's ever missing
 firestore.rules   Security rules matching the schema above
+firestore.indexes.json  Composite indexes (see "Firebase setup" → "Security
+                  rules" above) — needed for the admin dashboard's
+                  retention query
 scripts/          seed-lessons.mjs + lessons-data.mjs (Admin SDK lesson seeding),
                   seed-daily-content.mjs + daily-content-data.mjs (Admin SDK
                   Today-tab daily-content seeding),
+                  set-admin.mjs (Admin SDK — grants/revokes /admin access,
+                  see "Admin dashboard" above),
                   rules-test.mjs (firestore.rules tests, npm run test:rules),
                   plisio-verify.test.mjs (webhook signature tests, npm run test:plisio),
                   premium-extend.test.mjs (renewal-math tests, npm run test:premium),

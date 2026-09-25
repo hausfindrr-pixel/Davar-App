@@ -183,6 +183,32 @@ await check("alice CAN update other fields on her own user doc (e.g. displayName
   );
 });
 
+// --- users/{uid} isAdmin lock (same pattern as tier/premiumUntil/planId) ---
+await check("a brand-new user cannot self-create with isAdmin=true", async () => {
+  await assertFails(
+    setDoc(doc(eveDb, "users", "eve-uid"), {
+      uid: "eve-uid",
+      email: null,
+      displayName: null,
+      avatarId: null,
+      timezone: null,
+      tier: "free",
+      premiumSince: null,
+      premiumUntil: null,
+      planId: null,
+      isAdmin: true,
+    }),
+  );
+});
+
+await check("alice cannot grant herself isAdmin via update", async () => {
+  await assertFails(updateDoc(doc(aliceDb, "users", ALICE), { isAdmin: true }));
+});
+
+await check("alice CAN update unrelated fields while isAdmin is absent (doesn't trip the lock)", async () => {
+  await assertSucceeds(updateDoc(doc(aliceDb, "users", ALICE), { lastActiveAt: serverTimestamp() }));
+});
+
 // --- completeLesson()'s REAL transaction shape, not just setDoc/updateDoc
 // on daily_lesson_progress in isolation. Regression test for a bug found in
 // production (Sept 2026): completeLesson's first read is `tx.get()` on the
@@ -896,6 +922,51 @@ await check("alice cannot write a daily prayer", async () => {
       text: "Not managed content.",
     }),
   );
+});
+
+// --- lesson_starts/{uid}_{lessonId} (admin dashboard analytics only) ---
+await check("alice can record her own lesson_starts doc", async () => {
+  await assertSucceeds(
+    setDoc(doc(aliceDb, "lesson_starts", `${ALICE}_lesson-1`), {
+      uid: ALICE,
+      lessonId: "lesson-1",
+      updatedAt: serverTimestamp(),
+    }),
+  );
+});
+
+await check("alice can re-record (reopen) her own lesson_starts doc", async () => {
+  await assertSucceeds(
+    setDoc(doc(aliceDb, "lesson_starts", `${ALICE}_lesson-1`), {
+      uid: ALICE,
+      lessonId: "lesson-1",
+      updatedAt: serverTimestamp(),
+    }),
+  );
+});
+
+await check("alice cannot record a lesson_starts doc under bob's uid", async () => {
+  await assertFails(
+    setDoc(doc(aliceDb, "lesson_starts", `${BOB}_lesson-1`), {
+      uid: BOB,
+      lessonId: "lesson-1",
+      updatedAt: serverTimestamp(),
+    }),
+  );
+});
+
+await check("alice cannot record a lesson_starts doc whose docId doesn't match uid_lessonId", async () => {
+  await assertFails(
+    setDoc(doc(aliceDb, "lesson_starts", `${ALICE}_wrong-lesson-id`), {
+      uid: ALICE,
+      lessonId: "lesson-1",
+      updatedAt: serverTimestamp(),
+    }),
+  );
+});
+
+await check("alice cannot read her own lesson_starts doc (server/admin-only reads)", async () => {
+  await assertFails(getDoc(doc(aliceDb, "lesson_starts", `${ALICE}_lesson-1`)));
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

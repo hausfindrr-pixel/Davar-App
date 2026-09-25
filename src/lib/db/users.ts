@@ -72,3 +72,14 @@ export async function recordPremiumNudgeShown(
 export async function recordPremiumNudgeTapped(uid: string, date: string): Promise<void> {
   await updateDoc(doc(db!, COLLECTIONS.users, uid), { premiumNudgeLastTappedDate: date });
 }
+
+/** Marks this user as active right now (see `lastActiveAt`, UserDoc) —
+ * called unconditionally from AuthProvider on every sign-in, including a
+ * restored session on page load. No daily gate: onAuthStateChanged only
+ * fires on an actual auth-state transition (not on every render), so
+ * that's already about once per app open, and one extra write per user
+ * per app open is negligible. Powers the admin dashboard only — never
+ * read anywhere in the regular app UI. */
+export async function recordActivity(uid: string): Promise<void> {
+  await updateDoc(doc(db!, COLLECTIONS.users, uid), { lastActiveAt: serverTimestamp() });
+}

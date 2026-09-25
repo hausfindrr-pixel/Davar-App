@@ -21,6 +21,7 @@ export const COLLECTIONS = {
   dailyPrayers: "daily_prayers",
   premiumGrants: "premium_grants",
   paymentEvents: "payment_events",
+  lessonStarts: "lesson_starts",
 } as const;
 
 export type UserTier = "free" | "premium";
@@ -83,6 +84,25 @@ export interface UserDoc {
   premiumNudgeLastShownDate: string | null; // "YYYY-MM-DD"
   premiumNudgeLastShownCompletedCount: number | null;
   premiumNudgeLastTappedDate: string | null; // "YYYY-MM-DD"
+  /**
+   * Grants access to /admin (see src/lib/admin/session.ts). Absent/false for
+   * every normal user — only ever set to `true` by hand, via
+   * scripts/set-admin.mjs or the Firebase console, never by the client app.
+   * Locked from client writes the same way tier/premiumSince/premiumUntil/
+   * planId are (see the `users` rule in firestore.rules): a client update
+   * can't flip this on itself even by forging a direct Firestore write.
+   */
+  isAdmin?: boolean;
+  /**
+   * Last time this user's client was known to be signed in and running —
+   * set unconditionally (no daily gate needed; it's one cheap write per app
+   * open) from AuthProvider's auth-state-changed handler. Absent for any
+   * account created before this field existed, until their next sign-in.
+   * Powers the admin dashboard's active-user and retention metrics
+   * (src/lib/admin/stats.ts) — not read or shown anywhere in the regular
+   * app UI.
+   */
+  lastActiveAt?: Timestamp;
 }
 
 /**
@@ -502,10 +522,39 @@ export interface ConversationMessageDoc {
  * this directly (see firestore.rules) — the API route enforces the cap
  * with it and the client instead reads `limitReached` off the persisted
  * conversation message (see ConversationMessageDoc above).
+ *
+ * `inputTokens`/`outputTokens` accumulate the *real* token counts off each
+ * Anthropic response's own `usage` field (never estimated from message
+ * length — a reply's input cost depends heavily on how much conversation
+ * history got replayed that turn, see HISTORY_LIMIT in the watch-chat
+ * route, so a length-based guess would be a poor proxy). Absent on any
+ * usage doc written before this field existed; the admin dashboard's cost
+ * math (src/lib/admin/stats.ts) treats a missing value as 0.
  */
 export interface WatchChatUsageDoc {
   userId: string;
   date: string; // "YYYY-MM-DD", in the user's timezone
   messageCount: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  updatedAt: Timestamp;
+}
+
+/**
+ * lesson_starts/{uid}_{lessonId} — written once (idempotent upsert) the
+ * moment a user opens a given lesson's intro screen, purely so the admin
+ * dashboard can compute a completion rate (completed / started) per lesson.
+ * Nothing else in the schema records "opened but didn't finish": check_ins
+ * only fires on completion, and a lesson's own saved answers
+ * (LessonAnswerDoc) only exist if the user actually typed something on a
+ * scenario/shortAnswer screen, which a user who bails out early may never
+ * reach. One doc per (user, lesson) regardless of how many times it's
+ * reopened — this counts unique attempts, not opens. Server-only reads
+ * (see firestore.rules): the client only ever writes its own doc, the
+ * admin dashboard aggregates via the Admin SDK.
+ */
+export interface LessonStartDoc {
+  uid: string;
+  lessonId: string;
   updatedAt: Timestamp;
 }
