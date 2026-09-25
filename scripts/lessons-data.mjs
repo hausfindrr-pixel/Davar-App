@@ -99,7 +99,7 @@ export const lessons = [
     chronologicalOrder: 110,
     scriptureReference: "Genesis 2:4-3:24",
     lessonBook: "Genesis",
-    imageUrl: null,
+    imageUrl: "/events/adam-and-eve.webp",
     summary:
       "God places the first two humans in a garden with exactly one rule — and everything they could ever want except that. When a serpent asks a simple, twisted question ('Did God really say...?'), the whole story turns on how they answer it.",
     screens: [
@@ -158,7 +158,7 @@ export const lessons = [
     chronologicalOrder: 120,
     scriptureReference: "Genesis 4:1-16",
     lessonBook: "Genesis",
-    imageUrl: null,
+    imageUrl: "/events/cain-and-abel.webp",
     summary:
       "Two brothers each bring an offering to God. One is accepted, one isn't — and instead of asking why, Cain lets the question curdle into something worse. God shows up before it's too late, but Cain answers anyway.",
     screens: [
@@ -281,7 +281,7 @@ export const lessons = [
     chronologicalOrder: 210,
     scriptureReference: "Genesis 11:1-9",
     lessonBook: "Genesis",
-    imageUrl: null,
+    imageUrl: "/events/tower-of-babel.webp",
     summary:
       "One people, one language, one plan: build a tower to the heavens and make a name for themselves before they're scattered. God doesn't destroy the tower — He just confuses their language, and the ambitious unity falls apart on its own.",
     screens: [
@@ -340,7 +340,7 @@ export const lessons = [
     chronologicalOrder: 220,
     scriptureReference: "Genesis 12:1-9",
     lessonBook: "Genesis",
-    imageUrl: null,
+    imageUrl: "/events/abrams-call.webp",
     summary:
       "God tells a 75-year-old man to leave his country, his people, and his father's household for a land he hasn't seen yet — with nothing but a promise attached. Abram goes, 'as the LORD had told him.'",
     screens: [
@@ -399,7 +399,7 @@ export const lessons = [
     chronologicalOrder: 230,
     scriptureReference: "Genesis 22:1-19",
     lessonBook: "Genesis",
-    imageUrl: null,
+    imageUrl: "/events/abraham-and-isaac.webp",
     summary:
       "God asks Abraham to sacrifice Isaac — the son he waited decades for, the son the promise depended on. Abraham climbs the mountain anyway, and at the very last moment, God provides another way.",
     screens: [
