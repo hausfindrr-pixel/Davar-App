@@ -14,6 +14,15 @@ export function FlameIcon({ className }: IconProps) {
   );
 }
 
+/** A downward chevron — expand/collapse affordance. */
+export function ChevronDownIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M6 9.5 12 15.5 18 9.5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 /** A compass — finding direction when growth feels overwhelming. */
 export function CompassIcon({ className }: IconProps) {
   return (
