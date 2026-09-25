@@ -307,7 +307,15 @@ export async function getRevenueStats(): Promise<AdminRevenueStats> {
 }
 
 /** Same shape as countsByDay, but sums each granted payment's plan price
- * instead of just counting rows — used for the revenue trend chart. */
+ * instead of just counting rows — used for the revenue trend chart. An
+ * equality filter (result) plus a range filter (receivedAt) with no
+ * explicit orderBy needs its OWN composite index, ascending on
+ * receivedAt — a *different* index shape than getRevenueStats' recent-
+ * payments/problem-invoices queries below, which explicitly orderBy
+ * receivedAt desc. Both are declared in firestore.indexes.json; missing
+ * this one is exactly what broke /admin in production the first time
+ * (FAILED_PRECONDITION on this query alone — the other payment_events
+ * queries already had their index and worked fine). */
 async function countsByDayAmount(paymentEvents: CollectionReference, days: number): Promise<DayAmount[]> {
   const since = Timestamp.fromMillis(Date.now() - days * DAY_MS);
   const snap = await paymentEvents

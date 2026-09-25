@@ -25,6 +25,14 @@
       ]
     },
     {
+      "collectionGroup": "payment_events",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "result", "order": "ASCENDING" },
+        { "fieldPath": "receivedAt", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "watch_chat_usage",
       "queryScope": "COLLECTION",
       "fields": [
