@@ -1314,7 +1314,7 @@ export const lessons = [
     chronologicalOrder: 610,
     scriptureReference: "Matthew 3:1-12",
     lessonBook: "Matthew",
-    imageUrl: null,
+    imageUrl: "/events/john-the-baptist.webp",
     summary:
       "Decades after Jesus' birth, a wild-living prophet appears in the wilderness, calling all of Israel to repent and be baptized — and pointing, again and again, to someone greater who is about to arrive.",
     screens: [
@@ -1373,7 +1373,7 @@ export const lessons = [
     chronologicalOrder: 620,
     scriptureReference: "Matthew 3:13-17",
     lessonBook: "Matthew",
-    imageUrl: null,
+    imageUrl: "/events/jesus-baptism.webp",
     summary:
       "Jesus comes to John to be baptized — and John tries to stop Him, since it should be the other way around. Jesus insists, and as He comes up out of the water, heaven opens and a voice declares who He is.",
     screens: [
@@ -1432,7 +1432,7 @@ export const lessons = [
     chronologicalOrder: 630,
     scriptureReference: "Matthew 4:1-11",
     lessonBook: "Matthew",
-    imageUrl: null,
+    imageUrl: "/events/jesus-tempted.webp",
     summary:
       "Right after His baptism, the Spirit leads Jesus into the desert to fast for forty days — and the devil shows up right when He's weakest, with three offers that all sound reasonable on the surface.",
     screens: [
