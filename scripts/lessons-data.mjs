@@ -2724,7 +2724,7 @@ export const lessons = [
     chronologicalOrder: 640,
     scriptureReference: "Matthew 4:18-22",
     lessonBook: "Matthew",
-    imageUrl: null,
+    imageUrl: "/events/jesus-calls-disciples.webp",
     summary:
       "Walking along the Sea of Galilee, Jesus finds two sets of fishing brothers at work and says just one thing: 'Follow me.' No résumé, no interview — they drop their nets right where they stand.",
     screens: [
@@ -2836,7 +2836,7 @@ export const lessons = [
     chronologicalOrder: 650,
     scriptureReference: "Matthew 5:1-12",
     lessonBook: "Matthew",
-    imageUrl: null,
+    imageUrl: "/events/sermon-on-the-mount.webp",
     summary:
       "Jesus sits down on a hillside and opens His most famous teaching with a list of who's actually blessed — and it's not the powerful or the comfortable. It's the poor in spirit, the mourning, the meek, the persecuted.",
     screens: [
@@ -2951,7 +2951,7 @@ export const lessons = [
     chronologicalOrder: 660,
     scriptureReference: "Matthew 6:9-13",
     lessonBook: "Matthew",
-    imageUrl: null,
+    imageUrl: "/events/lords-prayer-teaching.webp",
     summary:
       "When His disciples want to know how to pray, Jesus doesn't give them a formula to perform — He gives them a short, plain pattern that starts with 'Our Father' and asks for daily bread, forgiveness, and protection.",
     screens: [
@@ -3060,7 +3060,7 @@ export const lessons = [
     chronologicalOrder: 670,
     scriptureReference: "Mark 2:1-12",
     lessonBook: "Mark",
-    imageUrl: null,
+    imageUrl: "/events/heals-paralyzed-man.webp",
     summary:
       "Four friends carry a paralyzed man to Jesus, but the house is too crowded to get through the door — so they cut a hole in the roof and lower him down. Jesus forgives his sins before He heals his legs, and the religious leaders bristle.",
     screens: [
@@ -3302,7 +3302,7 @@ export const lessons = [
     chronologicalOrder: 710,
     scriptureReference: "John 6:1-14",
     lessonBook: "John",
-    imageUrl: null,
+    imageUrl: "/events/feeding-five-thousand.webp",
     summary:
       "A crowd of thousands follows Jesus into a remote place with no food and no plan for dinner. A boy offers five loaves and two small fish — barely a snack for one — and Jesus turns it into more than enough for everyone.",
     screens: [
