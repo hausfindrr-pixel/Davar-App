@@ -205,7 +205,7 @@ export interface VerseActivity {
 /** The exact substring a VerseBlank's `template` uses to mark each blank. */
 export const BLANK_TOKEN = "_____";
 
-export type LessonScreenType = "scenario" | "multipleChoice" | "shortAnswer" | "verseBlank";
+export type LessonScreenType = "scenario" | "readAndAnswer" | "multipleChoice" | "shortAnswer" | "verseBlank";
 
 interface LessonScreenBase {
   /** Stable within the lesson (e.g. "q1") — also the `screenId` half of a
@@ -237,6 +237,20 @@ export interface MultipleChoiceScreen extends LessonScreenBase {
   correctIndex: number;
 }
 
+/** Shows a short passage of narrative or scripture text directly on
+ * screen, then a multiple-choice-shaped question that can only be
+ * answered correctly by having just read it — comprehension of given
+ * text, not assumed background knowledge (that's what `scenario` is
+ * for) or general lesson recall (that's `multipleChoice`). Same
+ * pick-to-unlock-Continue mechanics as multipleChoice, just with the
+ * `passage` shown above the question. */
+export interface ReadAndAnswerScreen extends LessonScreenBase {
+  type: "readAndAnswer";
+  passage: string;
+  options: string[];
+  correctIndex: number;
+}
+
 /** A typed, self-marked reflection — the user answers, then marks for
  * themselves whether they got the idea, rather than an auto-graded exact
  * match (which tends to false-negative a reasonable but differently
@@ -252,7 +266,12 @@ export interface VerseBlankScreen extends LessonScreenBase {
   activity: VerseActivity;
 }
 
-export type LessonScreen = ScenarioScreen | MultipleChoiceScreen | ShortAnswerScreen | VerseBlankScreen;
+export type LessonScreen =
+  | ScenarioScreen
+  | ReadAndAnswerScreen
+  | MultipleChoiceScreen
+  | ShortAnswerScreen
+  | VerseBlankScreen;
 
 export function isMultipleChoiceScreen(screen: LessonScreen): screen is MultipleChoiceScreen {
   return screen.type === "multipleChoice";
@@ -264,8 +283,13 @@ export function isMultipleChoiceScreen(screen: LessonScreen): screen is Multiple
  *
  * 1. Intro screen — `imageUrl` (or the placeholder) + `summary` (the scene
  *    setup — deliberately doesn't give away the ending; see `resolution`).
- * 2. One question screen per entry in `screens`, one of the four
- *    LessonScreen types above.
+ * 2. One question screen per entry in `screens`, one of the five
+ *    LessonScreen types above. Every lesson has 10: 1 scenario, 1
+ *    readAndAnswer, 4 multipleChoice, 3 shortAnswer, 1 verseBlank, in
+ *    that order — scenario opens (no facts assumed yet), readAndAnswer
+ *    grounds the lesson in an actual passage, the multipleChoice block
+ *    tests recall of it, the shortAnswer block is personal reflection,
+ *    and verseBlank closes with scripture memorization.
  * 3. Resolution screen — `resolution` (what actually happened in
  *    Scripture) plus `nextHook` (a cliffhanger pointing at the next
  *    lesson in chronological order). This is where completing the lesson

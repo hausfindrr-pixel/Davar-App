@@ -51,6 +51,16 @@ function isValidScreen(value: unknown): value is LessonScreen {
         s.correctIndex >= 0 &&
         s.correctIndex < s.options.length
       );
+    case "readAndAnswer":
+      return (
+        typeof s.passage === "string" &&
+        Array.isArray(s.options) &&
+        s.options.length > 0 &&
+        s.options.every((o) => typeof o === "string") &&
+        typeof s.correctIndex === "number" &&
+        s.correctIndex >= 0 &&
+        s.correctIndex < s.options.length
+      );
     case "shortAnswer":
       return true;
     case "verseBlank": {

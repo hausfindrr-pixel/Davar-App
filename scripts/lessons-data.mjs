@@ -11,10 +11,15 @@
  *   inserted between two existing ones without renumbering the rest).
  * - `summary` — the opening screen's scene-setup text. Deliberately
  *   doesn't give away the ending; `resolution` does that.
- * - `screens` — the question screens in between: a mix of "scenario" (free
- *   text, no wrong answer), "multipleChoice" (plausible distractors),
- *   "shortAnswer" (self-marked), and "verseBlank" (the existing
- *   fill-in-the-blank activity, reused as one screen type — same
+ * - `screens` — 10 question screens in between, always in this order: 1
+ *   "scenario" (free text, no wrong answer — the opening hook, no facts
+ *   assumed yet), 1 "readAndAnswer" (a short passage shown directly on
+ *   screen, then a multiple-choice-shaped question only answerable by
+ *   having just read it — distinct from "scenario"'s assumed-knowledge
+ *   imagining and from "multipleChoice"'s general recall), 4
+ *   "multipleChoice" (plausible distractors), 3 "shortAnswer"
+ *   (self-marked reflection), then 1 "verseBlank" closing the lesson (the
+ *   existing fill-in-the-blank activity, reused as one screen type — same
  *   VerseActivity shape as before: up to 5 of the passage's most
  *   important verses, fewer when the passage doesn't have that many
  *   worth quizzing, `template` marking each blank with the literal

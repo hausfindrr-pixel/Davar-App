@@ -537,8 +537,10 @@ A lesson is a guided, one-screen-at-a-time sequence — `LessonFlow.tsx`
    needed **zero changes** for any of this restructure, since it only ever
    touched `lesson.id`.
 
-`LessonScreen` is a union of four types, each its own component inside
-`LessonFlow.tsx`:
+`LessonScreen` is a union of five types, each its own component inside
+`LessonFlow.tsx`. Every lesson has exactly 10 screens, always in this
+fixed order: 1 `scenario`, 1 `readAndAnswer`, 4 `multipleChoice`, 3
+`shortAnswer`, 1 `verseBlank`.
 
 - **`scenario`** — "You're standing with the Israelites at the sea — what
   do you say to Moses?" Free text, no right/wrong answer; advancing just
@@ -546,19 +548,33 @@ A lesson is a guided, one-screen-at-a-time sequence — `LessonFlow.tsx`
   (`src/lib/db/lessonAnswers.ts`) to `users/{uid}/lessonAnswers/{lessonId}_
   {screenId}` — preserved, never graded, same spirit as the prayer journal
   below. Writing again (e.g. after stepping back to revise) just overwrites
-  the same doc, unlike the prayer journal's immutability.
+  the same doc, unlike the prayer journal's immutability. Always the
+  opening screen — no facts have been given yet, so it's the one screen
+  that assumes nothing beyond general background knowledge.
+- **`readAndAnswer`** — shows a short `passage` (a few sentences of
+  narrative or scripture text) directly on screen, then a
+  multiple-choice-shaped question that can only be answered correctly by
+  having just read it. Distinct from `scenario` (assumes no context is
+  given at all) and from `multipleChoice` (tests recall of the lesson
+  generally, not a specific just-shown passage) — same
+  pick-`correctIndex`-to-unlock-Continue mechanics as `multipleChoice`,
+  just with the passage rendered above the prompt. Always the second
+  screen, right after `scenario` — it grounds the lesson in an actual
+  passage before anything gets quizzed.
 - **`multipleChoice`** — a recall question with plausible distractors.
   Picking `correctIndex` unlocks Continue; a wrong pick shows a gentle "not
   quite" and stays open to retry — never a dead end, matching the app's
-  tone everywhere else.
+  tone everywhere else. Four per lesson, screens 3-6, right after
+  `readAndAnswer`.
 - **`shortAnswer`** — a typed, **self-marked** reflection: the user answers,
   taps "Check my thinking" to reveal it was worth writing down, then
   Continue. Not an auto-graded exact match — those tend to false-negative a
   reasonable but differently worded answer, which would undercut the
-  app's grace-first tone.
+  app's grace-first tone. Three per lesson, screens 7-9.
 - **`verseBlank`** — the existing Duolingo-style fill-in-the-blank activity,
   reused as one screen type among several rather than a lesson's only
-  interactive content. Its `activity` field is the same `VerseActivity`
+  interactive content, and always the closing screen (10th) — scripture
+  memorization as the capstone. Its `activity` field is the same `VerseActivity`
   shape as before (`{ verses: VerseBlank[], wordBank: string[] }`) — up to
   5 of the passage's most important verses (fewer when the passage doesn't
   have that many worth quizzing), each with a `template` marking blanks
@@ -612,6 +628,16 @@ original reading/fillBlank split) *and* the old top-level `order`/
 `verseActivity` fields (from the single-card era) on existing docs —
 otherwise `merge: true` would leave them stranded alongside the current
 shape rather than replacing them.
+
+**Second migration note:** every lesson in the library (the original 10 and
+the ~30 added later) was later expanded from 4 screens to the fixed 10
+described above — `readAndAnswer` added as a new type, plus 3 more
+`multipleChoice` and 2 more `shortAnswer`, spliced into the existing
+`scenario`/`multipleChoice`/`shortAnswer`/`verseBlank` screens rather than
+replacing them, so each lesson's original 4 screens keep their original
+`id`s (and any already-saved `lessonAnswers` docs for them stay matched) —
+only the new screens get fresh `id`s (`read1`, `q4`-`q6`, `q7`-`q8`) and the
+array is reordered to the fixed 10-screen sequence.
 
 **A schema change alone doesn't update already-written documents** —
 `npm run seed:lessons` has to actually be re-run against a project for its

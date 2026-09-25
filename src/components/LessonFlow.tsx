@@ -10,6 +10,7 @@ import type {
   LessonDoc,
   LessonScreen,
   MultipleChoiceScreen,
+  ReadAndAnswerScreen,
   ScenarioScreen,
   ShortAnswerScreen,
   VerseBlankScreen,
@@ -188,6 +189,62 @@ function MultipleChoiceScreenView({
       </div>
       {picked !== null && !correct && (
         <p className="text-xs font-medium text-clay-600">Not quite — take another look.</p>
+      )}
+      {screen.context && <ContextDropdown context={screen.context} />}
+      <button
+        type="button"
+        disabled={!correct || isLocked}
+        onClick={onNext}
+        className={`self-start rounded-full px-5 py-2 text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed ${meta.activeBgClass}`}
+      >
+        Continue
+      </button>
+    </div>
+  );
+}
+
+function ReadAndAnswerScreenView({
+  screen,
+  meta,
+  isLocked,
+  onNext,
+}: {
+  screen: ReadAndAnswerScreen;
+  meta: (typeof CONTENT_TYPE_META)[keyof typeof CONTENT_TYPE_META];
+  isLocked: boolean;
+  onNext: () => void;
+}) {
+  const [picked, setPicked] = useState<number | null>(null);
+  const correct = picked === screen.correctIndex;
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="rounded-xl bg-ivory border border-mist p-3.5">
+        <p className="text-xs font-semibold uppercase tracking-wide text-stone mb-1.5">Read</p>
+        <p className="text-sm text-ink/85 leading-relaxed whitespace-pre-wrap">{screen.passage}</p>
+      </div>
+      <p className="text-base font-semibold text-ink leading-snug">{screen.prompt}</p>
+      <div className="flex flex-col gap-2">
+        {screen.options.map((opt, i) => (
+          <button
+            key={i}
+            type="button"
+            disabled={isLocked}
+            onClick={() => setPicked(i)}
+            className={`text-left rounded-xl border-2 px-3.5 py-2.5 text-sm font-medium transition-colors disabled:opacity-70 ${
+              picked === i
+                ? correct
+                  ? "border-transparent bg-sage-700 text-paper"
+                  : "border-transparent bg-ink text-paper"
+                : "border-mist bg-paper text-ink hover:bg-mist/30"
+            }`}
+          >
+            {opt}
+          </button>
+        ))}
+      </div>
+      {picked !== null && !correct && (
+        <p className="text-xs font-medium text-clay-600">Not quite — take another look at the passage above.</p>
       )}
       {screen.context && <ContextDropdown context={screen.context} />}
       <button
@@ -409,13 +466,14 @@ function ResolutionScreen({
 }
 
 /** A lesson's guided, one-screen-at-a-time sequence — intro (illustration +
- * scene setup) → one question screen per LessonScreen (scenario / multiple
- * choice / short answer / the existing verse fill-in-the-blank, reused
- * unmodified) → a resolution screen (what happened + a cliffhanger to the
- * next lesson), where completing actually fires. Only "current"/"completed"
- * lessons ever reach this component (PathEventList gates that); a
- * `completed` lesson gets a compact read-only recap instead of the full
- * interactive replay, since re-running onComplete would double-count it. */
+ * scene setup) → one question screen per LessonScreen (scenario / read and
+ * answer / multiple choice / short answer / the existing verse
+ * fill-in-the-blank, reused unmodified) → a resolution screen (what
+ * happened + a cliffhanger to the next lesson), where completing actually
+ * fires. Only "current"/"completed" lessons ever reach this component
+ * (PathEventList gates that); a `completed` lesson gets a compact
+ * read-only recap instead of the full interactive replay, since
+ * re-running onComplete would double-count it. */
 export function LessonFlow({
   lesson,
   uid,
@@ -474,6 +532,10 @@ export function LessonFlow({
       case "multipleChoice":
         return (
           <MultipleChoiceScreenView key={screen.id} screen={screen} meta={meta} isLocked={isLocked} onNext={goNext} />
+        );
+      case "readAndAnswer":
+        return (
+          <ReadAndAnswerScreenView key={screen.id} screen={screen} meta={meta} isLocked={isLocked} onNext={goNext} />
         );
       case "shortAnswer":
         return (
