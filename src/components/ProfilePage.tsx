@@ -1,9 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { ApostleAvatar } from "@/components/ApostleAvatar";
 import { Avatar } from "@/components/Avatar";
-import { ArrowLeftIcon, CameraIcon } from "@/components/icons";
+import { ArrowLeftIcon, BarChartIcon, CameraIcon } from "@/components/icons";
 import { MatthewsLedger } from "@/components/MatthewsLedger";
 import { UnlockCard } from "@/components/PremiumGate";
 import { updateUserProfile } from "@/lib/db/users";
@@ -277,6 +278,28 @@ export function ProfilePage({
           <p className="text-xs text-stone">(Archives) — your lessons, prayers, and highlighted verses, kept</p>
         </div>
       </button>
+
+      {/* Only ever rendered for the one account with isAdmin: true (see
+          UserDoc, src/types/firestore.ts) — a UI convenience, not the
+          security boundary: /admin itself re-verifies this server-side
+          (verifyAdminSession, src/lib/admin/session.ts) regardless of
+          whether this link is ever shown or hidden. isAdmin is locked from
+          client writes in firestore.rules, so a non-admin can't make this
+          appear by editing their own profile doc. */}
+      {profile?.isAdmin ? (
+        <Link
+          href="/admin"
+          className="w-full max-w-sm rounded-2xl bg-paper border border-mist p-4 flex items-center gap-3 text-left hover:bg-mist/20 transition-colors"
+        >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-dusk-50 text-dusk-600">
+            <BarChartIcon className="h-4 w-4" />
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold text-ink">Admin Dashboard</h2>
+            <p className="text-xs text-stone">Signups, revenue, and usage — visible only to you</p>
+          </div>
+        </Link>
+      ) : null}
 
       <button
         type="button"

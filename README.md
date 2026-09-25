@@ -895,6 +895,12 @@ lives here now instead of the main header.
   already in the schema, saved explicitly (a "Save name" button, disabled
   until the value actually changes) rather than auto-saving on every
   keystroke.
+- **Admin Dashboard link.** Shown only when `profile.isAdmin` is `true` (see
+  "Admin dashboard" below) — everyone else's Profile page simply doesn't
+  have this row. A UI convenience only, not the security boundary: `/admin`
+  itself independently re-verifies `isAdmin` server-side regardless of
+  whether this link is ever rendered, so hiding it isn't what keeps a
+  non-admin out.
 - **Highlighted Verses.** Every highlight from `user_highlights`
   (`subscribeToHighlights`), newest first, each its own card — reference,
   the verse text stored on the highlight itself (no re-fetch), and a notes
