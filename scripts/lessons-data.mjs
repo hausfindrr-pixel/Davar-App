@@ -817,7 +817,7 @@ export const lessons = [
     chronologicalOrder: 320,
     scriptureReference: "Joshua 6:1-20",
     lessonBook: "Joshua",
-    imageUrl: null,
+    imageUrl: "/events/joshua-and-jericho.webp",
     summary:
       "God commands Israel to march around the walled city of Jericho once a day for six days, seven times on the seventh, then blow trumpets and shout — no siege engines, no battering ram, just obedience shaped like a parade.",
     screens: [
@@ -876,7 +876,7 @@ export const lessons = [
     chronologicalOrder: 330,
     scriptureReference: "Judges 7:1-22",
     lessonBook: "Judges",
-    imageUrl: null,
+    imageUrl: "/events/gideon-and-the-three-hundred.webp",
     summary:
       "God keeps shrinking Gideon's army — from thirty-two thousand down to three hundred — before sending them into battle with nothing but torches, jars, and trumpets, so that when the victory comes, no one can say they won it themselves.",
     screens: [
@@ -935,7 +935,7 @@ export const lessons = [
     chronologicalOrder: 340,
     scriptureReference: "Ruth 1:1-18",
     lessonBook: "Ruth",
-    imageUrl: null,
+    imageUrl: "/events/ruth-and-naomi.webp",
     summary:
       "Widowed, foreign, and free to go back to her own people, Ruth instead makes an oath to stay with her equally widowed mother-in-law Naomi — one of the most quoted vows of loyalty in Scripture, made to someone with nothing left to offer her.",
     screens: [
@@ -999,7 +999,7 @@ export const lessons = [
     chronologicalOrder: 350,
     scriptureReference: "1 Samuel 3:1-21",
     lessonBook: "1 Samuel",
-    imageUrl: null,
+    imageUrl: "/events/the-lord-calls-samuel.webp",
     summary:
       "In the dark of the temple, a boy hears his name called three times and runs to Eli each time, thinking it's him — until Eli realizes it's the LORD calling, and tells Samuel exactly how to answer.",
     screens: [
@@ -1122,7 +1122,7 @@ export const lessons = [
     chronologicalOrder: 420,
     scriptureReference: "1 Kings 18:20-39",
     lessonBook: "1 Kings",
-    imageUrl: null,
+    imageUrl: "/events/elijah-and-the-prophets-of-baal.webp",
     summary:
       "One prophet of the LORD against four hundred fifty prophets of Baal, on a mountain, with two altars and no matches — whichever god answers by fire is God. Baal never answers. The LORD does.",
     screens: [
