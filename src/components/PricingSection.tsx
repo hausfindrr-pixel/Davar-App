@@ -1,14 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { CheckIcon, CompassIcon, KeyIcon, ScrollIcon, SearchIcon, ShieldIcon } from "@/components/icons";
+import { CheckIcon, KeyIcon, ScrollIcon, SearchIcon, ShieldIcon } from "@/components/icons";
 import { SecureCheckoutNote } from "@/components/PremiumGate";
-import {
-  FREE_DAILY_EVENT_LIMIT,
-  FREE_DAILY_PRAYER_LIMIT,
-  PREMIUM_DAILY_EVENT_LIMIT,
-  PREMIUM_DAILY_PRAYER_LIMIT,
-} from "@/types/firestore";
+import { FREE_DAILY_EVENT_LIMIT, FREE_DAILY_PRAYER_LIMIT } from "@/types/firestore";
 
 const MONTHLY_PRICE = 6.99;
 const YEARLY_PRICE = 59.99;
@@ -32,12 +27,7 @@ const PREMIUM_FEATURE_ROWS = [
   {
     icon: ScrollIcon,
     title: "The whole story, unlocked",
-    copy: "Free shows one lesson at a time; Premium opens the full chronological Path — every lesson from Creation to Pentecost, browsable at your own pace.",
-  },
-  {
-    icon: CompassIcon,
-    title: `${PREMIUM_DAILY_EVENT_LIMIT} lessons and ${PREMIUM_DAILY_PRAYER_LIMIT} prayers a day`,
-    copy: `Well beyond the free tier's ${FREE_DAILY_EVENT_LIMIT} lesson and ${FREE_DAILY_PRAYER_LIMIT} prayers a day.`,
+    copy: "Free shows one lesson at a time; Premium opens the full chronological Path — every lesson from Creation to Pentecost, all unlocked.",
   },
   {
     icon: KeyIcon,
