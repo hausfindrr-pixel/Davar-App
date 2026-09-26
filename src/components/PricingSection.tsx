@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { BarChartIcon, BookOpenIcon, CheckIcon, CompassIcon, UsersIcon } from "@/components/icons";
+import { CheckIcon, CompassIcon, KeyIcon, ScrollIcon, SearchIcon, ShieldIcon } from "@/components/icons";
 import { SecureCheckoutNote } from "@/components/PremiumGate";
 import {
   FREE_DAILY_EVENT_LIMIT,
@@ -25,24 +25,29 @@ const FREE_FEATURES = [
 
 const PREMIUM_FEATURE_ROWS = [
   {
-    icon: BookOpenIcon,
+    icon: ShieldIcon,
     title: "The Armory",
     copy: "Scripture for lust, anger, envy, or fear — the sword of the Spirit for the struggle in front of you. (Ephesians 6:17)",
   },
   {
+    icon: ScrollIcon,
+    title: "The whole story, unlocked",
+    copy: "Free shows one lesson at a time; Premium opens the full chronological Path — every lesson from Creation to Pentecost, browsable at your own pace.",
+  },
+  {
     icon: CompassIcon,
     title: `${PREMIUM_DAILY_EVENT_LIMIT} lessons and ${PREMIUM_DAILY_PRAYER_LIMIT} prayers a day`,
-    copy: `Go well beyond the free tier's ${FREE_DAILY_EVENT_LIMIT}-lesson daily cap, with the full story library unlocked.`,
+    copy: `Well beyond the free tier's ${FREE_DAILY_EVENT_LIMIT} lesson and ${FREE_DAILY_PRAYER_LIMIT} prayers a day.`,
   },
   {
-    icon: UsersIcon,
-    title: "Accountability matching",
-    copy: "Find a steady partner who brings support, not judgment.",
+    icon: KeyIcon,
+    title: "Peter's Watch",
+    copy: "An AI companion for the struggle in front of you — talk through temptation, doubt, or a hard day, any time.",
   },
   {
-    icon: BarChartIcon,
-    title: "Progress analytics",
-    copy: "See your growth and keep a meaningful history of your streaks — grace-based, never shaming.",
+    icon: SearchIcon,
+    title: "Matthew's Ledger, unlocked",
+    copy: "Search your whole history of lessons, prayers, and highlights, plus “On This Day” resurfacing what you wrote in earlier months.",
   },
 ];
 
@@ -109,7 +114,7 @@ export function PricingSection({ onGetStarted }: PricingSectionProps) {
           </ul>
 
           <p className="text-xs text-stone text-center">
-            No accountability partner, Armory access, or advanced analytics —
+            No Armory, Peter&apos;s Watch, full library, or Ledger search —
             those stay in Premium.
           </p>
 
