@@ -21,6 +21,9 @@ type WatchTabProps = {
 
 const OPENING_LINE = "Tell me what's on your mind today.";
 
+/** Which illustration WatchHero shows — see its own doc comment below. */
+type PeterPose = "listening" | "thinking" | "speaking";
+
 function UserBubble({ text }: { text: string }) {
   return (
     <div className="flex justify-end">
@@ -75,6 +78,7 @@ function ChatInterface({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const lastMessage = messages[messages.length - 1];
 
   useEffect(() => {
     return subscribeToConversation(uid, (msgs) => {
@@ -86,6 +90,30 @@ function ChatInterface({
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length, sending]);
+
+  // Peter's Watch hero pose (see WatchHero below): "thinking" while waiting
+  // on a reply, a brief "speaking" the moment one actually arrives, settling
+  // back to the resting "listening" pose otherwise — the default for an
+  // empty conversation, a failed send, or just waiting on the user's next
+  // turn. `poseKey` is what this has already reacted to (sending, or the
+  // latest message's id) — React's own "adjusting state during render"
+  // pattern (not an effect): when the key actually changes, set the pose
+  // synchronously, right here, instead of mirroring it via useEffect. The
+  // effect below only runs the "speaking" pose's timed decay — the one
+  // genuinely external-timer part — never sets pose synchronously itself.
+  const [pose, setPose] = useState<PeterPose>("listening");
+  const [poseKey, setPoseKey] = useState("initial");
+  const currentPoseKey = sending ? "sending" : `message:${lastMessage?.id ?? "none"}`;
+  if (currentPoseKey !== poseKey) {
+    setPoseKey(currentPoseKey);
+    setPose(sending ? "thinking" : lastMessage?.role === "assistant" ? "speaking" : "listening");
+  }
+
+  useEffect(() => {
+    if (pose !== "speaking") return;
+    const timer = setTimeout(() => setPose("listening"), 2500);
+    return () => clearTimeout(timer);
+  }, [pose]);
 
   async function handleSend() {
     const text = draft.trim();
@@ -109,13 +137,13 @@ function ChatInterface({
   // last message in history (rather than a separate usage-counter read)
   // means the input stays disabled across a reload, and re-enables itself
   // naturally once a new calendar day's first message arrives.
-  const lastMessage = messages[messages.length - 1];
   const dailyLimitReached =
     !!lastMessage?.limitReached && dateKeyInTimeZone(lastMessage.createdAt.toDate(), timeZone) === today;
   const closingApostleName = APOSTLES[lastMessage?.apostleId ?? "peter"].name;
 
   return (
-    <div className="w-full max-w-sm flex-1 min-h-0 flex flex-col">
+    <div className="w-full max-w-sm flex-1 min-h-0 flex flex-col gap-4">
+      <WatchHero pose={pose} />
       <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-3 py-2">
         {!loaded ? (
           <p className="text-xs text-stone text-center py-4">Loading…</p>
@@ -189,14 +217,17 @@ function TeaserChat() {
   );
 }
 
-/** Peter's standing presence at the top of the tab — same visual pattern as
- * John's always-on MascotHero on Today and Matthew's header on his Ledger
- * (speech bubble + standing portrait, public/apostles/{id}.png): Peter is
- * the one who opens this screen, even though Thomas or John may go on to
- * answer inside the conversation below (see src/lib/chat-apostle.ts) — that
+/** Peter's expression at the top of the tab, swapped to reflect where the
+ * conversation actually is right now (see ChatInterface's pose effect) —
+ * "listening" is the resting/default pose (free tier's teaser, an empty
+ * conversation, waiting on the user's next turn), "thinking" while a reply
+ * is in flight, "speaking" for a few seconds once one lands. One static
+ * illustration per pose (public/apostles/peter-{pose}.png) — Peter is the
+ * one who opens this screen even though Thomas or John may go on to answer
+ * inside the conversation below (see src/lib/chat-apostle.ts); that
  * back-and-forth is instead carried by ApostlePhotoAvatar next to each
- * reply, a persistent chat-contact photo rather than a one-time image. */
-function WatchHero() {
+ * reply, a persistent chat-contact photo rather than this one hero image. */
+function WatchHero({ pose }: { pose: PeterPose }) {
   return (
     <div className="w-full max-w-sm flex items-start gap-3 shrink-0">
       <div className="relative flex-1 rounded-2xl bg-paper border border-mist px-4 py-3">
@@ -213,7 +244,7 @@ function WatchHero() {
         />
       </div>
       <Image
-        src="/apostles/peter.png"
+        src={`/apostles/peter-${pose}.png`}
         alt="Peter"
         width={200}
         height={300}
@@ -233,12 +264,11 @@ function WatchHero() {
 export function WatchTab({ uid, isPremium, today, timeZone, getIdToken }: WatchTabProps) {
   return (
     <div className="flex-1 min-h-0 flex flex-col items-center gap-4 p-6">
-      <WatchHero />
-
       {isPremium ? (
         <ChatInterface uid={uid} today={today} timeZone={timeZone} getIdToken={getIdToken} />
       ) : (
         <>
+          <WatchHero pose="listening" />
           <UnlockCard
             title="Unlock Peter's Watch"
             description="Talk it through with Peter, John, and Thomas — an AI-guided conversation that meets you honestly and always points back to grace."
