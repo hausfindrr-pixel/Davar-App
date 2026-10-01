@@ -7,6 +7,7 @@ import { ApostleAvatar } from "@/components/ApostleAvatar";
 import { AuthForm } from "@/components/AuthForm";
 import { BottomTabBar, type TabId } from "@/components/BottomTabBar";
 import { CompassIcon, FlameIcon, UsersIcon } from "@/components/icons";
+import { InstallPrompt } from "@/components/InstallPrompt";
 import { PricingSection } from "@/components/PricingSection";
 import { ProfileButton } from "@/components/ProfileButton";
 import { ProfilePage } from "@/components/ProfilePage";
@@ -552,6 +553,8 @@ function Dashboard({ uid }: { uid: string }) {
           />
         </div>
       </header>
+
+      {!showProfile && <InstallPrompt />}
 
       {justUpgraded && (
         <div
