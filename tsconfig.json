@@ -31,5 +31,15 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    // The custom service worker (worker/index.ts) runs in a
+    // ServiceWorkerGlobalScope, not a window — its globals conflict with
+    // this program's "dom" lib (TypeScript doesn't allow both "dom" and
+    // "webworker" libs in one program). next-pwa compiles it through its
+    // own webpack child compiler (transpile-only, same as the rest of
+    // this app's SWC-compiled code), so excluding it here only drops it
+    // from this standalone `tsc` pass, not from the actual build.
+    "worker"
+  ]
 }

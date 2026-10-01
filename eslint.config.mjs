@@ -18,6 +18,10 @@ const eslintConfig = defineConfig([
     "public/worker-*.js",
     "public/fallback-*.js",
     "public/swe-worker-*.js",
+    // Runs in a ServiceWorkerGlobalScope, excluded from tsconfig.json for
+    // the same reason (see its comment there) — type-aware lint rules
+    // need a project that actually includes the file.
+    "worker/**",
   ]),
 ]);
 

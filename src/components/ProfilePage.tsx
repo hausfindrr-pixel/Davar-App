@@ -4,10 +4,11 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { ApostleAvatar } from "@/components/ApostleAvatar";
 import { Avatar } from "@/components/Avatar";
-import { ArrowLeftIcon, BarChartIcon, CameraIcon } from "@/components/icons";
+import { ArrowLeftIcon, BarChartIcon, BellIcon, CameraIcon } from "@/components/icons";
 import { MatthewsLedger } from "@/components/MatthewsLedger";
 import { UnlockCard } from "@/components/PremiumGate";
 import { updateUserProfile } from "@/lib/db/users";
+import { disableNotifications, enableNotifications, isPushSupported } from "@/lib/notifications";
 import { AVATAR_PRESETS } from "@/lib/avatars";
 import type { PlanId } from "@/lib/plisio/plans";
 import {
@@ -93,6 +94,81 @@ function PlanCard({ profile, getIdToken }: { profile: UserDoc | null; getIdToken
         {accessThrough && <p className="text-xs text-stone">{accessThrough}</p>}
         {!planLabel && !accessThrough && <p className="text-sm text-ink/80">Premium member</p>}
       </div>
+    </div>
+  );
+}
+
+/** "Daily reminders" — the push-notification opt-in (today's verse +
+ * streak, see src/app/api/cron/daily-notification/route.ts). Renders
+ * nothing when this browser can't do push at all (isPushSupported —
+ * missing Notification API, no service worker in dev, or the
+ * NEXT_PUBLIC_FIREBASE_VAPID_KEY env var isn't set), rather than
+ * offering a switch that can only ever fail. `supported`/`permission`
+ * are read once via lazy useState initializers, not an effect: this
+ * component only ever mounts client-side (inside Dashboard, itself
+ * gated on AuthProvider's `loading` — see page.tsx's Home()), so
+ * `window`/`Notification` are always safe to read during its first
+ * render, same reasoning as InstallPrompt.tsx. */
+function NotificationsCard({ uid, profile }: { uid: string; profile: UserDoc | null }) {
+  const [supported] = useState(() => isPushSupported());
+  const [permission, setPermission] = useState<NotificationPermission | null>(() =>
+    supported ? Notification.permission : null,
+  );
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!supported) return null;
+
+  const enabled = profile?.notificationsEnabled === true;
+  const blockedMessage =
+    permission === "denied"
+      ? "Notifications are blocked for this site — allow them in your browser's site settings to turn this on."
+      : null;
+
+  async function handleToggle() {
+    setBusy(true);
+    setError(null);
+    try {
+      if (enabled) {
+        await disableNotifications(uid);
+      } else {
+        await enableNotifications(uid);
+        setPermission(Notification.permission);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not update notifications.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="w-full max-w-sm rounded-2xl bg-paper border border-mist p-4 flex items-center gap-3">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-clay-50 text-clay-600">
+        <BellIcon className="h-4 w-4" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <h2 className="text-sm font-semibold text-ink">Daily reminders</h2>
+        <p className="text-xs text-stone">Today&apos;s verse and your streak, once a day</p>
+        {(error ?? blockedMessage) && <p className="text-xs text-clay-700 mt-1">{error ?? blockedMessage}</p>}
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={enabled}
+        aria-label="Daily reminders"
+        disabled={busy || permission === "denied"}
+        onClick={() => void handleToggle()}
+        className={`shrink-0 relative h-6 w-11 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+          enabled ? "bg-clay-600" : "bg-mist"
+        }`}
+      >
+        <span
+          className={`absolute top-0.5 h-5 w-5 rounded-full bg-paper transition-transform ${
+            enabled ? "translate-x-[22px]" : "translate-x-0.5"
+          }`}
+        />
+      </button>
     </div>
   );
 }
@@ -266,6 +342,8 @@ export function ProfilePage({
       </div>
 
       <PlanCard profile={profile} getIdToken={getIdToken} />
+
+      <NotificationsCard uid={uid} profile={profile} />
 
       <button
         type="button"

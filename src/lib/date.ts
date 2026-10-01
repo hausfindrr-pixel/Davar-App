@@ -8,6 +8,16 @@ export function dateKeyInTimeZone(date: Date, timeZone: string): string {
   }).format(date);
 }
 
+/** The local hour (0-23) for the given date in the given IANA time zone —
+ * used by the daily-notification cron to match its hourly run against
+ * each user's own morning, rather than firing at one fixed UTC hour for
+ * everyone (see src/app/api/cron/daily-notification/route.ts). */
+export function hourInTimeZone(date: Date, timeZone: string): number {
+  return Number(
+    new Intl.DateTimeFormat("en-US", { timeZone, hour: "numeric", hour12: false }).format(date),
+  ) % 24;
+}
+
 /** Shift a "YYYY-MM-DD" key by `days` (may be negative), calendar-wise. */
 export function addDaysToKey(key: string, days: number): string {
   const [year, month, day] = key.split("-").map(Number);

@@ -1,4 +1,13 @@
-import { doc, getDoc, onSnapshot, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
+import {
+  arrayRemove,
+  arrayUnion,
+  doc,
+  getDoc,
+  onSnapshot,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
+} from "firebase/firestore";
 import type { User } from "firebase/auth";
 import { db } from "@/lib/firebase";
 import { COLLECTIONS, type UserDoc } from "@/types/firestore";
@@ -82,4 +91,28 @@ export async function recordPremiumNudgeTapped(uid: string, date: string): Promi
  * read anywhere in the regular app UI. */
 export async function recordActivity(uid: string): Promise<void> {
   await updateDoc(doc(db!, COLLECTIONS.users, uid), { lastActiveAt: serverTimestamp() });
+}
+
+/** Turns the daily push notification on and registers this device's FCM
+ * token (arrayUnion — a no-op if this exact token is already saved, and
+ * additive across devices rather than overwriting another device's
+ * token). Called from src/lib/notifications.ts once getToken() actually
+ * succeeds — never with an empty token, since that's indistinguishable
+ * from "notifications are on but no device is registered". */
+export async function saveFcmToken(uid: string, token: string): Promise<void> {
+  await updateDoc(doc(db!, COLLECTIONS.users, uid), {
+    notificationsEnabled: true,
+    fcmTokens: arrayUnion(token),
+  });
+}
+
+/** Turns the daily push notification off for this account (all devices —
+ * there's no per-device setting, just per-device tokens) and removes
+ * this device's own token, same arrayRemove pattern the cron route uses
+ * to prune a token FCM reports as dead. */
+export async function disableNotifications(uid: string, token: string | null): Promise<void> {
+  await updateDoc(doc(db!, COLLECTIONS.users, uid), {
+    notificationsEnabled: false,
+    ...(token ? { fcmTokens: arrayRemove(token) } : {}),
+  });
 }

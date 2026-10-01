@@ -1,6 +1,7 @@
 import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
 import { getAuth, type Auth } from "firebase-admin/auth";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
+import { getMessaging, type Messaging } from "firebase-admin/messaging";
 
 /**
  * Turns whatever shape FIREBASE_PRIVATE_KEY ended up in after a paste into
@@ -107,4 +108,11 @@ export function adminDb(): Firestore {
 
 export function adminAuth(): Auth {
   return getAuth(adminApp());
+}
+
+/** Sends the daily push notification (src/app/api/cron/daily-notification)
+ * — same credential as adminDb()/adminAuth(), just a different Admin SDK
+ * namespace. */
+export function adminMessaging(): Messaging {
+  return getMessaging(adminApp());
 }

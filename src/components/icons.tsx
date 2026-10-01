@@ -353,6 +353,22 @@ export function ShareIcon({ className }: IconProps) {
   );
 }
 
+/** A bell — the daily push-notification setting on Profile. */
+export function BellIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className}>
+      <path
+        d="M6 10.5a6 6 0 0 1 12 0c0 3.2 1 4.8 1.6 5.5.4.5.1 1.2-.5 1.2H4.9c-.6 0-.9-.7-.5-1.2.6-.7 1.6-2.3 1.6-5.5Z"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M9.5 19.5a2.5 2.5 0 0 0 5 0" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 /** Android Chrome's overflow-menu glyph — three stacked dots — used only
  * in "open the menu, then Add to Home Screen / Install app" instructions. */
 export function MoreVerticalIcon({ className }: IconProps) {

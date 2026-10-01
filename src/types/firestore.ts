@@ -103,6 +103,35 @@ export interface UserDoc {
    * app UI.
    */
   lastActiveAt?: Timestamp;
+  /**
+   * Opted into the daily push notification (today's verse + streak — see
+   * src/app/api/cron/daily-notification/route.ts). Absent/false until the
+   * user explicitly enables it from Profile; unrestricted by the `users`
+   * update rule, same as displayName/avatarId.
+   */
+  notificationsEnabled?: boolean;
+  /**
+   * FCM registration tokens for this user's devices/browsers — a web push
+   * subscription can only be delivered to a token, not an email or uid.
+   * An array rather than one token since the same account can install the
+   * PWA on more than one device; each is added via arrayUnion when
+   * notifications are enabled on that device, and pruned (by the cron
+   * route, via the Admin SDK) the moment FCM reports it as no longer
+   * registered (uninstalled, permission revoked, etc.) — stale tokens
+   * aren't actively harmful, but there's no reason to keep sending to one
+   * FCM has already said is dead.
+   */
+  fcmTokens?: string[];
+  /**
+   * The last "YYYY-MM-DD" (in this user's own timezone) the daily
+   * notification was actually sent — written only by the cron route via
+   * the Admin SDK. The cron runs hourly and matches each user's local
+   * hour against a fixed target (see DAILY_NOTIFICATION_HOUR_LOCAL in the
+   * cron route), so this is what stops that same user from being sent a
+   * second notification within the same calendar day if an hourly run
+   * ever overlaps or re-fires.
+   */
+  lastDailyNotificationSentDate?: string | null;
 }
 
 /**

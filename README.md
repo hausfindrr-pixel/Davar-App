@@ -922,6 +922,124 @@ lives here now instead of the main header.
     so implying a renewal date would be a false claim. If neither field is
     set (a grant made before `planId` existed, or any other gap), it falls
     back to a plain "Premium member" — no invented date.
+- **Daily reminders.** A toggle (`NotificationsCard`, inside
+  `ProfilePage.tsx`) that opts into the daily push notification — see
+  "Daily push notifications" below. Renders nothing if this browser can't
+  do push at all (`isPushSupported`, `src/lib/notifications.ts`) rather
+  than offering a switch that can only ever fail; shows a disabled state
+  with an explanatory line if the browser itself has notifications
+  blocked for this site (`Notification.permission === "denied"`).
+
+## Daily push notifications
+
+Opt-in, once-a-day push notification with that day's verse and the
+user's current streak — reuses the exact same content and logic the app
+itself shows (`pickForDate`, `src/lib/dailyContent.ts`, and the live
+`streaks/{uid}` doc), not a separate duplicated rotation.
+
+- **Opting in.** `NotificationsCard` (Profile, above) calls
+  `enableNotifications(uid)` (`src/lib/notifications.ts`), which requests
+  browser notification permission, gets this device's FCM registration
+  token (`getToken`, `firebase/messaging`) via the service worker
+  next-pwa already registers, and saves that token to
+  `users/{uid}.fcmTokens` (`saveFcmToken`, `src/lib/db/users.ts`) —
+  additive (`arrayUnion`), so the same account can enable this on more
+  than one device. `users/{uid}.notificationsEnabled` is the on/off
+  switch the cron route (below) actually checks; neither field is
+  restricted by `firestore.rules`' `users` update rule (only
+  `tier`/`premiumSince`/`premiumUntil`/`planId`/`isAdmin` are locked), so
+  no rules change was needed for this feature.
+- **The service worker.** FCM delivery while the app isn't open needs a
+  service worker that imports `firebase/messaging/sw` and calls
+  `onBackgroundMessage`. Rather than register a second service worker
+  alongside next-pwa's own generated one (scope conflicts, double
+  registration churn), the messaging logic lives in `worker/index.ts`,
+  which next-pwa's `customWorkerSrc` option compiles separately and
+  `importScripts()`s into its own generated `public/sw.js` — one service
+  worker, Workbox's caching plus this app's messaging handler. It shows
+  the notification itself (`self.registration.showNotification`, not
+  FCM's own default display) and focuses/opens the app on click.
+  - **Firebase config inside the worker.** `worker/index.ts` is compiled
+    by next-pwa's own child webpack compiler, which (verified against its
+    source) does *not* get Next's usual `NEXT_PUBLIC_` env-var inlining —
+    only Next's main app bundle does. Fetching the config at runtime
+    instead isn't safe either: a service worker must register its `push`
+    listener synchronously while its script first evaluates, before any
+    `await` resolves, or it risks missing a push that arrives mid-load.
+    `next.config.ts` works around both: on every `next dev`/`next build`
+    start, it writes the Firebase web config straight from `process.env`
+    into a plain, gitignored module
+    (`worker/firebase-config.generated.ts`) that `worker/index.ts` just
+    imports like any other — no env inlining or runtime fetch involved.
+  - `worker/` is excluded from `tsconfig.json` and `eslint.config.mjs`:
+    it runs in a `ServiceWorkerGlobalScope`, not a window, and those
+    globals conflict with this program's `"dom"` lib (TypeScript doesn't
+    allow both `"dom"` and `"webworker"` libs in one program). next-pwa's
+    own compilation of the file (transpile-only, same as the rest of this
+    app) is unaffected — this only drops it from the standalone `tsc`
+    pass and from type-aware lint rules that need a project including the
+    file.
+- **The cron route**
+  (`src/app/api/cron/daily-notification/route.ts`), scheduled once a day
+  by Vercel Cron (`vercel.json`, `"0 13 * * *"`, 13:00 UTC). Queries
+  `users` where `notificationsEnabled == true` (a single equality filter
+  — no composite index, ever, same deliberate simplicity as
+  `expire-premium`'s `tier == "premium"` filter), then for each one not
+  already sent today (`lastDailyNotificationSentDate`, tracked per user
+  in their own timezone) builds the verse line
+  (`pickForDate` over the same `daily_verses` pool TodayTab reads from)
+  and, if they have one, a streak line, and sends a **data-only** FCM
+  message (no top-level `notification` field — the worker's
+  `onBackgroundMessage` is what displays it, so there's never a duplicate
+  from FCM's own default display) to every token on the account via
+  `sendEachForMulticast`. A token FCM reports as dead
+  (`messaging/registration-token-not-registered` or
+  `messaging/invalid-registration-token`) is pruned from `fcmTokens`
+  (`FieldValue.arrayRemove`) right then; any other send failure is left
+  alone to retry on the next scheduled send.
+  - **Not truly per-user local time — a Vercel Hobby-plan tradeoff.**
+    Every other "today" in this app (`dateKeyInTimeZone`, `pickForDate`)
+    is computed in each user's own timezone, and true "8am in each
+    user's own timezone" delivery is possible — `src/lib/date.ts`'s
+    `hourInTimeZone` exists for exactly that — but it needs this route to
+    run hourly so it can match each user's own local clock, and Vercel's
+    Hobby plan only allows a cron job to fire once a day (an hourly
+    schedule there would likely fail to deploy). This route instead fires
+    once daily at one fixed UTC time for everyone — not ideal (users land
+    across the full range of local hours depending on their timezone),
+    but it's the version that works regardless of plan. Upgrading to
+    Vercel Pro later is a two-line change, not a rewrite: set
+    `vercel.json`'s schedule to `"0 * * * *"` and skip any user whose
+    `hourInTimeZone(now, user.timezone ?? "UTC")` doesn't match the hour
+    you want.
+  - Reuses `CRON_SECRET` (see "Premium expiry" below) for the same
+    `Authorization: Bearer` check — no second secret needed.
+- **Setup: Cloud Messaging + the VAPID key.** In the Firebase console →
+  Project settings → Cloud Messaging, confirm the Cloud Messaging API
+  (V1) is enabled, then under "Web configuration" → "Web Push
+  certificates" → "Generate key pair". That key is
+  `NEXT_PUBLIC_FIREBASE_VAPID_KEY` — public by design (sent to every
+  browser that calls `getToken()`), hence the `NEXT_PUBLIC_` prefix,
+  unlike every other server-only credential in this README.
+
+**Environment variable:**
+
+| Variable | Used by | Notes |
+| --- | --- | --- |
+| `NEXT_PUBLIC_FIREBASE_VAPID_KEY` | `src/lib/notifications.ts` (client), `worker/index.ts` is unaffected (it doesn't need the VAPID key, only `getToken()` does) | From Firebase console → Project settings → Cloud Messaging → Web configuration → Web Push certificates → Generate key pair. `isPushSupported()` treats this as a hard requirement — the Daily reminders toggle hides itself entirely if it's unset. |
+
+**Not yet verified from this sandbox against a real device** — unlike
+`expire-premium`, there's no emulator for actually receiving a push
+notification. What *is* verified: `next build` finds and compiles
+`worker/index.ts` via next-pwa's `customWorkerSrc`, the real Firebase
+config values end up inlined as literals in the compiled
+`public/worker-*.js` (confirming the generated-config approach actually
+works, not just that it doesn't throw), `importScripts()` for it appears
+first in the generated `public/sw.js` (before Workbox's own setup, so
+its `push`/`notificationclick` listeners are registered in time), and
+`npm run lint`/`next build`'s TypeScript pass are both clean. Sending a
+real notification to a real device needs `NEXT_PUBLIC_FIREBASE_VAPID_KEY`
+filled in and a deploy — something only you can do from here.
 
 ## Matthew's Ledger (Archives)
 
@@ -1192,9 +1310,11 @@ Premium forever. Two pieces close that gap:
   days before `premiumUntil`, with a "Renew now" button that starts a
   fresh checkout for the same `planId` the user is already on (falling
   back to monthly if `planId` is unset — a legacy grant from before that
-  field existed). No push notification — that infrastructure doesn't
-  exist in this app; an in-app banner is what the feature request's
-  fallback option asked for when push isn't already set up.
+  field existed). Still just the in-app banner, not a push notification —
+  push infrastructure exists now (see "Daily push notifications" above),
+  but nothing wires the renewal reminder to it; the banner alone is what
+  the original feature request's fallback option asked for when push
+  wasn't already set up.
 - **`src/lib/premium.ts`** holds all three pieces of logic
   (`daysUntilExpiry`, `shouldShowRenewalReminder`, `isPremiumExpired`) as
   dependency-free pure functions — no Firestore import either way — so the
